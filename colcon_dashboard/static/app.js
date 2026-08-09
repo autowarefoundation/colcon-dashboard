@@ -1629,19 +1629,49 @@ function drawGantt() {
   }
   if (App.ganttFollow) wrap.scrollTop = wrap.scrollHeight;
 
-  svg.onclick = ev => {
-    const b = ev.target.closest('.gbar, .gname');
-    if (!b) return;
-    const name = b.dataset.name;
-    openPane(name);
-    if (App.view === 'gantt') setView('split');  // bring the graph in
-    zoomToPkg(name);
-  };
+  // clicks are handled in initGanttPan, resolved at press time: the live
+  // chart redraws every poll, and a mid-click redraw would eat the click
   svg.onpointermove = ev => {
     const b = ev.target.closest('.gbar, .gname');
     if (b) showNodeTooltip(b.dataset.name, ev); else hideTooltip();
   };
   svg.onpointerleave = hideTooltip;
+}
+
+function initGanttPan() {
+  // drag anywhere in the timeline to pan it, like the graph
+  const wrap = $('#ganttwrap');
+  let drag = null;
+  wrap.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0) return;
+    drag = { x: ev.clientX, y: ev.clientY,
+             sl: wrap.scrollLeft, st: wrap.scrollTop, moved: 0,
+             name: ev.target.closest?.('.gbar, .gname')?.dataset?.name
+                   || null };
+  });
+  wrap.addEventListener('pointermove', ev => {
+    if (!drag) return;
+    const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+    drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
+    if (drag.moved > 4) {
+      wrap.scrollLeft = drag.sl - dx;
+      wrap.scrollTop = drag.st - dy;
+      wrap.classList.add('panning');
+      wrap.setPointerCapture(ev.pointerId);
+    }
+  });
+  const end = ev => {
+    if (!drag) return;
+    if (drag.moved <= 4 && drag.name && ev.type === 'pointerup') {
+      openPane(drag.name);
+      if (App.view === 'gantt') setView('split');  // bring the graph in
+      zoomToPkg(drag.name);
+    }
+    drag = null;
+    wrap.classList.remove('panning');
+  };
+  wrap.addEventListener('pointerup', end);
+  wrap.addEventListener('pointercancel', end);
 }
 
 /* ---------------- log dock ---------------- */
@@ -2192,6 +2222,7 @@ function toast(html, cls = '', onclick = null, ttl = 9000) {
 
 function setView(v) {
   App.view = v;
+  localStorage.setItem('cmc-view', v);
   document.querySelectorAll('.vtab').forEach(x =>
     x.classList.toggle('on', x.dataset.view === v));
   const showGraph = v !== 'gantt';
@@ -2219,6 +2250,7 @@ function initViews() {
   for (const b of document.querySelectorAll('.vtab')) {
     b.onclick = () => setView(b.dataset.view);
   }
+  setView(localStorage.getItem('cmc-view') || 'split');
   $('#fitBtn').onclick = () => {
     breakFollow();
     App.layoutMode === '3d' ? fit3d() : fitGraph();
@@ -2590,6 +2622,7 @@ initStop();
 initWsPicker();
 initBuildPicker();
 initGraphSearch();
+initGanttPan();
 $('#sysBtn').onclick = () => document.body.classList.toggle('showsys');
 openPane(BUILD_PANE);  // the pinned whole-build terminal view
 pollState();

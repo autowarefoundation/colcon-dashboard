@@ -296,8 +296,11 @@ body.offline #sysmeters { display: none; }
 #graphwrap.mode3d svg { display: none; }
 #graphwrap.mode3d #graph3d { display: block; }
 #graph3d.panning { cursor: grabbing; }
-#ganttwrap { overflow: auto; }
+#ganttwrap { overflow: auto; cursor: grab; }
+#ganttwrap.panning { cursor: grabbing; }
+#ganttwrap.panning svg * { pointer-events: none; }  /* no hover flicker mid-drag */
 #ganttwrap svg { display: block; }
+#gantt .gbar { cursor: pointer; }
 
 /* side-by-side: timeline left, graph right, over a drag bar */
 #viz.split { display: flex; }
