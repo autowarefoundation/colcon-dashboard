@@ -1269,9 +1269,6 @@ class Registry:
         with self.lock:
             recents = [dict(r) for r in self.recents]
             monitors = dict(self.monitors)
-        # favorites first, then the most recently used
-        recents.sort(key=lambda r: (not r.get("fav"),
-                                    -(r.get("last_used") or 0)))
         out = []
         for r in recents:
             entry = {"path": r["path"], "last_used": r.get("last_used"),
@@ -1291,6 +1288,9 @@ class Registry:
                 except ValueError:
                     pass
             out.append(entry)
+        # building right now first, then favorites, then the recently used
+        out.sort(key=lambda e: (not e.get("active"), not e["fav"],
+                                -(e.get("last_used") or 0)))
         return {"workspaces": out}
 
 

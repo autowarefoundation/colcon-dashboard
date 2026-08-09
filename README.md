@@ -80,7 +80,7 @@ The server follows `log/latest_build`. If a new build starts in the same workspa
 
 The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The workspace path opens the workspace picker. The build id opens the build picker. The power button stops the server, after a confirmation. When the server stops answering, the whole top panel turns red.
 
-The workspace picker lists your recent workspaces with their build count, log size, and last build time, and shows live progress for workspaces that build now. A star pins a favorite to the top. The picker also opens any path and scans your home directory for colcon workspaces.
+The workspace picker lists your recent workspaces with their build count, log size, and last build time, and shows live progress for workspaces that build now. The list sorts by the last build time, and a workspace that builds now has the newest build, so it sits on top. A star pins a favorite, and a sort menu reorders the list by favorites, build count, or log size. The picker also opens any path and scans your home directory for colcon workspaces.
 
 The build picker lists every build of the workspace with its log size and its outcome: a passed, failed, or aborted chip, with the done, failed, aborted, and skipped package counts. The outcome comes from one pass over the build's `events.log`, cached in a small file inside the build folder. Open a build and the whole dashboard shows it, with the `build` query parameter in the address. The 🗑 buttons delete one build's logs, and a prune action keeps the last three. The server refuses to delete a build that runs now.
 

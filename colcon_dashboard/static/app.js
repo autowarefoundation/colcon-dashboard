@@ -2374,9 +2374,32 @@ function fmtBytes(n) {
   return n.toFixed(n >= 10 || i === 0 ? 0 : 1) + units[i];
 }
 
+const WS_SORTS = {
+  // a workspace building now has the newest build, so "last built"
+  // naturally keeps it on top; the active key covers stats-cache lag
+  built:     w => [!w.active, -(w.last_build || 0)],
+  favorites: w => [!w.fav, !w.active, -(w.last_used || 0)],
+  builds:    w => [-(w.builds || 0), !w.active],
+  logs:      w => [-(w.log_size || 0), !w.active],
+};
+
+function sortWs(items) {
+  const by = WS_SORTS[localStorage.getItem('cmc-wssort') || 'built']
+             || WS_SORTS.built;
+  return [...items].sort((a, b) => {
+    const ka = by(a), kb = by(b);
+    for (let i = 0; i < ka.length; i++) {
+      if (ka[i] < kb[i]) return -1;
+      if (ka[i] > kb[i]) return 1;
+    }
+    return 0;
+  });
+}
+
 function renderWsList(items) {
   const list = $('#wslist');
   list.innerHTML = '';
+  items = sortWs(items);
   if (!items.length) {
     list.innerHTML =
       '<div class="wsempty">No workspaces yet. Open a path below, or scan your home directory.</div>';
@@ -2427,6 +2450,13 @@ async function openWsPicker() {
 function initWsPicker() {
   $('#ws').title = 'switch workspace';
   $('#ws').onclick = openWsPicker;
+  const sortSel = $('#wssort');
+  const savedSort = localStorage.getItem('cmc-wssort');
+  sortSel.value = WS_SORTS[savedSort] ? savedSort : 'built';
+  sortSel.onchange = () => {
+    localStorage.setItem('cmc-wssort', sortSel.value);
+    renderWsList(wsItems);
+  };
   const overlay = $('#wspick');
   overlay.addEventListener('click', ev => {
     if (ev.target === overlay && WS) overlay.hidden = true;

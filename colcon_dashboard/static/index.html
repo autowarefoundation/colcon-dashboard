@@ -152,7 +152,14 @@
 
 <div id="wspick" hidden>
   <div class="cbox wsbox">
-    <div class="wshead">Workspaces</div>
+    <div class="wshead">Workspaces
+      <label class="wssort">sort <select id="wssort">
+        <option value="built">last built</option>
+        <option value="favorites">favorites</option>
+        <option value="builds">build count</option>
+        <option value="logs">log size</option>
+      </select></label>
+    </div>
     <div id="wslist"></div>
     <div class="wsadd">
       <input id="wsinput" type="text" placeholder="/path/to/workspace" spellcheck="false">
