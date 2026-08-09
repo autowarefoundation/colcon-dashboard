@@ -1123,49 +1123,61 @@ function setEdgeFlow(e, on) {
   }
 }
 
-let chainActive = null;
-let chainPending = null;
+/* Hover focus, split in two: the edge chain reacts instantly, like the
+   tooltip, while the node dim engages only after the pointer rests and
+   fades eased, so sweeping the mouse never strobes the whole graph. */
 
-function scheduleChain(name) {
-  // hover intent: only focus after the pointer rests on a node for a moment,
-  // so sweeping the mouse across the graph does not strobe the dimming
-  if (chainActive === name) {
-    clearTimeout(chainPending);
-    chainPending = null;
+let edgeFocus = null;
+let nodeFocus = null;
+let nodeFocusPending = null;
+let chainCache = { name: null, set: null };
+
+function chainSetFor(name) {
+  if (chainCache.name !== name) chainCache = { name, set: chainOf(name) };
+  return chainCache.set;
+}
+
+function hoverFocus(name) {
+  if (edgeFocus !== name) {  // edges: instant
+    edgeFocus = name;
+    const chain = chainSetFor(name);
+    $('#graph').classList.add('efocus');
+    for (const e of App.edgeList) {
+      const on = chain.has(e.a) && chain.has(e.b);
+      e.el.classList.toggle('hl', on);
+      if (e.flow) e.flow.classList.toggle('hl', on);
+    }
+  }
+  if (nodeFocus === name) {  // nodes: rest delay, then eased dim
+    clearTimeout(nodeFocusPending);
+    nodeFocusPending = null;
     return;
   }
-  clearTimeout(chainPending);
-  chainPending = setTimeout(() => {
-    chainPending = null;
-    highlightChain(name);
+  clearTimeout(nodeFocusPending);
+  nodeFocusPending = setTimeout(() => {
+    nodeFocusPending = null;
+    nodeFocus = name;
+    const chain = chainSetFor(name);
+    $('#graph').classList.add('nfocus');
+    for (const [n, g] of App.nodeEls) g.classList.toggle('hl', chain.has(n));
   }, 280);
 }
 
-function cancelChain() {
-  clearTimeout(chainPending);
-  chainPending = null;
-  clearChain();
-}
-function highlightChain(name) {
-  if (chainActive === name) return;
-  chainActive = name;
-  const chain = chainOf(name);
-  $('#graph').classList.add('focus');
-  for (const [n, g] of App.nodeEls) g.classList.toggle('hl', chain.has(n));
-  for (const e of App.edgeList) {
-    const on = chain.has(e.a) && chain.has(e.b);
-    e.el.classList.toggle('hl', on);
-    if (e.flow) e.flow.classList.toggle('hl', on);
+function clearFocus() {
+  clearTimeout(nodeFocusPending);
+  nodeFocusPending = null;
+  if (edgeFocus !== null) {
+    edgeFocus = null;
+    $('#graph').classList.remove('efocus');
+    for (const e of App.edgeList) {
+      e.el.classList.remove('hl');
+      if (e.flow) e.flow.classList.remove('hl');
+    }
   }
-}
-function clearChain() {
-  if (chainActive === null) return;
-  chainActive = null;
-  $('#graph').classList.remove('focus');
-  for (const [, g] of App.nodeEls) g.classList.remove('hl');
-  for (const e of App.edgeList) {
-    e.el.classList.remove('hl');
-    if (e.flow) e.flow.classList.remove('hl');
+  if (nodeFocus !== null) {
+    nodeFocus = null;
+    $('#graph').classList.remove('nfocus');
+    for (const [, g] of App.nodeEls) g.classList.remove('hl');
   }
 }
 
@@ -1202,7 +1214,7 @@ function initPanZoom() {
   svg.addEventListener('click', () => {
     if (moved <= 4 && downNode) openPane(downNode);
   });
-  svg.addEventListener('pointerleave', () => { hideTooltip(); cancelChain(); });
+  svg.addEventListener('pointerleave', () => { hideTooltip(); clearFocus(); });
   svg.addEventListener('wheel', ev => {
     ev.preventDefault();
     if (!App.vb) return;
@@ -1257,8 +1269,8 @@ function initPanZoom() {
       return;
     }
     const g = ev.target.closest('.node');
-    if (g) { showNodeTooltip(g.dataset.name, ev); scheduleChain(g.dataset.name); }
-    else { hideTooltip(); cancelChain(); }
+    if (g) { showNodeTooltip(g.dataset.name, ev); hoverFocus(g.dataset.name); }
+    else { hideTooltip(); clearFocus(); }
   });
   const end = () => {
     if (Force.dragging) { Force.dragging.fx = Force.dragging.fy = null; Force.dragging = null; }

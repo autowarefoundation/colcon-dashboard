@@ -237,11 +237,11 @@ button.on { color: var(--accent); border-color: var(--accent); }
 
 /* graph nodes */
 .edge { fill: none; stroke: var(--grid); stroke-width: 1; }
-.node, .pktg { transition: opacity 0.4s ease; }
-svg.focus .edge { stroke-opacity: 0.15; }
-svg.focus .edge.hl { stroke: var(--accent); stroke-width: 1.6; stroke-opacity: 1; }
+.node { transition: opacity 0.4s ease; }
+svg.efocus .edge { stroke-opacity: 0.15; }
+svg.efocus .edge.hl { stroke: var(--accent); stroke-width: 1.6; stroke-opacity: 1; }
 .node { cursor: pointer; }
-svg.focus .node:not(.hl) { opacity: 0.14; }
+svg.nfocus .node:not(.hl) { opacity: 0.14; }
 .node rect.box {
   fill: var(--surface);
   stroke: var(--baseline);
@@ -305,7 +305,7 @@ svg.focus .node:not(.hl) { opacity: 0.14; }
 .edge.edone { stroke: var(--good); stroke-opacity: 0.3; }
 @keyframes edgebreathe { 50% { stroke-opacity: 0.25; } }
 .pkt { fill: var(--accent); opacity: 0.85; }
-svg.focus .pktg:not(.hl) { opacity: 0.08; }
+svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 @keyframes waitpulse { 50% { stroke-opacity: 0.25; } }
 @keyframes flowdash { to { stroke-dashoffset: -24; } }
 .node.doomed rect.box {
