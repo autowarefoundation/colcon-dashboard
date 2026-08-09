@@ -1372,8 +1372,11 @@ function stepGraphSearch(dir) {
 
 function initGraphSearch() {
   const input = $('#gsearch');
+  const clear = $('#gsclear');
+  const sync = () => { clear.hidden = !input.value; };
   let timer = null;
   input.oninput = () => {
+    sync();
     clearTimeout(timer);
     timer = setTimeout(runGraphSearch, 200);
   };
@@ -1383,9 +1386,15 @@ function initGraphSearch() {
       stepGraphSearch(ev.shiftKey ? -1 : 1);
     } else if (ev.key === 'Escape') {
       input.value = '';
+      sync();
       runGraphSearch();
       input.blur();
     }
+  };
+  clear.onclick = () => {
+    input.value = '';
+    sync();
+    runGraphSearch();
   };
 }
 function initPanZoom() {
@@ -1607,7 +1616,7 @@ function createPane(name) {
       <span class="errn"></span>
       ${fixed || ai ? '' : `<button class="askai" hidden title="explain this failure with the claude CLI">✦ ask claude</button>`}
       <span class="grow"></span>
-      <input class="search" type="text" placeholder="search" spellcheck="false">
+      <span class="searchwrap"><input class="search" type="text" placeholder="search" spellcheck="false"><button class="sclear" hidden title="clear the search">✕</button></span>
       <span class="scount"></span>
       <button class="sprev" title="previous match">↑</button>
       <button class="snext" title="next match">↓</button>
@@ -1701,8 +1710,11 @@ function updateEarlierBtn(p) {
 
 function initSearch(p) {
   const input = p.el.querySelector('.search');
+  const clear = p.el.querySelector('.sclear');
+  const sync = () => { clear.hidden = !input.value; };
   let timer = null;
   input.oninput = () => {
+    sync();
     clearTimeout(timer);
     timer = setTimeout(() => runSearch(p), 250);
   };
@@ -1712,9 +1724,15 @@ function initSearch(p) {
       stepHit(p, ev.shiftKey ? -1 : 1);
     } else if (ev.key === 'Escape') {
       input.value = '';
+      sync();
       runSearch(p);
       input.blur();
     }
+  };
+  clear.onclick = () => {
+    input.value = '';
+    sync();
+    runSearch(p);
   };
   p.el.querySelector('.sprev').onclick = () => stepHit(p, -1);
   p.el.querySelector('.snext').onclick = () => stepHit(p, 1);

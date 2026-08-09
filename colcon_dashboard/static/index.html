@@ -99,8 +99,11 @@
   </select></label>
   <button id="scopeBtn" title="toggle between this build's packages and the whole workspace">This build</button>
   <button id="gfollowBtn" class="on" style="display:none" title="auto-scroll to the newest packages as they start">⤓ follow new</button>
-  <input id="gsearch" type="text" placeholder="find package" spellcheck="false"
-         title="highlight matching packages; Enter jumps through them">
+  <span class="searchwrap">
+    <input id="gsearch" type="text" placeholder="find package" spellcheck="false"
+           title="highlight matching packages; Enter jumps through them">
+    <button id="gsclear" class="sclear" hidden title="clear the search">✕</button>
+  </span>
   <span id="gscount"></span>
   <span class="hint" id="prefixHint"></span>
 </nav>

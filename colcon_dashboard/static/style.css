@@ -536,6 +536,19 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 }
 #gsearch:focus { outline: none; border-color: var(--accent); }
 #gscount { font-size: 10.5px; color: var(--muted); min-width: 40px; }
+.searchwrap { position: relative; display: inline-flex; align-items: center; }
+.searchwrap input { padding-right: 22px; }
+.searchwrap .sclear {
+  position: absolute;
+  right: 3px;
+  border: none;
+  background: none;
+  padding: 0 4px;
+  font-size: 10px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.searchwrap .sclear:hover { color: var(--critical); }
 #graph.searching .node:not(.smatch) { opacity: 0.15; }
 #graph.searching .edge { opacity: 0.12; }
 .node.smatch .box { stroke: var(--accent); stroke-width: 2.5; }
