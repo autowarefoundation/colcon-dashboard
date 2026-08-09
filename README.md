@@ -6,21 +6,21 @@ The server is one Python file. It uses only the standard library. It works on an
 
 ## Install
 
-Install with pip, into the same Python that runs colcon:
+The package has two parts: the `colcon-mission-control` command, and a colcon plugin that starts the dashboard on every `colcon build`.
+
+For the command, install with pipx:
 
 ```bash
-pip install colcon-mission-control
+pipx install colcon-mission-control
 ```
 
-On Ubuntu with the apt colcon, pip refuses to touch the system Python. Install into your user site instead:
+The plugin loads only when the package is in the same Python environment as colcon itself:
 
-```bash
-python3 -m pip install --user --break-system-packages colcon-mission-control
-```
+- colcon in a virtualenv or a conda environment: `pip install colcon-mission-control` in that environment.
+- colcon installed with pipx: `pipx inject colcon-common-extensions colcon-mission-control`.
+- colcon from apt: the system Python is guarded, so skip the plugin. Install with pipx and start the dashboard yourself: `colcon-mission-control <workspace>`.
 
 To install from a checkout, replace the package name with the path to this repository.
-
-The install registers a colcon plugin and the `colcon-mission-control` command.
 
 ## Quick start
 
