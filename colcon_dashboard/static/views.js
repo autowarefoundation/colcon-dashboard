@@ -1,0 +1,140 @@
+import { breakFollow, fitGraph, frontierView } from './camera.js';
+import { applySpread, Force, setLayoutMode, startForce, stopForce, updateForceCtl } from './force.js';
+import { enter3d, exit3d, fit3d, frontier3d, G3 } from './g3d.js';
+import { drawGantt } from './gantt.js';
+import { buildGraphView } from './graph.js';
+import { App } from './state.js';
+import { $ } from './util.js';
+
+/* ---------------- view switching, dock resize ---------------- */
+
+export function setView(v) {
+  App.view = v;
+  localStorage.setItem('cmc-view', v);
+  document.querySelectorAll('.vtab').forEach(x =>
+    x.classList.toggle('on', x.dataset.view === v));
+  const showGraph = v !== 'gantt';
+  const showGantt = v !== 'graph';
+  $('#graphwrap').hidden = !showGraph;
+  $('#ganttwrap').hidden = !showGantt;
+  $('#vsplit').hidden = v !== 'split';
+  $('#viz').classList.toggle('split', v === 'split');
+  $('#fitBtn').style.display = showGraph ? '' : 'none';
+  $('#followBuildBtn').style.display = showGraph ? '' : 'none';
+  $('#scopeCtl').style.display = showGraph ? '' : 'none';
+  $('#layoutSel').style.display = showGraph ? '' : 'none';
+  document.querySelectorAll('.vsep.gonly')
+    .forEach(x => x.style.display = showGraph ? '' : 'none');
+  document.querySelectorAll('.vsep.bothonly')  // between the two control groups
+    .forEach(x => x.style.display = v === 'split' ? '' : 'none');
+  $('#gfollowBtn').style.display = showGantt ? '' : 'none';
+  $('#gsortSel').style.display = showGantt ? '' : 'none';
+  updateForceCtl();
+  dispatchEvent(new Event('resize'));  // both panels take their new sizes
+  if (showGantt) drawGantt();
+  if (!showGraph) { stopForce(); exit3d(); }
+  else if (App.layoutMode === 'force' && !Force.raf) startForce(0.15);
+  else if (App.layoutMode === '3d' && !G3.raf) enter3d(0.15, true);
+}
+
+export function initViews() {
+  for (const b of document.querySelectorAll('.vtab')) {
+    b.onclick = () => setView(b.dataset.view);
+  }
+  setView(localStorage.getItem('cmc-view') || 'split');
+  $('#fitBtn').onclick = () => {
+    breakFollow();
+    App.layoutMode === '3d' ? fit3d() : fitGraph();
+  };
+  const fb = $('#followBuildBtn');
+  fb.onclick = () => {
+    App.followBuild = !App.followBuild;
+    fb.classList.toggle('on', App.followBuild);
+    if (App.followBuild)
+      App.layoutMode === '3d' ? frontier3d() : frontierView();
+  };
+  $('#layoutSelect').value = App.layoutMode;
+  $('#graphwrap').classList.toggle('mode3d', App.layoutMode === '3d');
+  const slider = $('#spreadSlider');
+  slider.value = localStorage.getItem('cmc-spread') || '1';
+  applySpread(parseFloat(slider.value), false);
+  slider.oninput = () => {
+    localStorage.setItem('cmc-spread', slider.value);
+    applySpread(parseFloat(slider.value));
+  };
+  updateForceCtl();
+  $('#layoutSelect').onchange = ev => setLayoutMode(ev.target.value);
+  App.ganttSort = localStorage.getItem('cmc-gsort') || 'start';
+  const gsort = $('#gsortSelect');
+  gsort.value = App.ganttSort;
+  gsort.onchange = () => {
+    App.ganttSort = gsort.value;
+    localStorage.setItem('cmc-gsort', gsort.value);
+    drawGantt();
+  };
+  const gf = $('#gfollowBtn');
+  const gwrap = $('#ganttwrap');
+  gf.onclick = () => {
+    App.ganttFollow = !App.ganttFollow;
+    gf.classList.toggle('on', App.ganttFollow);
+    if (App.ganttFollow) gwrap.scrollTop = gwrap.scrollHeight;
+  };
+  gwrap.addEventListener('scroll', () => {
+    const atEnd = gwrap.scrollTop + gwrap.clientHeight >= gwrap.scrollHeight - 30;
+    if (App.ganttFollow !== atEnd) {
+      App.ganttFollow = atEnd;
+      gf.classList.toggle('on', atEnd);
+    }
+  });
+  const setScope = scope => {
+    if (App.scope === scope) return;
+    App.scope = scope;
+    $('#scopeBuild').classList.toggle('on', scope === 'build');
+    $('#scopeAll').classList.toggle('on', scope === 'all');
+    App.vb = null;  // refit to the new extent
+    buildGraphView();
+  };
+  $('#scopeBuild').onclick = () => setScope('build');
+  $('#scopeAll').onclick = () => setScope('all');
+
+  const vs = $('#vsplit');
+  const viz = $('#viz');
+  const savedSplit = localStorage.getItem('cmc-split');
+  if (savedSplit) viz.style.setProperty('--split-w', savedSplit);
+  vs.addEventListener('pointerdown', ev => {
+    ev.preventDefault();
+    const move = e => {
+      const r = viz.getBoundingClientRect();
+      const pct = Math.min(85, Math.max(15,
+        (e.clientX - r.left) / r.width * 100));
+      viz.style.setProperty('--split-w', pct.toFixed(1) + '%');
+      dispatchEvent(new Event('resize'));
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      localStorage.setItem('cmc-split',
+        viz.style.getPropertyValue('--split-w'));
+      drawGantt();
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+  });
+
+  const bar = $('#dockbar');
+  bar.addEventListener('pointerdown', ev => {
+    ev.preventDefault();
+    const startY = ev.clientY;
+    const startH = $('#dock').getBoundingClientRect().height;
+    const move = e => {
+      const h = Math.min(innerHeight * 0.75, Math.max(90, startH + (startY - e.clientY)));
+      document.documentElement.style.setProperty('--dock-h', h + 'px');
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+  });
+}
