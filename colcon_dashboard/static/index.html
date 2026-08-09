@@ -90,6 +90,7 @@
 <nav id="viewbar">
   <button class="vtab on" data-view="graph">Dependency graph</button>
   <button class="vtab" data-view="gantt">Timeline</button>
+  <button class="vtab" data-view="split">Side by side</button>
   <span class="vsep gonly"></span>
   <button id="fitBtn" title="frame the whole graph">Fit</button>
   <button id="followBuildBtn" title="keep the camera on the packages that build now; pan or zoom to release">⌖ follow build</button>
@@ -117,6 +118,7 @@
 
 <main id="viz">
   <div id="graphwrap"><svg id="graph"></svg><canvas id="graph3d"></canvas></div>
+  <div id="vsplit" hidden title="drag to resize"></div>
   <div id="ganttwrap" hidden><svg id="gantt"></svg></div>
   <div id="tooltip" hidden></div>
   <div id="forceCtl" hidden title="how far the simulation spreads the nodes">

@@ -299,6 +299,18 @@ body.offline #sysmeters { display: none; }
 #ganttwrap { overflow: auto; }
 #ganttwrap svg { display: block; }
 
+/* side-by-side: timeline left, graph right, over a drag bar */
+#viz.split { display: flex; }
+#viz.split #graphwrap, #viz.split #ganttwrap { position: relative; inset: auto; min-width: 0; }
+#viz.split #ganttwrap { order: 0; flex: 0 0 var(--split-w, 42%); }
+#viz.split #vsplit { order: 1; }
+#viz.split #graphwrap { order: 2; flex: 1; }
+#vsplit { flex: none; width: 6px; cursor: col-resize; background: var(--border); }
+#vsplit:hover { background: var(--accent); }
+#vsplit[hidden] { display: none; }
+#gantt .gname { cursor: pointer; }
+#gantt .gname:hover { fill: var(--accent); }
+
 /* graph nodes */
 .edge { fill: none; stroke: var(--grid); stroke-width: 1; }
 .node { transition: opacity 0.4s ease; }

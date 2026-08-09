@@ -145,6 +145,10 @@ A Gantt chart of every started package, sorted by start time, with a time axis a
 
 The chart makes the parallelism and the long serial chains visible. It auto-scrolls to the newest bars as they start. Scroll up to release, or use the **⤓ follow new** toggle.
 
+Click a bar or a package name and its log pane opens while the graph flies to that package. From the pure timeline this switches to the side-by-side view, so the graph comes in without losing the timeline.
+
+**Side by side** shows the graph and the timeline together, over a drag bar. The split ratio persists.
+
 ### Log panes
 
 The dock opens with a pinned **build log** tab: the whole build, as a terminal shows it, with `Starting >>>` and `Finished <<<` lines between every package's output. Click any package in the graph or the timeline to open its own tab next to it. Each tab has its own scrollback, so logs never interleave.

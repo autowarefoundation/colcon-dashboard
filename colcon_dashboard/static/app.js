@@ -141,7 +141,7 @@ async function pollState() {
   App.elapsedBase = s.elapsed;
   App.elapsedAt = Date.now();
   applyState(s);
-  if (App.followBuild && App.active && App.view === 'graph') {
+  if (App.followBuild && App.active && App.view !== 'gantt') {
     App.layoutMode === '3d' ? frontier3d() : frontierView();
   }
   // jobs can register moments after the graph was fetched
@@ -266,7 +266,7 @@ function applyState(s) {
   updateNodes();
   if (App.layoutMode === '3d') update3dPlanes();
   updatePaneHeads();
-  if (App.view === 'gantt' && (App.pollTick++ % 2 === 0)) drawGantt();
+  if (App.view !== 'graph' && (App.pollTick++ % 2 === 0)) drawGantt();
 
   for (const [name, p] of Object.entries(App.pkgs)) {
     if (p.s === 'failed' && !App.failedSeen.has(name)) {
@@ -798,7 +798,7 @@ function svgCoords(ev) {
 
 function updateForceCtl() {
   $('#forceCtl').hidden =
-    !(App.view === 'graph' && App.layoutMode !== 'layered');
+    !(App.view !== 'gantt' && App.layoutMode !== 'layered');
 }
 
 function setLayoutMode(mode) {
@@ -875,7 +875,7 @@ function enter3d(alpha = 1, keep = false) {
   startForce(alpha, true, keep);
   if (!keep) fit3d();
   if (!G3.bound) bind3d();
-  if (!G3.raf && App.view === 'graph') {
+  if (!G3.raf && App.view !== 'gantt') {
     G3.lastT = performance.now();
     G3.raf = requestAnimationFrame(loop3d);
   }
@@ -952,7 +952,7 @@ function stepParticles3d(dt) {
 
 function loop3d(now) {
   G3.raf = null;
-  if (App.layoutMode !== '3d' || App.view !== 'graph') return;
+  if (App.layoutMode !== '3d' || App.view === 'gantt') return;
   const dt = Math.min(0.1, (now - G3.lastT) / 1000 || 0.016);
   G3.lastT = now;
   if (Force.alpha > 0.004) {
@@ -1612,6 +1612,7 @@ function drawGantt() {
       x: GUT - 8, y: y + 11, 'text-anchor': 'end',
     }, svg);
     tn.textContent = label(name);
+    tn.dataset.name = name;
     const end = p.t1 || (App.active ? nowS : p.t0 + 1);
     const bar = svgEl('rect', {
       class: 'gbar ' + p.s,
@@ -1629,11 +1630,15 @@ function drawGantt() {
   if (App.ganttFollow) wrap.scrollTop = wrap.scrollHeight;
 
   svg.onclick = ev => {
-    const b = ev.target.closest('.gbar');
-    if (b) openPane(b.dataset.name);
+    const b = ev.target.closest('.gbar, .gname');
+    if (!b) return;
+    const name = b.dataset.name;
+    openPane(name);
+    if (App.view === 'gantt') setView('split');  // bring the graph in
+    zoomToPkg(name);
   };
   svg.onpointermove = ev => {
-    const b = ev.target.closest('.gbar');
+    const b = ev.target.closest('.gbar, .gname');
     if (b) showNodeTooltip(b.dataset.name, ev); else hideTooltip();
   };
   svg.onpointerleave = hideTooltip;
@@ -2185,26 +2190,34 @@ function toast(html, cls = '', onclick = null, ttl = 9000) {
 
 /* ---------------- view switching, dock resize ---------------- */
 
+function setView(v) {
+  App.view = v;
+  document.querySelectorAll('.vtab').forEach(x =>
+    x.classList.toggle('on', x.dataset.view === v));
+  const showGraph = v !== 'gantt';
+  const showGantt = v !== 'graph';
+  $('#graphwrap').hidden = !showGraph;
+  $('#ganttwrap').hidden = !showGantt;
+  $('#vsplit').hidden = v !== 'split';
+  $('#viz').classList.toggle('split', v === 'split');
+  $('#fitBtn').style.display = showGraph ? '' : 'none';
+  $('#followBuildBtn').style.display = showGraph ? '' : 'none';
+  $('#scopeCtl').style.display = showGraph ? '' : 'none';
+  $('#layoutSel').style.display = showGraph ? '' : 'none';
+  document.querySelectorAll('.vsep.gonly')
+    .forEach(x => x.style.display = showGraph ? '' : 'none');
+  $('#gfollowBtn').style.display = showGantt ? '' : 'none';
+  updateForceCtl();
+  dispatchEvent(new Event('resize'));  // both panels take their new sizes
+  if (showGantt) drawGantt();
+  if (!showGraph) { stopForce(); exit3d(); }
+  else if (App.layoutMode === 'force' && !Force.raf) startForce(0.15);
+  else if (App.layoutMode === '3d' && !G3.raf) enter3d(0.15, true);
+}
+
 function initViews() {
   for (const b of document.querySelectorAll('.vtab')) {
-    b.onclick = () => {
-      App.view = b.dataset.view;
-      document.querySelectorAll('.vtab').forEach(x => x.classList.toggle('on', x === b));
-      $('#graphwrap').hidden = App.view !== 'graph';
-      $('#ganttwrap').hidden = App.view !== 'gantt';
-      const graphBtns = App.view === 'graph';
-      $('#fitBtn').style.display = graphBtns ? '' : 'none';
-      $('#followBuildBtn').style.display = graphBtns ? '' : 'none';
-      $('#scopeCtl').style.display = graphBtns ? '' : 'none';
-      $('#layoutSel').style.display = graphBtns ? '' : 'none';
-      document.querySelectorAll('.vsep.gonly')
-        .forEach(x => x.style.display = graphBtns ? '' : 'none');
-      $('#gfollowBtn').style.display = App.view === 'gantt' ? '' : 'none';
-      updateForceCtl();
-      if (App.view === 'gantt') { stopForce(); exit3d(); drawGantt(); }
-      else if (App.layoutMode === 'force' && !Force.raf) startForce(0.15);
-      else if (App.layoutMode === '3d' && !G3.raf) enter3d(0.15, true);
-    };
+    b.onclick = () => setView(b.dataset.view);
   }
   $('#fitBtn').onclick = () => {
     breakFollow();
@@ -2252,6 +2265,30 @@ function initViews() {
   };
   $('#scopeBuild').onclick = () => setScope('build');
   $('#scopeAll').onclick = () => setScope('all');
+
+  const vs = $('#vsplit');
+  const viz = $('#viz');
+  const savedSplit = localStorage.getItem('cmc-split');
+  if (savedSplit) viz.style.setProperty('--split-w', savedSplit);
+  vs.addEventListener('pointerdown', ev => {
+    ev.preventDefault();
+    const move = e => {
+      const r = viz.getBoundingClientRect();
+      const pct = Math.min(85, Math.max(15,
+        (e.clientX - r.left) / r.width * 100));
+      viz.style.setProperty('--split-w', pct.toFixed(1) + '%');
+      dispatchEvent(new Event('resize'));
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      localStorage.setItem('cmc-split',
+        viz.style.getPropertyValue('--split-w'));
+      drawGantt();
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+  });
 
   const bar = $('#dockbar');
   bar.addEventListener('pointerdown', ev => {
