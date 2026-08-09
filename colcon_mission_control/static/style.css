@@ -438,6 +438,22 @@ svg.focus .pktg:not(.hl) { opacity: 0.08; }
 .pane pre .l-warn { color: color-mix(in srgb, var(--warning) 70%, var(--ink)); }
 .pane pre .ts { color: var(--muted); }
 .pane pre:not(.showts) .ts { display: none; }
+.pane .phead .search {
+  font: 11px var(--mono);
+  color: var(--ink);
+  background: var(--page);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  width: 150px;
+}
+.pane .phead .search:focus { outline: none; border-color: var(--accent); }
+.pane .phead .scount { font-size: 10.5px; color: var(--muted); min-width: 34px; text-align: center; }
+.pane pre .hit { background: color-mix(in srgb, var(--warning) 20%, transparent); }
+.pane pre .hit-cur {
+  background: color-mix(in srgb, var(--warning) 45%, transparent);
+  outline: 1px solid var(--warning);
+}
 
 /* terminal palette for ANSI-colored log output (theme-tuned) */
 :root {

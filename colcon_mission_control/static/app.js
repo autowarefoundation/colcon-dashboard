@@ -1372,6 +1372,10 @@ function createPane(name) {
       <span class="ph"></span>
       <span class="errn"></span>
       <span class="grow"></span>
+      <input class="search" type="text" placeholder="search" spellcheck="false">
+      <span class="scount"></span>
+      <button class="sprev" title="previous match">↑</button>
+      <button class="snext" title="next match">↓</button>
       ${fixed ? '' : `<label>file <select class="fsel">
         <option value="combined">stdout+stderr</option>
         <option value="stderr">stderr</option>
@@ -1400,6 +1404,7 @@ function createPane(name) {
     tsBtn.classList.toggle('on', on);
     if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
   };
+  initSearch(p);
   pane.querySelector('.fsel')?.addEventListener('change', ev => {
     p.file = ev.target.value;
     resetPane(p);
@@ -1434,6 +1439,88 @@ function resetPane(p) {
 
 function updateEarlierBtn(p) {
   p.earlierBtn.style.display = p.start > 0 ? '' : 'none';
+}
+
+/* ---- per-pane log search ---- */
+
+function initSearch(p) {
+  const input = p.el.querySelector('.search');
+  let timer = null;
+  input.oninput = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => runSearch(p), 250);
+  };
+  input.onkeydown = ev => {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      stepHit(p, ev.shiftKey ? -1 : 1);
+    } else if (ev.key === 'Escape') {
+      input.value = '';
+      runSearch(p);
+      input.blur();
+    }
+  };
+  p.el.querySelector('.sprev').onclick = () => stepHit(p, -1);
+  p.el.querySelector('.snext').onclick = () => stepHit(p, 1);
+}
+
+function markHit(p, node) {
+  if (node.nodeType === 3) {  // bare text line: wrap it so it can carry a class
+    const s = document.createElement('span');
+    node.replaceWith(s);
+    s.appendChild(node);
+    node = s;
+  }
+  node.classList.add('hit');
+  p.hits.push(node);
+  return node;
+}
+
+function runSearch(p) {
+  const q = p.el.querySelector('.search').value.toLowerCase();
+  for (const el of p.hits || []) el.classList.remove('hit', 'hit-cur');
+  p.query = q || null;
+  p.hits = [];
+  p.hitIdx = -1;
+  if (q) {
+    for (const node of [...p.pre.childNodes]) {
+      if (node.classList?.contains('ts')) continue;
+      if (node.textContent.toLowerCase().includes(q)) markHit(p, node);
+    }
+    if (p.hits.length) {
+      p.hitIdx = p.hits.length - 1;  // start at the most recent match
+      focusHit(p);
+    }
+  }
+  updateSearchCount(p);
+}
+
+function focusHit(p) {
+  p.hits.forEach((h, i) => h.classList.toggle('hit-cur', i === p.hitIdx));
+  const cur = p.hits[p.hitIdx];
+  if (cur) {
+    if (p.follow) {
+      p.follow = false;
+      p.el.querySelector('.follow').classList.remove('on');
+    }
+    cur.scrollIntoView({ block: 'center' });
+  }
+}
+
+function stepHit(p, dir) {
+  if (p.hits?.length) {
+    p.hits = p.hits.filter(h => h.isConnected);  // drop trimmed lines
+    if (p.hitIdx >= p.hits.length) p.hitIdx = p.hits.length - 1;
+  }
+  if (!p.hits?.length) return;
+  p.hitIdx = (p.hitIdx + dir + p.hits.length) % p.hits.length;
+  focusHit(p);
+  updateSearchCount(p);
+}
+
+function updateSearchCount(p) {
+  p.el.querySelector('.scount').textContent =
+    p.query ? `${p.hits.length ? p.hitIdx + 1 : 0}/${p.hits.length}` : '';
 }
 
 async function loadEarlier(p) {
@@ -1646,7 +1733,17 @@ function appendLog(p, data) {
   const frag = document.createDocumentFragment();
   for (const line of lines) renderLogLine(p, line, frag);
   p.lines += lines.length;
+  const firstNew = p.pre.childNodes.length;
   p.pre.appendChild(frag);
+  if (p.query) {  // keep the search live as the log streams
+    const nodes = p.pre.childNodes;
+    for (let i = firstNew; i < nodes.length; i++) {
+      const node = nodes[i];
+      if (node.classList?.contains('ts')) continue;
+      if (node.textContent.toLowerCase().includes(p.query)) markHit(p, node);
+    }
+    updateSearchCount(p);
+  }
   while (!p.noTrim && p.lines > 6000 && p.pre.firstChild) {
     p.pre.removeChild(p.pre.firstChild);
     p.lines--;
