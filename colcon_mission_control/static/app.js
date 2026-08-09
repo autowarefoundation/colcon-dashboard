@@ -1294,17 +1294,6 @@ function showNodeTooltip(name, ev) {
   tip.innerHTML = `<div class="tname">${name}</div>` +
     rows.map(r => `<div class="trow">${r}</div>`).join('');
   tip.hidden = false;
-  positionTooltip(ev);
-}
-function positionTooltip(ev) {
-  const tip = $('#tooltip');
-  const pad = 14;
-  let x = ev.clientX + pad, y = ev.clientY + pad;
-  const r = tip.getBoundingClientRect();
-  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - pad;
-  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - pad;
-  tip.style.left = x + 'px';
-  tip.style.top = y + 'px';
 }
 function hideTooltip() { $('#tooltip').hidden = true; }
 

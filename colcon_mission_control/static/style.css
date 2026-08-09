@@ -333,7 +333,9 @@ svg.focus .pktg:not(.hl) { opacity: 0.08; }
 
 /* tooltip */
 #tooltip {
-  position: fixed;
+  position: absolute;
+  top: 12px;
+  right: 12px;
   z-index: 30;
   max-width: 380px;
   overflow-wrap: anywhere;
