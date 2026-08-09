@@ -1379,12 +1379,12 @@ function createPane(name) {
         <option value="command">commands</option>
         <option value="streams">streams (timestamps)</option>
       </select></label>`}
-      <button class="tsbtn" title="show or hide timestamps">🕒 ts</button>
+      <button class="tsbtn on" title="show or hide timestamps">🕒 ts</button>
       <button class="earlier" style="display:none" title="load the whole log from the start">⤒ load all</button>
       <button class="follow on" title="auto-scroll to the end">⤓ follow</button>
       ${fixed ? '' : `<button class="close" title="close pane">✕</button>`}
     </div>
-    <pre tabindex="0"></pre>`;
+    <pre tabindex="0" class="showts"></pre>`;
   $('#panes').appendChild(pane);
 
   const p = {
