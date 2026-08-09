@@ -543,6 +543,17 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   outline: 1px solid var(--warning);
 }
 
+/* ambient halos behind building packages */
+#graph .gs0 { stop-color: var(--accent); stop-opacity: 0.30; }
+#graph .gs1 { stop-color: var(--accent); stop-opacity: 0.10; }
+#graph .gs2 { stop-color: var(--accent); stop-opacity: 0; }
+#graph .glow { animation: glowbreath 2.6s ease-in-out infinite; }
+@keyframes glowbreath {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+#graph.searching #glowlayer { opacity: 0.15; }
+
 /* graph search: matches keep their color, the rest fades */
 #gsearch {
   font: 11px var(--mono);

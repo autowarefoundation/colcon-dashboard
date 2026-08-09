@@ -104,7 +104,7 @@ Every package in the build, laid out left to right by dependency depth. An edge 
 Node states combine color, border, and motion:
 
 - **Done**: a green wash.
-- **Building**: a blue box that slowly breathes, each node in its own rhythm. The box fills left to right with a deeper blue as make reports `[ 42%]` progress, and the label stays legible on top.
+- **Building**: a blue box that slowly breathes, each node in its own rhythm. The box fills left to right with a deeper blue as make reports `[ 42%]` progress, and the label stays legible on top. A faint halo glows behind the node on the backmost layer, so the active zone shows even from far out.
 - **Ready**: a dashed blue border. All dependencies are done, and the package starts as soon as a worker becomes free.
 - **Next up**: a slow pulse. This waiting package starts when the packages that build now finish, because no deeper dependency blocks it.
 - **Waiting**: quiet gray. **Skipped**: gray with a struck label.

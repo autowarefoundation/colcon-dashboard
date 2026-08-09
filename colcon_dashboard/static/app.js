@@ -402,6 +402,14 @@ function renderGraph() {
   if (!App.lay || App.lay.nodes.size === 0) return;
   const { nodes, edges, H } = App.lay;
 
+  const defs = svgEl('defs', {}, svg);
+  defs.innerHTML = `<radialGradient id="glowGrad">
+    <stop offset="0" class="gs0"/>
+    <stop offset="0.55" class="gs1"/>
+    <stop offset="1" class="gs2"/>
+  </radialGradient>`;
+  App.glowLayer = svgEl('g', { id: 'glowlayer' }, svg);  // halos, backmost
+  App.glowEls = new Map();
   const gE = svgEl('g', {}, svg);
   const gP = svgEl('g', { id: 'pktlayer' }, svg);  // flow particles, above edges
   const gN = svgEl('g', {}, svg);
@@ -466,6 +474,31 @@ function computeNext() {
   return next;
 }
 
+function syncGlow() {
+  // a faint accent halo behind every building package, on the backmost layer
+  if (!App.glowLayer || !App.lay) return;
+  const want = new Set();
+  for (const [name, p] of Object.entries(App.pkgs)) {
+    if (p.s !== 'building') continue;
+    const n = App.lay.nodes.get(name);
+    if (!n) continue;
+    want.add(name);
+    let el = App.glowEls.get(name);
+    if (!el) {
+      el = svgEl('ellipse', { class: 'glow', fill: 'url(#glowGrad)' },
+                 App.glowLayer);
+      el.style.animationDelay = `-${(Math.random() * 2.6).toFixed(2)}s`;
+      App.glowEls.set(name, el);
+    }
+    el.setAttribute('cx', n.x + n.w / 2);
+    el.setAttribute('cy', n.y);
+    el.setAttribute('rx', n.w / 2 + 70);
+    el.setAttribute('ry', 62);
+  }
+  for (const [name, el] of App.glowEls)
+    if (!want.has(name)) { el.remove(); App.glowEls.delete(name); }
+}
+
 function updateNodes() {
   if (!App.nodeEls.size) return;
   const { failed, doomed } = computeDoomed();
@@ -505,6 +538,7 @@ function updateNodes() {
     if (e.el.getAttribute('class') !== ec) e.el.setAttribute('class', ec);
     setEdgeFlow(e, ec.includes(' active') && App.layoutMode !== '3d');
   }
+  syncGlow();
 }
 
 /* ---------------- force layout mode ----------------
@@ -752,6 +786,7 @@ function forceTick() {
     const na = App.lay.nodes.get(e.a), nb = App.lay.nodes.get(e.b);
     if (na && nb) e.el.setAttribute('d', edgePathD(na, nb));
   }
+  syncGlow();  // halos ride along with the moving nodes
   Force.alpha *= Force.DECAY;
   if (Force.alpha < 0.004 && !Force.dragging) { stopForce(); return; }
   Force.raf = requestAnimationFrame(forceTick);
@@ -948,6 +983,26 @@ function draw3d(now) {
     const pr = project3d(n.cx, n.cy, n.cz);
     if (pr) proj.set(name, pr);
   }
+
+  // ambient halos first, so they sit behind everything else
+  for (const [name, n] of App.lay.nodes) {
+    if (App.pkgs[name]?.s !== 'building') continue;
+    const pr = proj.get(name);
+    if (!pr) continue;
+    const [sx, sy, s] = pr;
+    const r = (n.w / 2 + 70) * s;
+    if (r < 4) continue;
+    const pulse = 0.7 + 0.3 * Math.sin(now / 420 + (n.cx + n.cy) * 0.01);
+    const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+    grad.addColorStop(0, c.accent);
+    grad.addColorStop(1, 'transparent');
+    ctx.globalAlpha = 0.16 * pulse * Math.min(1, s / G3.refS);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, 6.2832);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 
   // faint disc outline per wavefront plane: the hierarchy skeleton
   {
