@@ -687,10 +687,7 @@ function forceTick() {
 }
 
 function svgCoords(ev) {
-  const svg = $('#graph');
-  const r = svg.getBoundingClientRect();
-  return [App.vb.x + (ev.clientX - r.left) / r.width * App.vb.w,
-          App.vb.y + (ev.clientY - r.top) / r.height * App.vb.h];
+  return clientToWorld(ev.clientX, ev.clientY);
 }
 
 function setLayoutMode(mode) {
@@ -1182,6 +1179,22 @@ function clearFocus() {
 }
 
 /* pan / zoom */
+
+function viewScale(vb, r) {
+  // the uniform scale SVG really renders with (preserveAspectRatio meet)
+  return Math.min(r.width / vb.w, r.height / vb.h);
+}
+
+function clientToWorld(clientX, clientY) {
+  const r = $('#graph').getBoundingClientRect();
+  const vb = App.vb;
+  const s = viewScale(vb, r);
+  const ox = (r.width - vb.w * s) / 2;   // letterbox centering offsets
+  const oy = (r.height - vb.h * s) / 2;
+  return [vb.x + (clientX - r.left - ox) / s,
+          vb.y + (clientY - r.top - oy) / s];
+}
+
 function setViewBox(vb) {
   App.vb = vb;
   $('#graph').setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
@@ -1218,13 +1231,17 @@ function initPanZoom() {
   svg.addEventListener('wheel', ev => {
     ev.preventDefault();
     if (!App.vb) return;
-    const r = svg.getBoundingClientRect();
-    const fx = (ev.clientX - r.left) / r.width, fy = (ev.clientY - r.top) / r.height;
-    const f = ev.deltaY > 0 ? 1.18 : 1 / 1.18;
+    const [wx, wy] = clientToWorld(ev.clientX, ev.clientY);
     const vb = App.vb;
-    const nw = Math.min(Math.max(vb.w * f, 120), 200000);
-    const nh = vb.h * (nw / vb.w);
-    setViewBox({ x: vb.x + (vb.w - nw) * fx, y: vb.y + (vb.h - nh) * fy, w: nw, h: nh });
+    const f = Math.min(Math.max((ev.deltaY > 0 ? 1.18 : 1 / 1.18),
+                                120 / vb.w), 200000 / vb.w);
+    // keep the world point under the cursor fixed while scaling
+    setViewBox({
+      x: wx + (vb.x - wx) * f,
+      y: wy + (vb.y - wy) * f,
+      w: vb.w * f,
+      h: vb.h * f,
+    });
   }, { passive: false });
   let drag = null;
   svg.addEventListener('pointerdown', ev => {
@@ -1259,12 +1276,11 @@ function initPanZoom() {
     if (drag && App.vb) {
       moved = Math.max(moved,
         Math.abs(ev.clientX - drag.x) + Math.abs(ev.clientY - drag.y));
-      const r = svg.getBoundingClientRect();
-      const k = drag.vb.w / r.width;
+      const s = viewScale(drag.vb, svg.getBoundingClientRect());
       setViewBox({
         ...drag.vb,
-        x: drag.vb.x - (ev.clientX - drag.x) * k,
-        y: drag.vb.y - (ev.clientY - drag.y) * k,
+        x: drag.vb.x - (ev.clientX - drag.x) / s,
+        y: drag.vb.y - (ev.clientY - drag.y) / s,
       });
       return;
     }
