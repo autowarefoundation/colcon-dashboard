@@ -425,6 +425,7 @@ function renderGraph() {
   }
 
   updateNodes();
+  if (GS.q) runGraphSearch();  // recompute matches for the new node set
   if (App.vb) setViewBox(App.vb);
   else fitGraph();
   if (App.layoutMode === 'force') startForce();
@@ -477,6 +478,7 @@ function updateNodes() {
     if (doomed.has(name)) cls += ' doomed';
     if (next.has(name)) cls += ' next';
     if (g.classList.contains('hl')) cls += ' hl';  // keep the hover highlight
+    if (GS.set?.has(name)) cls += ' smatch';       // keep the search highlight
     if (g.getAttribute('class') !== cls) g.setAttribute('class', cls);
     const inner = g.firstChild;
     if (p?.s === 'building' && !inner.style.animationDelay) {
@@ -937,6 +939,7 @@ function draw3d(now) {
   const chain = G3.dimEase > 0.02 ? G3.lastChain : null;
   const dimMul = 1 - 0.9 * G3.dimEase;    // eased focus dim
   const discMul = 1 - 0.65 * G3.dimEase;
+  const sset = GS.set;                    // active graph search matches
   const proj = new Map();
   for (const [name, n] of App.lay.nodes) {
     const pr = project3d(n.cx, n.cy, n.cz);
@@ -984,6 +987,7 @@ function draw3d(now) {
     else if (cls.includes('edone')) { col = c.good; alpha = 0.3; }
     let al = alpha * Math.min(1, (a[2] + b[2]) / (2 * G3.refS) * 1.05);
     if (chain && !(chain.has(e.a) && chain.has(e.b))) al *= dimMul;
+    if (sset && !(sset.has(e.a) && sset.has(e.b))) al *= 0.15;
     ctx.globalAlpha = al;
     ctx.strokeStyle = col;
     ctx.lineWidth = w;
@@ -1005,6 +1009,8 @@ function draw3d(now) {
       ctx.globalAlpha = 0.85 * Math.min(1, pr[2] / G3.refS * 1.1);
       if (chain && !(chain.has(P.na.name) && chain.has(P.nb.name)))
         ctx.globalAlpha *= dimMul;
+      if (sset && !(sset.has(P.na.name) && sset.has(P.nb.name)))
+        ctx.globalAlpha *= 0.15;
       ctx.beginPath();
       ctx.arc(pr[0], pr[1], Math.max(0.8, 2.4 * pr[2] * 3), 0, 6.2832);
       ctx.fill();
@@ -1023,6 +1029,7 @@ function draw3d(now) {
     const isNext = App.nextSet?.has(name);
     let alpha = Math.min(1, s / G3.refS * 1.15);
     if (chain && !chain.has(name)) alpha *= dimMul;
+    if (sset && !sset.has(name)) alpha *= 0.12;
     if (stKey === 'excluded') alpha *= 0.35;
 
     ctx.globalAlpha = alpha;
@@ -1038,6 +1045,11 @@ function draw3d(now) {
     ctx.strokeStyle = doomed ? c.critical : (isNext ? c.accent : pal.stroke);
     ctx.lineWidth = Math.max(0.5,
       (stKey === 'building' || stKey === 'failed' ? 1.5 : 1) * s * 1.4);
+    if (sset && sset.has(name)) {  // a search match keeps an accent ring
+      ctx.strokeStyle = c.accent;
+      ctx.globalAlpha = Math.max(strokeAlpha, 0.9);
+      ctx.lineWidth = Math.max(1.4, 2.2 * s * 1.4);
+    }
     const dash = isNext ? [4, 3] : (pal.dash || (doomed ? [3, 3] : null));
     ctx.setLineDash(dash ? dash.map(d => d * s * 2) : []);
     ctx.beginPath();
@@ -1326,6 +1338,56 @@ function zoomToPkg(name) {
     setTimeout(() => el.classList.remove('flash'), 2000);
   }
 }
+
+/* ---- graph search: find packages by name in any view ---- */
+
+const GS = { q: '', matches: [], set: null, idx: -1 };
+
+function runGraphSearch() {
+  const q = $('#gsearch').value.trim().toLowerCase();
+  GS.q = q;
+  GS.matches = [];
+  GS.idx = -1;
+  if (q && App.lay) {
+    for (const name of App.lay.nodes.keys())
+      if (name.toLowerCase().includes(q)) GS.matches.push(name);
+    GS.matches.sort();
+  }
+  GS.set = q ? new Set(GS.matches) : null;
+  $('#graph').classList.toggle('searching', !!q);
+  $('#gantt').classList.toggle('searching', !!q);
+  for (const [name, g] of App.nodeEls)
+    g.classList.toggle('smatch', !!GS.set?.has(name));
+  for (const bar of $('#gantt').querySelectorAll('.gbar'))
+    bar.classList.toggle('smatch', !!GS.set?.has(bar.dataset.name));
+  $('#gscount').textContent = q ? `${GS.matches.length} found` : '';
+}
+
+function stepGraphSearch(dir) {
+  if (!GS.matches.length) return;
+  GS.idx = (GS.idx + dir + GS.matches.length) % GS.matches.length;
+  $('#gscount').textContent = `${GS.idx + 1}/${GS.matches.length}`;
+  zoomToPkg(GS.matches[GS.idx]);
+}
+
+function initGraphSearch() {
+  const input = $('#gsearch');
+  let timer = null;
+  input.oninput = () => {
+    clearTimeout(timer);
+    timer = setTimeout(runGraphSearch, 200);
+  };
+  input.onkeydown = ev => {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      stepGraphSearch(ev.shiftKey ? -1 : 1);
+    } else if (ev.key === 'Escape') {
+      input.value = '';
+      runGraphSearch();
+      input.blur();
+    }
+  };
+}
 function initPanZoom() {
   const svg = $('#graph');
   let moved = 0;
@@ -1479,6 +1541,7 @@ function drawGantt() {
       width: Math.max(2, (end - p.t0) * k), height: ROW - 5, rx: 3,
     }, svg);
     bar.dataset.name = name;
+    if (GS.set?.has(name)) bar.classList.add('smatch');
   });
 
   if (App.active) {
@@ -2376,6 +2439,7 @@ initPanZoom();
 initStop();
 initWsPicker();
 initBuildPicker();
+initGraphSearch();
 $('#sysBtn').onclick = () => document.body.classList.toggle('showsys');
 openPane(BUILD_PANE);  // the pinned whole-build terminal view
 pollState();

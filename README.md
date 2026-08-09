@@ -122,6 +122,8 @@ Interaction:
 
 - Hover a node to see its state, phase, time, stderr count, and path, and to light its full dependency chain while the rest dims.
 - Click a node to open its log pane.
+- The **find package** box highlights matching packages while the rest fades, in every layout and in the timeline. Enter and Shift+Enter jump through the matches.
+- Double-click a log tab in the dock to center the view on that package.
 - Drag to pan, scroll to zoom. **Fit** frames the whole graph. **Frontier** zooms to what builds now.
 - **This build / All packages** switches between the build's packages and the whole workspace.
 - When most package names share a prefix such as `autoware_`, the labels hide it. Tooltips keep the full name.

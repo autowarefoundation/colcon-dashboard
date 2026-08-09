@@ -524,6 +524,24 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   outline: 1px solid var(--warning);
 }
 
+/* graph search: matches keep their color, the rest fades */
+#gsearch {
+  font: 11px var(--mono);
+  color: var(--ink);
+  background: var(--page);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  width: 130px;
+}
+#gsearch:focus { outline: none; border-color: var(--accent); }
+#gscount { font-size: 10.5px; color: var(--muted); min-width: 40px; }
+#graph.searching .node:not(.smatch) { opacity: 0.15; }
+#graph.searching .edge { opacity: 0.12; }
+.node.smatch .box { stroke: var(--accent); stroke-width: 2.5; }
+#gantt.searching .gbar:not(.smatch) { opacity: 0.18; }
+#gantt .gbar.smatch { stroke: var(--accent); stroke-width: 2; }
+
 /* a double-clicked tab flashes its package in the graph or timeline */
 .node.flash .box, .gbar.flash { animation: pkgflash 0.5s ease-in-out 4; }
 @keyframes pkgflash {
