@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colcon Mission Control</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><polygon points="50,4 93,27 93,73 50,96 7,73 7,27" fill="none" stroke="%232a78d6" stroke-width="10"/><circle cx="50" cy="50" r="14" fill="%230ca30c"/></svg>'>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand"><span class="hex">⬡</span> <b>Mission Control</b></div>
+  <div class="meta">
+    <span id="ws" class="mono" title="workspace"></span>
+    <span id="buildid" class="mono" title="build log directory"></span>
+    <span id="livebadge" class="badge"><span class="dot">●</span> …</span>
+    <span id="workers" title="parallel workers"></span>
+  </div>
+  <div class="spacer"></div>
+  <div id="sysmeters" hidden>
+    <div class="sysm" id="sm-cores" title="per-core CPU use">
+      <div class="coregrid"></div>
+    </div>
+    <div class="sysm" id="sm-cpu">
+      <div class="sml"><span class="k">CPU</span><span class="v">–</span></div>
+      <div class="smbar"><div class="smfill"></div></div>
+    </div>
+    <div class="sysm" id="sm-ram">
+      <div class="sml"><span class="k">RAM</span><span class="v">–</span></div>
+      <div class="smbar"><div class="smfill"></div></div>
+    </div>
+    <div class="sysm" id="sm-swap">
+      <div class="sml"><span class="k">Swap</span><span class="v">–</span></div>
+      <div class="smbar"><div class="smfill"></div></div>
+    </div>
+  </div>
+  <button id="themeBtn" title="theme: system / light / dark">◐</button>
+</header>
+
+<section id="stats">
+  <div id="meter">
+    <div class="seg done"></div>
+    <div class="seg failed"></div>
+    <div class="seg aborted"></div>
+    <div class="seg building"></div>
+  </div>
+  <div id="tiles">
+    <div class="tile hero">
+      <div class="label"><span class="dot c-done"></span>Done</div>
+      <div class="value"><span id="t-done">–</span><small id="t-total"> / –</small></div>
+    </div>
+    <div class="tile">
+      <div class="label"><span class="dot c-building"></span>Building</div>
+      <div class="value" id="t-building">–</div>
+    </div>
+    <div class="tile">
+      <div class="label"><span class="dot c-ready"></span>Ready</div>
+      <div class="value" id="t-ready">–</div>
+    </div>
+    <div class="tile">
+      <div class="label"><span class="dot c-waiting"></span>Waiting</div>
+      <div class="value" id="t-waiting">–</div>
+    </div>
+    <div class="tile">
+      <div class="label"><span class="dot c-failed"></span>Failed</div>
+      <div class="value" id="t-failed">–</div>
+    </div>
+    <div class="tile">
+      <div class="label"><span class="dot c-aborted"></span>Aborted</div>
+      <div class="value" id="t-aborted">–</div>
+    </div>
+    <div class="tile">
+      <div class="label"><span class="dot c-skipped"></span>Skipped</div>
+      <div class="value" id="t-skipped">–</div>
+    </div>
+    <div class="tile">
+      <div class="label"><span class="dot c-none"></span>Elapsed</div>
+      <div class="value" id="t-elapsed">–</div>
+    </div>
+    <div class="tile">
+      <div class="label"><span class="dot c-none"></span>Rate</div>
+      <div class="value" id="t-rate">–<small> pkg/min</small></div>
+    </div>
+  </div>
+</section>
+
+<nav id="viewbar">
+  <button class="vtab on" data-view="graph">Dependency graph</button>
+  <button class="vtab" data-view="gantt">Timeline</button>
+  <button id="fitBtn" title="fit whole graph">Fit</button>
+  <button id="frontierBtn" title="zoom to what is building now">Frontier</button>
+  <button id="layoutBtn" title="switch between the layered layout and a live force simulation (drag nodes to rearrange)">Layout: layered</button>
+  <button id="scopeBtn" title="toggle between this build's packages and the whole workspace">This build</button>
+  <button id="gfollowBtn" class="on" style="display:none" title="auto-scroll to the newest packages as they start">⤓ follow new</button>
+  <span class="hint" id="prefixHint"></span>
+</nav>
+
+<main id="viz">
+  <div id="graphwrap"><svg id="graph"></svg><canvas id="graph3d"></canvas></div>
+  <div id="ganttwrap" hidden><svg id="gantt"></svg></div>
+</main>
+
+<div id="dockbar" title="drag to resize"></div>
+<section id="dock">
+  <div id="logtabs"></div>
+  <div id="panes">
+    <div class="placeholder">Click a package in the graph or timeline to open its build log — each package gets its own pane.</div>
+  </div>
+</section>
+
+<div id="tooltip" hidden></div>
+<div id="toasts"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
