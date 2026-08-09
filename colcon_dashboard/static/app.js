@@ -2108,11 +2108,28 @@ function buildHref(id) {
   return s;
 }
 
-async function openBuildPicker() {
+function outcomeHtml(b) {
+  if (!b.outcome) return '';
+  const label = b.outcome === 'passed' ? 'passed'
+              : b.outcome === 'failed' ? 'failed'
+              : b.outcome === 'aborted' ? 'aborted' : 'empty';
+  let h = `<span class="btag ${label}">${label}</span>`;
+  if (b.total) {
+    const parts = [`${b.done}/${b.total}`];
+    if (b.failed) parts.push(`${b.failed} failed`);
+    if (b.aborted) parts.push(`${b.aborted} aborted`);
+    if (b.skipped) parts.push(`${b.skipped} skipped`);
+    h += `<span class="wmeta bstats">${parts.join(' · ')}</span>`;
+  }
+  return h;
+}
+
+async function openBuildPicker(retry) {
   if (!WS) return;
+  const tries = typeof retry === 'number' ? retry : 0;  // onclick passes an event
   $('#bpick').hidden = false;
   const list = $('#blist');
-  list.innerHTML = '<div class="wsempty">loading…</div>';
+  if (!tries) list.innerHTML = '<div class="wsempty">loading…</div>';
   let d;
   try {
     d = await (await fetch(`/api/builds${wsParam()}`)).json();
@@ -2123,6 +2140,12 @@ async function openBuildPicker() {
   list.innerHTML = '';
   const builds = d.builds || [];
   const latest = builds.length ? builds[0].id : null;
+  // Outcomes compute in the background on first sight of old builds.
+  if (builds.some(b => !b.outcome) && tries < 8) {
+    setTimeout(() => {
+      if (!$('#bpick').hidden) openBuildPicker(tries + 1);
+    }, 1200);
+  }
   const live = document.createElement('a');
   live.className = 'wsrow' + (!PINNED_BUILD ? ' cur' : '');
   live.href = buildHref(null);
@@ -2136,6 +2159,7 @@ async function openBuildPicker() {
     a.innerHTML =
       `<span class="wpath">${b.id}</span>` +
       (b.id === latest ? '<span class="tag">latest</span>' : '') +
+      outcomeHtml(b) +
       `<span class="wmeta">${fmtBytes(b.size)}</span>` +
       `<button class="del" title="delete this build's logs">🗑</button>`;
     const del = a.querySelector('.del');

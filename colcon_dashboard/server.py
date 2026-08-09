@@ -433,6 +433,64 @@ class BuildMonitor:
             return None
         return os.path.join(self.log_base, candidates[-1]) if candidates else None
 
+    OUTCOME_FILE = ".colcon-dashboard.json"
+
+    def _read_outcome(self, build_dir):
+        try:
+            with open(os.path.join(build_dir, self.OUTCOME_FILE)) as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return None
+
+    def _compute_outcome(self, build_dir):
+        """One streaming pass over events.log; cached in the build folder."""
+        path = os.path.join(build_dir, "events.log")
+        total = done = failed = aborted = skipped = 0
+        shutdown = False
+        try:
+            mtime = os.stat(path).st_mtime
+            with open(path, "rb") as f:
+                for line in f:
+                    if b"JobQueued" in line:
+                        total += 1
+                    elif b"JobEnded" in line:
+                        m = RC_RE.search(line)
+                        if not m:
+                            continue
+                        if m.group(1):  # a signal name, e.g. SIGINT
+                            aborted += 1
+                        elif int(m.group(2)) == 0:
+                            done += 1
+                        else:
+                            failed += 1
+                    elif b"JobSkipped" in line:
+                        skipped += 1
+                    elif b"EventReactorShutdown" in line:
+                        shutdown = True
+        except OSError:
+            return None
+        if not shutdown and time.time() - mtime < 120:
+            return None  # the build still runs: nothing to cache
+        # Skipped jobs never emit JobEnded, so a finished run satisfies
+        # done+failed+aborted+skipped == total even after a failure cascade.
+        if failed:
+            outcome = "failed"
+        elif aborted or not shutdown \
+                or done + failed + aborted + skipped < total:
+            outcome = "aborted"
+        elif total:
+            outcome = "passed"
+        else:
+            outcome = "empty"
+        info = {"outcome": outcome, "done": done, "total": total,
+                "failed": failed, "aborted": aborted, "skipped": skipped}
+        try:
+            with open(os.path.join(build_dir, self.OUTCOME_FILE), "w") as f:
+                json.dump(info, f)
+        except OSError:
+            pass
+        return info
+
     def list_builds(self):
         try:
             names = sorted(
@@ -446,19 +504,39 @@ class BuildMonitor:
                 and self._builds_cache[1] == names:
             return self._builds_cache[2]
         builds = []
+        pending = []
         for name in names:
+            bdir = os.path.join(self.log_base, name)
             size = 0
-            for dp, _dn, fns in os.walk(os.path.join(self.log_base, name)):
+            for dp, _dn, fns in os.walk(bdir):
                 for fn in fns:
                     try:
                         size += os.stat(os.path.join(dp, fn)).st_size
                     except OSError:
                         pass
-            builds.append({"id": name, "time": parse_build_id_time(name),
-                           "size": size})
+            entry = {"id": name, "time": parse_build_id_time(name),
+                     "size": size}
+            info = self._read_outcome(bdir)
+            if info:
+                entry.update(info)
+            elif not (name == self.build_id
+                      and getattr(self, "active_flag", False)):
+                pending.append(name)
+            builds.append(entry)
         result = {"builds": builds, "latest": self.build_id,
                   "pinned": self.pin_build}
         self._builds_cache = (now, names, result)
+        if pending and not getattr(self, "_outcome_busy", False):
+            self._outcome_busy = True
+
+            def work(todo):
+                for n in todo:
+                    self._compute_outcome(os.path.join(self.log_base, n))
+                self._builds_cache = None
+                self._outcome_busy = False
+
+            threading.Thread(target=work, args=(pending,),
+                             daemon=True).start()
         return result
 
     # -- graph reduction -----------------------------------------------------
@@ -527,6 +605,7 @@ class BuildMonitor:
 
         now = time.time()
         active = (not ev.shutdown) and (now - ev.mtime() < 15.0)
+        self.active_flag = bool(active)
         epoch0 = parse_build_id_time(build_id) or (ev.mtime() - ev.last_t)
 
         jobs = ev.jobs

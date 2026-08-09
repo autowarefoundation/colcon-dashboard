@@ -664,6 +664,17 @@ body.offline #ws, body.offline #buildid { border-color: rgba(255, 255, 255, 0.45
   border: 1px solid var(--accent);
   color: var(--accent);
 }
+.wsrow .btag {
+  font-size: 10px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+}
+.wsrow .btag.passed { border-color: var(--good); color: var(--good); }
+.wsrow .btag.failed { border-color: var(--critical); color: var(--critical); }
+.wsrow .btag.aborted { border-color: var(--serious); color: var(--serious); }
+.wsrow .bstats { flex: 1; text-align: right; }
 
 /* confirmation overlay */
 #confirm {
