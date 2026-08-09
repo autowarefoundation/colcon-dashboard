@@ -1,4 +1,4 @@
-Source: colcon-mission-control
+Source: colcon-dashboard
 Section: python
 Priority: optional
 Maintainer: Mete Fatih Cırıt <mfc@autoware.org>
@@ -8,19 +8,19 @@ Build-Depends: debhelper-compat (= 13),
                python3-all,
                python3-setuptools
 Standards-Version: 4.6.2
-Homepage: https://github.com/autowarefoundation/colcon-mission-control
+Homepage: https://github.com/autowarefoundation/colcon-dashboard
 Rules-Requires-Root: no
 
-Package: python3-colcon-mission-control
+Package: python3-colcon-dashboard
 Architecture: all
 Depends: ${misc:Depends}, ${python3:Depends}, python3-colcon-core
 Description: live web dashboard for colcon builds
- Colcon Mission Control serves a single-page dashboard for a colcon
+ Colcon Dashboard serves a single-page dashboard for a colcon
  workspace: a state-colored dependency graph with layered, force, and 3D
  layouts, a Gantt timeline, isolated per-package log panes with terminal
  colors, and CPU, RAM, and swap meters with a per-core heatmap.
  .
  The package registers a colcon plugin. Enable it for one build with
- --event-handlers mission_control+ or for every build with
- COLCON_MISSION_CONTROL=1, or start the dashboard by hand with the
- colcon-mission-control command.
+ --event-handlers dashboard+ or for every build with
+ COLCON_DASHBOARD=1, or start the dashboard by hand with the
+ colcon-dashboard command.

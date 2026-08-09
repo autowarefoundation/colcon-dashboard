@@ -1,4 +1,4 @@
-colcon-mission-control (0.2.0ppa1) noble; urgency=medium
+colcon-dashboard (0.3.0ppa1) noble; urgency=medium
 
   * New upstream release. First PPA upload.
 

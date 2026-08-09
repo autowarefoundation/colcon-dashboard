@@ -6,8 +6,8 @@ dist/
 build/
 .pybuild/
 debian/.debhelper/
-debian/python3-colcon-mission-control/
-debian/python3-colcon-mission-control.*.debhelper
+debian/python3-colcon-dashboard/
+debian/python3-colcon-dashboard.*.debhelper
 debian/files
 debian/*.substvars
 debian/debhelper-build-stamp

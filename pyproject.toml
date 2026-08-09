@@ -3,8 +3,8 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "colcon-mission-control"
-version = "0.2.0"
+name = "colcon-dashboard"
+version = "0.3.0"
 description = "Live web dashboard for colcon builds: dependency graph, timeline, per-package logs, system pressure"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -21,17 +21,17 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/autowarefoundation/colcon-mission-control"
-Issues = "https://github.com/autowarefoundation/colcon-mission-control/issues"
+Repository = "https://github.com/autowarefoundation/colcon-dashboard"
+Issues = "https://github.com/autowarefoundation/colcon-dashboard/issues"
 
 [project.scripts]
-colcon-mission-control = "colcon_mission_control.server:main"
+colcon-dashboard = "colcon_dashboard.server:main"
 
 [project.entry-points."colcon_core.event_handler"]
-mission_control = "colcon_mission_control.event_handler:MissionControlEventHandler"
+dashboard = "colcon_dashboard.event_handler:DashboardEventHandler"
 
 [tool.setuptools]
-packages = ["colcon_mission_control"]
+packages = ["colcon_dashboard"]
 
 [tool.setuptools.package-data]
-colcon_mission_control = ["static/*"]
+colcon_dashboard = ["static/*"]

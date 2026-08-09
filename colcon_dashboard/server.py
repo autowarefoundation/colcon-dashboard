@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Colcon Mission Control - a live web dashboard for colcon builds.
+"""Colcon Dashboard - a live web dashboard for colcon builds.
 
 Tails the events.log that colcon writes for every build, reconstructs the
 exact job graph and job states from it, and serves a single-page UI with a
@@ -8,7 +8,7 @@ live dependency graph, a timeline, and isolated per-package log panes.
 Zero dependencies: Python 3.8+ standard library only. Works on any colcon
 workspace:
 
-    colcon-mission-control [WORKSPACE] [--port N] [--host 127.0.0.1] [--stop]
+    colcon-dashboard [WORKSPACE] [--port N] [--host 127.0.0.1] [--stop]
 """
 
 import argparse
@@ -723,7 +723,7 @@ class Handler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache",
-                         "colcon-mission-control")
+                         "colcon-dashboard")
 
 
 def instance_path(workspace):
@@ -798,7 +798,7 @@ def ensure_running(workspace, wait=4.0):
     os.makedirs(CACHE_DIR, exist_ok=True)
     log_file = open(os.path.join(CACHE_DIR, "spawn.log"), "ab")
     subprocess.Popen(
-        [sys.executable, "-m", "colcon_mission_control", workspace],
+        [sys.executable, "-m", "colcon_dashboard", workspace],
         stdout=log_file, stderr=subprocess.STDOUT,
         stdin=subprocess.DEVNULL, start_new_session=True)
     deadline = time.time() + wait
@@ -812,7 +812,7 @@ def ensure_running(workspace, wait=4.0):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Colcon Mission Control - live colcon build dashboard")
+        description="Colcon Dashboard - live colcon build dashboard")
     ap.add_argument("workspace", nargs="?", default=".",
                     help="colcon workspace root (default: current directory)")
     ap.add_argument("--port", type=int, default=None,
@@ -893,7 +893,7 @@ def main():
     Handler.monitor = monitor
 
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-    print("Colcon Mission Control")
+    print("Colcon Dashboard")
     print(f"  workspace: {workspace}")
     print(f"  url:       http://{args.host}:{port}/")
     try:

@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/colcon-mission-control
+      url: https://pypi.org/p/colcon-dashboard
     permissions:
       id-token: write  # PyPI trusted publishing, no token needed
     steps:

@@ -1,4 +1,4 @@
-# Colcon Mission Control
+# Colcon Dashboard
 
 A live web dashboard for `colcon build`. It shows how many packages are done, building, ready, waiting, or failed. It draws the dependency graph and colors each node as the build moves through it. Each package gets its own log pane, so logs never mix.
 
@@ -6,20 +6,20 @@ The server is one Python file. It uses only the standard library. It works on an
 
 ## Install
 
-The package has two parts: the `colcon-mission-control` command, and a colcon plugin that can start the dashboard when `colcon build` runs.
+The package has two parts: the `colcon-dashboard` command, and a colcon plugin that can start the dashboard when `colcon build` runs.
 
 On Ubuntu, install the apt package from the PPA. This is the official method. It puts the plugin in the same Python environment as the apt colcon, where colcon finds it:
 
 ```bash
-sudo add-apt-repository ppa:xmfcx/colcon-mission-control
-sudo apt install python3-colcon-mission-control
+sudo add-apt-repository ppa:xmfcx/colcon-dashboard
+sudo apt install python3-colcon-dashboard
 ```
 
 For other setups, install from PyPI into the environment that runs colcon:
 
-- colcon in a virtualenv or a conda environment: `pip install colcon-mission-control` in that environment.
-- colcon installed with pipx: `pipx inject colcon-common-extensions colcon-mission-control`.
-- For the `colcon-mission-control` command alone, without the plugin: `pipx install colcon-mission-control`.
+- colcon in a virtualenv or a conda environment: `pip install colcon-dashboard` in that environment.
+- colcon installed with pipx: `pipx inject colcon-common-extensions colcon-dashboard`.
+- For the `colcon-dashboard` command alone, without the plugin: `pipx install colcon-dashboard`.
 
 To install from a checkout, replace the package name with the path to this repository.
 
@@ -28,8 +28,8 @@ To install from a checkout, replace the package name with the path to this repos
 Run a build with the dashboard switched on. The plugin starts it and prints its address:
 
 ```text
-$ colcon build --event-handlers mission_control+
-[mission-control] dashboard: http://127.0.0.1:8635/
+$ colcon build --event-handlers dashboard+
+[colcon-dashboard] dashboard: http://127.0.0.1:8635/
 ```
 
 The plugin stays off by default, so a plain `colcon build` starts no server.
@@ -39,14 +39,14 @@ For daily use, turn it on once. Pick one of these:
 Add this line to your `~/.bashrc`:
 
 ```bash
-export COLCON_MISSION_CONTROL=1
+export COLCON_DASHBOARD=1
 ```
 
 Or enable the handler in `~/.colcon/defaults.yaml`:
 
 ```yaml
 build:
-  event-handlers: [mission_control+]
+  event-handlers: [dashboard+]
 ```
 
 After that, every `colcon build` starts the dashboard, or reuses the one that already runs for the workspace. The command line toggle wins over the environment default in both directions.
@@ -56,10 +56,10 @@ Each workspace gets exactly one server, on a stable port derived from the worksp
 You can also run it by hand, with or without the plugin:
 
 ```bash
-colcon-mission-control ~/projects/autoware          # start, or print the running URL
-colcon-mission-control ~/projects/autoware --stop   # stop this workspace's server
-colcon-mission-control --list                       # all running servers
-colcon-mission-control --stop-all                   # stop every server
+colcon-dashboard ~/projects/autoware          # start, or print the running URL
+colcon-dashboard ~/projects/autoware --stop   # stop this workspace's server
+colcon-dashboard --list                       # all running servers
+colcon-dashboard --stop-all                   # stop every server
 ```
 
 The server follows `log/latest_build`. If a new build starts in the same workspace, the page switches to it and shows a notice.
@@ -113,13 +113,13 @@ Interaction:
 
 ### Layout modes
 
-The **Layout** button cycles three modes, and the choice persists:
+The **layout** menu picks one of three modes, and the choice persists:
 
 - `layered`: the static left-to-right layout described above.
 - `force`: a live spring simulation with the same left-to-right anchoring. Drag nodes to rearrange. The simulation cools and stops by itself.
 - `3d`: the build as a wavefront. Building packages share one central plane, finished discs stack to its left, and waiting discs queue to the right by dependency depth. Packages glide through the blue plane as the build advances. Left-drag orbits, shift-drag or right-drag or middle-drag pans, the wheel zooms, and the camera rotates by itself until the first grab.
 
-Fit and Frontier drive the camera in every mode.
+Fit and Frontier drive the camera in every mode. In the force and 3D modes, a **spread** slider in the corner scales how far the simulation spreads the nodes.
 
 ### Timeline
 
@@ -129,10 +129,13 @@ The chart makes the parallelism and the long serial chains visible. It auto-scro
 
 ### Log panes
 
-Click any package in the graph or the timeline to open its log in the dock at the bottom. Each package gets its own tab and its own scrollback, so logs never interleave.
+The dock opens with a pinned **build log** tab: the whole build as a terminal would show it, with `Starting >>>` and `Finished <<<` lines between every package's output. Click any package in the graph or the timeline to open its own tab next to it. Each tab has its own scrollback, so logs never interleave.
 
 - A pane follows new output until you scroll up. The **⤓ follow** button re-engages.
-- A selector switches between `stdout+stderr`, `stderr`, `stdout`, and the command log.
+- Panes open at the tail for an instant start. **⤒ load all** fetches the whole history in one click.
+- Every line carries a timestamp: build-relative in the build log, job-relative in package panes. The **🕒 ts** button hides them.
+- The **search** box filters as you type: matching lines highlight, Enter and Shift+Enter step through them, and the search stays live while the log streams.
+- A selector switches a package pane between the timestamped output, `stdout+stderr`, `stderr`, `stdout`, and the command log.
 - ANSI colors render as in a terminal: the 16 classic colors, 256-color, and truecolor, with palettes tuned per theme. Uncolored lines that match error or warning patterns still get color.
 - When a package fails, its pane opens by itself and a toast points to it.
 - Drag the bar above the dock to resize it.
