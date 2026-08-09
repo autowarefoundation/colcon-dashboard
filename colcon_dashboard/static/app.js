@@ -1,6 +1,11 @@
 'use strict';
 
 const $ = s => document.querySelector(s);
+
+// the workspace this page shows; every browser tab can show a different one
+const WS = new URLSearchParams(location.search).get('ws');
+const wsParam = (joiner = '?') =>
+  WS ? `${joiner}ws=${encodeURIComponent(WS)}` : '';
 const SVGNS = 'http://www.w3.org/2000/svg';
 
 function svgEl(tag, attrs, parent) {
@@ -60,11 +65,15 @@ function applyTheme(mode) {
 async function pollState() {
   let s;
   try {
-    s = await (await fetch('/api/state')).json();
+    s = await (await fetch(`/api/state${wsParam()}`)).json();
   } catch (e) {
     setBadge('offline', App.stopped
       ? 'STOPPED — the server was shut down'
       : 'OFFLINE — the server does not answer');
+    return;
+  }
+  if (s.nows) {
+    setBadge('idle', 'PICK A WORKSPACE');
     return;
   }
   if (s.error) {
@@ -99,7 +108,7 @@ async function pollState() {
 }
 
 async function fetchGraph() {
-  const g = await (await fetch('/api/graph')).json();
+  const g = await (await fetch(`/api/graph${wsParam()}`)).json();
   App.graph = g.packages;
   App.lastGraphFetch = Date.now();
   App.graphJobCount = Object.values(g.packages).filter(p => p.in_build).length;
@@ -1618,7 +1627,7 @@ async function loadEarlier(p) {
       const from = Math.max(0, start - 512 * 1024);
       const r = await (await fetch(
         `${base}offset=${from}&limit=${start - from}` +
-        `&align=${from > 0 ? 1 : 0}`)).json();
+        `&align=${from > 0 ? 1 : 0}${wsParam('&')}`)).json();
       parts.unshift(r.data);
       if (!(r.start < start)) break;  // no progress: stop
       start = r.start;
@@ -1784,8 +1793,9 @@ async function pollPane(p) {
   p.fetching = true;
   try {
     const url = p.fixed
-      ? `/api/buildlog?offset=${p.offset}`
-      : `/api/log/${encodeURIComponent(p.name)}?offset=${p.offset}&file=${p.file}`;
+      ? `/api/buildlog?offset=${p.offset}${wsParam('&')}`
+      : `/api/log/${encodeURIComponent(p.name)}?offset=${p.offset}` +
+        `&file=${p.file}${wsParam('&')}`;
     const r = await (await fetch(url)).json();
     if (r.reset) {
       p.pre.textContent = '';
@@ -1957,14 +1967,95 @@ function tickElapsed() {
   $('#t-elapsed').textContent = fmtDur(e);
 }
 
+/* ---- workspace picker: one server, any workspace ---- */
+
+function fmtAgo(ts) {
+  if (!ts) return '';
+  const s = Date.now() / 1000 - ts;
+  if (s < 90) return 'just now';
+  if (s < 5400) return `${Math.round(s / 60)} min ago`;
+  if (s < 129600) return `${Math.round(s / 3600)} h ago`;
+  return `${Math.round(s / 86400)} d ago`;
+}
+
+function renderWsList(items) {
+  const list = $('#wslist');
+  list.innerHTML = '';
+  if (!items.length) {
+    list.innerHTML =
+      '<div class="wsempty">No workspaces yet. Open a path below, or scan your home directory.</div>';
+    return;
+  }
+  for (const w of items) {
+    const a = document.createElement('a');
+    a.className = 'wsrow' + (WS === w.path ? ' cur' : '');
+    a.href = `?ws=${encodeURIComponent(w.path)}`;
+    const bits = [];
+    if (w.active) bits.push(`<span class="live">building ${w.done ?? '?'}/${w.total ?? '?'}</span>`);
+    if (w.found) bits.push('found');
+    if (w.last_used) bits.push(fmtAgo(w.last_used));
+    if (w.exists === false) bits.push('missing');
+    a.innerHTML = `<span class="wpath">${w.path}</span>` +
+                  `<span class="wmeta">${bits.join(' · ')}</span>`;
+    list.appendChild(a);
+  }
+}
+
+let wsItems = [];
+
+async function openWsPicker() {
+  $('#wspick').hidden = false;
+  const list = $('#wslist');
+  list.innerHTML = '<div class="wsempty">loading…</div>';
+  try {
+    const d = await (await fetch('/api/workspaces')).json();
+    wsItems = d.workspaces || [];
+    renderWsList(wsItems);
+  } catch (e) {
+    list.innerHTML = '<div class="wsempty">The server does not answer.</div>';
+  }
+}
+
+function initWsPicker() {
+  $('#ws').title = 'switch workspace';
+  $('#ws').onclick = openWsPicker;
+  const overlay = $('#wspick');
+  overlay.addEventListener('click', ev => {
+    if (ev.target === overlay && WS) overlay.hidden = true;
+  });
+  const go = () => {
+    const p = $('#wsinput').value.trim();
+    if (p) location.search = `?ws=${encodeURIComponent(p)}`;
+  };
+  $('#wsopen').onclick = go;
+  $('#wsinput').addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') go();
+  });
+  $('#wsscan').onclick = async () => {
+    $('#wsscan').textContent = 'Scanning…';
+    $('#wsscan').disabled = true;
+    try {
+      const d = await (await fetch('/api/discover')).json();
+      const known = new Set(wsItems.map(w => w.path));
+      for (const p of d.workspaces || []) {
+        if (!known.has(p)) wsItems.push({ path: p, exists: true, found: true });
+      }
+      renderWsList(wsItems);
+    } catch (e) { /* server gone */ }
+    $('#wsscan').textContent = 'Scan home';
+    $('#wsscan').disabled = false;
+  };
+  if (!WS) openWsPicker();
+}
+
 function initStop() {
   const overlay = $('#confirm');
   const text = overlay.querySelector('.ctext');
   const btns = overlay.querySelector('.cbtns');
   $('#stopBtn').onclick = () => {
     text.textContent =
-      `Stop the dashboard server for ${$('#ws').textContent || 'this workspace'}? ` +
-      'The page goes offline until you start the server again.';
+      'Stop the dashboard server? It serves every workspace on this machine, ' +
+      'and all dashboard pages go offline until you start it again.';
     btns.hidden = false;
     overlay.hidden = false;
   };
@@ -2009,6 +2100,7 @@ initTheme();
 initViews();
 initPanZoom();
 initStop();
+initWsPicker();
 openPane(BUILD_PANE);  // the pinned whole-build terminal view
 pollState();
 setInterval(pollState, 1000);

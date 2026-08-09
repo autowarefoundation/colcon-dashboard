@@ -13,7 +13,6 @@ workspace:
 
 import argparse
 import ast
-import hashlib
 import json
 import os
 import re
@@ -31,7 +30,7 @@ try:
 except ImportError:  # non-Unix: run without the single-instance lock
     fcntl = None
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
@@ -367,6 +366,7 @@ class BuildMonitor:
         self.namespace = None
         self.direct_deps = {}  # transitive reduction of the job dep closures
         self.seq = 0
+        self.last_request = time.time()
         self._prev_cpu = {}
 
     def sample_system(self):
@@ -589,7 +589,7 @@ class BuildMonitor:
             self.state_json = json.dumps(state, separators=(",", ":"))
             self.graph_json = json.dumps(graph, separators=(",", ":"))
 
-    def run(self, interval=0.8):
+    def run(self):
         while True:
             try:
                 self.scan_once()
@@ -597,7 +597,9 @@ class BuildMonitor:
                 with self.lock:
                     self.state_json = json.dumps(
                         {"error": f"{type(exc).__name__}: {exc}", "seq": self.seq})
-            time.sleep(interval)
+            # scan fast while someone watches, slow down when nobody does
+            watched = time.time() - self.last_request < 15
+            time.sleep(0.8 if watched else 4.0)
 
     # -- log serving ---------------------------------------------------------
 
@@ -650,8 +652,15 @@ MIME = {".html": "text/html", ".js": "text/javascript", ".css": "text/css",
         ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon"}
 
 
+def query_int(q, key, default):
+    try:
+        return int(q.get(key, [default])[0])
+    except (ValueError, TypeError):
+        return default
+
+
 class Handler(BaseHTTPRequestHandler):
-    monitor = None  # set in main()
+    registry = None  # set in main()
 
     def log_message(self, *args):
         pass
@@ -665,54 +674,79 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _monitor(self, q):
+        ws = q.get("ws", [None])[0]
+        if not ws:
+            return None
+        return self.registry.monitor(ws)
+
     def do_POST(self):
-        path = unquote(urlparse(self.path).path)
+        url = urlparse(self.path)
+        q = parse_qs(url.query)
+        path = unquote(url.path)
         if path == "/api/stop":
             self._send(200, json.dumps({"ok": True}))
             # a handler thread may signal the serve_forever loop to end
             threading.Thread(target=self.server.shutdown, daemon=True).start()
             return
+        if path == "/api/register":
+            mon = self._monitor(q)
+            if mon is None:
+                return self._send(400, json.dumps({"error": "not a directory"}))
+            return self._send(200, json.dumps(
+                {"ok": True, "workspace": mon.workspace}))
         self._send(404, json.dumps({"error": "not found"}))
 
     def do_GET(self):
-        mon = self.monitor
         url = urlparse(self.path)
         q = parse_qs(url.query)
         path = unquote(url.path)
 
-        if path == "/api/state":
-            with mon.lock:
-                return self._send(200, mon.state_json)
-        if path == "/api/graph":
-            with mon.lock:
-                return self._send(200, mon.graph_json)
-        if path == "/api/builds":
-            return self._send(200, json.dumps(mon.list_builds()))
-        def int_q(key, default):
-            try:
-                return int(q.get(key, [default])[0])
-            except (ValueError, TypeError):
-                return default
+        if path == "/api/ping":
+            return self._send(200, json.dumps(
+                {"app": "colcon-dashboard", "pid": os.getpid()}))
+        if path == "/api/workspaces":
+            return self._send(200, json.dumps(self.registry.overview()))
+        if path == "/api/discover":
+            return self._send(200, json.dumps(
+                {"workspaces": discover_workspaces()}))
 
-        if path == "/api/buildlog":
-            ev = mon.events
-            if ev is None:
+        if path.startswith("/api/"):
+            mon = self._monitor(q)
+            if mon is None:
                 return self._send(200, json.dumps(
-                    {"size": 0, "start": 0, "offset": 0, "data": "",
-                     "reset": False}))
-            return self._send(200, json.dumps(ev.buildlog.read(
-                int_q("offset", -1), limit=int_q("limit", 0) or None,
-                align=bool(int_q("align", 0)))))
-        if path.startswith("/api/log/"):
-            pkg = path[len("/api/log/"):]
-            which = q.get("file", ["combined"])[0]
-            build = q.get("build", [None])[0]
-            result = mon.read_log(
-                pkg, which, int_q("offset", -1), build,
-                limit=int_q("limit", 0) or None, align=bool(int_q("align", 0)))
-            if result is None:
-                return self._send(400, json.dumps({"error": "bad request"}))
-            return self._send(200, json.dumps(result))
+                    {"error": "no workspace selected", "nows": True}))
+            mon.last_request = time.time()
+            if path == "/api/state":
+                with mon.lock:
+                    return self._send(200, mon.state_json)
+            if path == "/api/graph":
+                with mon.lock:
+                    return self._send(200, mon.graph_json)
+            if path == "/api/builds":
+                return self._send(200, json.dumps(mon.list_builds()))
+            if path == "/api/buildlog":
+                ev = mon.events
+                if ev is None:
+                    return self._send(200, json.dumps(
+                        {"size": 0, "start": 0, "offset": 0, "data": "",
+                         "reset": False}))
+                return self._send(200, json.dumps(ev.buildlog.read(
+                    query_int(q, "offset", -1),
+                    limit=query_int(q, "limit", 0) or None,
+                    align=bool(query_int(q, "align", 0)))))
+            if path.startswith("/api/log/"):
+                pkg = path[len("/api/log/"):]
+                which = q.get("file", ["combined"])[0]
+                build = q.get("build", [None])[0]
+                result = mon.read_log(
+                    pkg, which, query_int(q, "offset", -1), build,
+                    limit=query_int(q, "limit", 0) or None,
+                    align=bool(query_int(q, "align", 0)))
+                if result is None:
+                    return self._send(400, json.dumps({"error": "bad request"}))
+                return self._send(200, json.dumps(result))
+            return self._send(404, json.dumps({"error": "not found"}))
 
         rel = "index.html" if path in ("/", "") else path.lstrip("/")
         full = os.path.realpath(os.path.join(STATIC_DIR, rel))
@@ -728,162 +762,262 @@ class Handler(BaseHTTPRequestHandler):
 
 
 # ---------------------------------------------------------------------------
-# Single instance per workspace
+# One server per machine
 # ---------------------------------------------------------------------------
 
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache",
                          "colcon-dashboard")
+SERVER_FILE = os.path.join(CACHE_DIR, "server.json")
+REGISTRY_FILE = os.path.join(CACHE_DIR, "workspaces.json")
+GLOBAL_PORT = 8642
 
 
-def instance_path(workspace):
-    key = hashlib.sha1(workspace.encode()).hexdigest()[:12]
-    return os.path.join(CACHE_DIR, key + ".json")
+class Registry:
+    """Monitors for any number of workspaces, plus the recents list."""
+
+    def __init__(self, log_base="log"):
+        self.log_base = log_base
+        self.lock = threading.Lock()
+        self.monitors = {}
+        try:
+            with open(REGISTRY_FILE) as f:
+                self.recents = json.load(f)
+        except (OSError, ValueError):
+            self.recents = []
+
+    def _save(self):
+        try:
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            with open(REGISTRY_FILE, "w") as f:
+                json.dump(self.recents, f)
+        except OSError:
+            pass
+
+    def touch(self, ws):
+        with self.lock:
+            head = self.recents[0] if self.recents else None
+            if head and head["path"] == ws and \
+                    time.time() - head["last_used"] < 60:
+                return
+            self.recents = [r for r in self.recents if r["path"] != ws]
+            self.recents.insert(0, {"path": ws, "last_used": time.time()})
+            del self.recents[24:]
+            self._save()
+
+    def monitor(self, ws):
+        try:
+            ws = os.path.realpath(os.path.expanduser(ws))
+        except (OSError, ValueError):
+            return None
+        if not os.path.isdir(ws):
+            return None
+        with self.lock:
+            mon = self.monitors.get(ws)
+            if mon is None:
+                mon = BuildMonitor(ws, self.log_base)
+                self.monitors[ws] = mon
+                threading.Thread(target=mon.run, daemon=True).start()
+        self.touch(ws)
+        return mon
+
+    def overview(self):
+        with self.lock:
+            recents = [dict(r) for r in self.recents]
+            monitors = dict(self.monitors)
+        out = []
+        for r in recents:
+            entry = {"path": r["path"], "last_used": r.get("last_used"),
+                     "exists": os.path.isdir(r["path"])}
+            mon = monitors.get(r["path"])
+            if mon is not None:
+                try:
+                    with mon.lock:
+                        state = json.loads(mon.state_json)
+                    entry["build_id"] = state.get("build_id")
+                    entry["active"] = state.get("active")
+                    entry["done"] = (state.get("counts") or {}).get("done")
+                    entry["total"] = state.get("total")
+                except ValueError:
+                    pass
+            out.append(entry)
+        return {"workspaces": out}
 
 
-def default_port(workspace):
-    return 8600 + int(hashlib.sha1(workspace.encode()).hexdigest()[:8], 16) % 300
+SCAN_PRUNE = {"node_modules", "__pycache__", "build", "install", "log",
+              "src", "snap", "Downloads", "Pictures", "Music", "Videos"}
 
 
-def read_instance(workspace):
+def discover_workspaces(root=None, max_depth=4):
+    """Directories under root that look like colcon workspaces."""
+    root = root or os.path.expanduser("~")
+    found = []
+
+    def walk(d, depth):
+        try:
+            names = set(os.listdir(d))
+        except OSError:
+            return
+        if "log" in names or "build" in names:
+            has_build_logs = False
+            try:
+                has_build_logs = any(
+                    n == "latest_build" or n.startswith("build_")
+                    for n in os.listdir(os.path.join(d, "log")))
+            except OSError:
+                pass
+            if has_build_logs or ("src" in names and "install" in names):
+                found.append(d)
+                return  # a workspace does not nest more workspaces
+        if depth >= max_depth:
+            return
+        for n in sorted(names):
+            if n.startswith(".") or n in SCAN_PRUNE:
+                continue
+            p = os.path.join(d, n)
+            if os.path.isdir(p) and not os.path.islink(p):
+                walk(p, depth + 1)
+
+    walk(root, 0)
+    return found
+
+
+def read_server():
     try:
-        with open(instance_path(workspace)) as f:
+        with open(SERVER_FILE) as f:
             return json.load(f)
     except (OSError, ValueError):
         return None
 
 
-def probe_instance(info, timeout=0.8):
-    """True when the recorded server is alive and watches this workspace."""
+def probe_server(info, timeout=0.8):
+    """True when the recorded global server answers."""
     if not info or "port" not in info:
         return False
-    url = f"http://{info.get('host', '127.0.0.1')}:{info['port']}/api/state"
+    url = f"http://{info.get('host', '127.0.0.1')}:{info['port']}/api/ping"
     try:
         with urllib.request.urlopen(url, timeout=timeout) as r:
-            state = json.load(r)
-        return state.get("workspace") == info.get("workspace")
+            return json.load(r).get("app") == "colcon-dashboard"
     except (OSError, ValueError):
         return False
 
 
-def instance_url(info):
-    return f"http://{info.get('host', '127.0.0.1')}:{info['port']}/"
+def server_url(info, workspace=None):
+    base = f"http://{info.get('host', '127.0.0.1')}:{info['port']}/"
+    if workspace:
+        base += "?ws=" + quote(workspace, safe="")
+    return base
 
 
-def all_instances():
-    """The live servers of every workspace; stale entries get pruned."""
-    out = []
+def register_workspace(info, workspace, timeout=2.0):
+    url = (f"http://{info.get('host', '127.0.0.1')}:{info['port']}"
+           f"/api/register?ws=" + quote(workspace, safe=""))
     try:
-        names = sorted(os.listdir(CACHE_DIR))
-    except OSError:
-        return out
-    for name in names:
-        if not name.endswith(".json"):
-            continue
-        path = os.path.join(CACHE_DIR, name)
-        try:
-            with open(path) as f:
-                info = json.load(f)
-        except (OSError, ValueError):
-            continue
-        if probe_instance(info):
-            out.append(info)
-        else:
-            try:
-                os.unlink(path)
-            except OSError:
-                pass
-    return out
+        with urllib.request.urlopen(url, data=b"", timeout=timeout) as r:
+            return json.load(r).get("ok", False)
+    except (OSError, ValueError):
+        return False
 
 
-def ensure_running(workspace, wait=4.0):
-    """Reuse the workspace's server, or spawn a detached one.
+def ensure_running(workspace=None, wait=4.0):
+    """Reuse the machine's server, or spawn a detached one.
 
     Returns (url, started) - url is None when the server did not come up.
     """
-    workspace = os.path.realpath(workspace)
-    info = read_instance(workspace)
-    if probe_instance(info):
-        return instance_url(info), False
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    log_file = open(os.path.join(CACHE_DIR, "spawn.log"), "ab")
-    subprocess.Popen(
-        [sys.executable, "-m", "colcon_dashboard", workspace],
-        stdout=log_file, stderr=subprocess.STDOUT,
-        stdin=subprocess.DEVNULL, start_new_session=True)
-    deadline = time.time() + wait
-    while time.time() < deadline:
-        time.sleep(0.2)
-        info = read_instance(workspace)
-        if probe_instance(info):
-            return instance_url(info), True
-    return None, True
+    if workspace:
+        workspace = os.path.realpath(workspace)
+    info = read_server()
+    started = False
+    if not probe_server(info):
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        log_file = open(os.path.join(CACHE_DIR, "spawn.log"), "ab")
+        subprocess.Popen(
+            [sys.executable, "-m", "colcon_dashboard"],
+            stdout=log_file, stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL, start_new_session=True)
+        started = True
+        deadline = time.time() + wait
+        info = None
+        while time.time() < deadline:
+            time.sleep(0.2)
+            info = read_server()
+            if probe_server(info):
+                break
+        else:
+            return None, started
+    if workspace:
+        register_workspace(info, workspace)
+    return server_url(info, workspace), started
 
 
 def main():
     ap = argparse.ArgumentParser(
         description="Colcon Dashboard - live colcon build dashboard")
-    ap.add_argument("workspace", nargs="?", default=".",
-                    help="colcon workspace root (default: current directory)")
+    ap.add_argument("workspace", nargs="?", default=None,
+                    help="workspace to open (optional: the page can pick one)")
     ap.add_argument("--port", type=int, default=None,
-                    help="HTTP port (default: a stable per-workspace port)")
+                    help=f"HTTP port (default: {GLOBAL_PORT})")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--log-base", default="log",
-                    help="log directory relative to the workspace (default: log)")
+                    help="log directory relative to a workspace (default: log)")
     ap.add_argument("--stop", action="store_true",
-                    help="stop the server that watches this workspace")
-    ap.add_argument("--list", action="store_true", dest="list_servers",
-                    help="list the running servers of all workspaces")
-    ap.add_argument("--stop-all", action="store_true",
-                    help="stop the servers of all workspaces")
+                    help="stop the dashboard server")
+    ap.add_argument("--stop-all", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--list", action="store_true", dest="list_workspaces",
+                    help="list the known workspaces")
     args = ap.parse_args()
 
-    if args.list_servers or args.stop_all:
-        infos = all_instances()
-        if not infos:
-            print("no servers run")
-            return
-        for info in infos:
-            if args.stop_all:
-                os.kill(info["pid"], signal.SIGTERM)
-                print(f"stopped {info['workspace']} (pid {info['pid']})")
-            else:
-                print(f"{instance_url(info)}  pid {info['pid']}  "
-                      f"{info['workspace']}")
-        return
+    info = read_server()
+    alive = probe_server(info)
 
-    workspace = os.path.realpath(args.workspace)
-    if not os.path.isdir(workspace):
-        raise SystemExit(f"not a directory: {workspace}")
-
-    if args.stop:
-        info = read_instance(workspace)
-        if info and probe_instance(info):
+    if args.stop or args.stop_all:
+        if alive:
             os.kill(info["pid"], signal.SIGTERM)
-            print(f"stopped the server for {workspace} (pid {info['pid']})")
+            print(f"stopped the dashboard server (pid {info['pid']})")
         else:
-            print(f"no server runs for {workspace}")
+            print("no server runs")
         return
 
-    # one server per workspace: hold an exclusive lock on the instance file
+    if args.list_workspaces:
+        if alive:
+            url = (f"http://{info.get('host', '127.0.0.1')}:{info['port']}"
+                   f"/api/workspaces")
+            with urllib.request.urlopen(url, timeout=2) as r:
+                entries = json.load(r).get("workspaces", [])
+            print(f"server: {server_url(info)}  pid {info['pid']}")
+            for e in entries:
+                state = ("building" if e.get("active")
+                         else "idle" if e.get("build_id") else "")
+                print(f"  {server_url(info, e['path'])}  {state}")
+            if not entries:
+                print("  no workspaces yet")
+        else:
+            print("no server runs")
+        return
+
+    workspace = None
+    if args.workspace:
+        workspace = os.path.realpath(args.workspace)
+        if not os.path.isdir(workspace):
+            raise SystemExit(f"not a directory: {workspace}")
+
+    if alive:
+        if workspace:
+            register_workspace(info, workspace)
+        print(f"already running: {server_url(info, workspace)}")
+        return
+
+    # one server per machine: hold an exclusive lock on the server file
     os.makedirs(CACHE_DIR, exist_ok=True)
-    lock_file = open(instance_path(workspace), "a+")
+    lock_file = open(SERVER_FILE, "a+")
     if fcntl is not None:
         try:
             fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
-            lock_file.seek(0)
-            try:
-                info = json.loads(lock_file.read() or "{}")
-            except ValueError:
-                info = {}
-            if "port" in info:
-                print(f"already running for {workspace}: {instance_url(info)}")
-            else:
-                print(f"another server is starting for {workspace}")
+            print("another server is starting")
             return
 
     ThreadingHTTPServer.daemon_threads = True  # a stop request must not hang
-    port = args.port if args.port else default_port(workspace)
+    port = args.port if args.port else GLOBAL_PORT
     try:
         server = ThreadingHTTPServer((args.host, port), Handler)
     except OSError:
@@ -894,25 +1028,27 @@ def main():
 
     lock_file.seek(0)
     lock_file.truncate()
-    json.dump({"workspace": workspace, "host": args.host, "port": port,
-               "pid": os.getpid()}, lock_file)
+    json.dump({"host": args.host, "port": port, "pid": os.getpid()}, lock_file)
     lock_file.flush()
 
-    monitor = BuildMonitor(workspace, args.log_base)
-    threading.Thread(target=monitor.run, daemon=True).start()
-    Handler.monitor = monitor
+    registry = Registry(args.log_base)
+    Handler.registry = registry
+    if workspace:
+        registry.monitor(workspace)
 
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    info = {"host": args.host, "port": port}
     print("Colcon Dashboard")
-    print(f"  workspace: {workspace}")
-    print(f"  url:       http://{args.host}:{port}/")
+    print(f"  url: {server_url(info)}")
+    if workspace:
+        print(f"  workspace: {server_url(info, workspace)}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         try:
-            os.unlink(instance_path(workspace))
+            os.unlink(SERVER_FILE)
         except OSError:
             pass
 

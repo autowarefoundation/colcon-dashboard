@@ -25,11 +25,11 @@ To install from a checkout, replace the package name with the path to this repos
 
 ## Quick start
 
-Run a build with the dashboard switched on. The plugin starts it and prints its address:
+Run a build with the dashboard switched on. The plugin starts it and prints the address of your workspace's page:
 
 ```text
 $ colcon build --event-handlers dashboard+
-[colcon-dashboard] dashboard: http://127.0.0.1:8635/
+[colcon-dashboard] dashboard: http://127.0.0.1:8642/?ws=%2Fhome%2Fuser%2Fws
 ```
 
 The plugin stays off by default, so a plain `colcon build` starts no server.
@@ -51,15 +51,17 @@ build:
 
 After that, every `colcon build` starts the dashboard, or reuses the one that already runs for the workspace. The command line toggle wins over the environment default in both directions.
 
-Each workspace gets exactly one server, on a stable port derived from the workspace path. A second `colcon build` reuses it, and a file lock refuses duplicate servers. The server keeps running after the build, so the page stays available for the next build and for post-mortems.
+One server runs per machine, on port 8642, and serves every workspace. The page's `ws` query parameter picks the workspace, so each browser tab can show a different one. A file lock refuses duplicate servers, and the server keeps running after the build, so the pages stay available for the next build and for post-mortems.
+
+Click the workspace path in the header to open the workspace picker: your recent workspaces, a path box, and a scan of your home directory for colcon workspaces.
 
 You can also run it by hand, with or without the plugin:
 
 ```bash
-colcon-dashboard ~/projects/autoware          # start, or print the running URL
-colcon-dashboard ~/projects/autoware --stop   # stop this workspace's server
-colcon-dashboard --list                       # all running servers
-colcon-dashboard --stop-all                   # stop every server
+colcon-dashboard                              # start the server, or print its URL
+colcon-dashboard ~/projects/autoware          # same, and open this workspace
+colcon-dashboard --list                       # the known workspaces and their URLs
+colcon-dashboard --stop                       # stop the server
 ```
 
 The server follows `log/latest_build`. If a new build starts in the same workspace, the page switches to it and shows a notice.
@@ -68,7 +70,7 @@ The server follows `log/latest_build`. If a new build starts in the same workspa
 
 ### Header
 
-The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The ⏻ button stops the server for this workspace, after a confirmation.
+The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The workspace path opens the workspace picker. The ⏻ button stops the server, after a confirmation.
 
 The right side is the system strip. A colcon build can exhaust the machine, so pressure stays visible at all times:
 
@@ -156,27 +158,31 @@ Per-package logs come from `log/<build>/<package>/`. The server serves them incr
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `workspace` | `.` | Colcon workspace root (positional) |
-| `--port` | stable per-workspace port | HTTP port. The default falls back to a free port when taken |
+| `workspace` | | Workspace to register and print the page URL for (optional) |
+| `--port` | `8642` | HTTP port. The default falls back to a free port when taken |
 | `--host` | `127.0.0.1` | Bind address. Use `0.0.0.0` to reach the page from another machine |
-| `--log-base` | `log` | Log directory, relative to the workspace |
-| `--stop` | | Stop the server that watches this workspace |
-| `--list` | | List the running servers of all workspaces |
-| `--stop-all` | | Stop the servers of all workspaces |
+| `--log-base` | `log` | Log directory, relative to a workspace |
+| `--stop` | | Stop the server |
+| `--list` | | List the known workspaces and their URLs |
 
 ## API
 
+Workspace endpoints take a `ws=<path>` query parameter.
+
 | Endpoint | Returns |
 |---|---|
-| `/api/state` | Job states, counts, timings, build metadata |
-| `/api/graph` | Direct dependency edges for the graph views |
-| `/api/builds` | The `build_*` directories under the log base |
-| `/api/log/<pkg>?offset=N&file=streams` | A log chunk from byte `N`, plus the new offset |
-| `/api/buildlog?offset=N` | A chunk of the combined build log, same shape |
+| `/api/workspaces` | The recent workspaces, with live build info where known |
+| `/api/discover` | Colcon workspaces found under the home directory |
+| `/api/register?ws=` (POST) | Registers a workspace, like opening it in the page |
+| `/api/state?ws=` | Job states, counts, timings, build metadata |
+| `/api/graph?ws=` | Direct dependency edges for the graph views |
+| `/api/builds?ws=` | The `build_*` directories under the log base |
+| `/api/log/<pkg>?ws=&offset=N&file=streams` | A log chunk from byte `N`, plus the new offset |
+| `/api/buildlog?ws=&offset=N` | A chunk of the combined build log, same shape |
 | `/api/stop` (POST) | Stops the server, like `colcon-dashboard --stop` |
 
 ## Limits
 
-- One server watches one workspace, and a lock enforces it. Each workspace gets its own server and port.
-- The page follows the latest build. Finished builds stay readable until a new build starts.
+- One server per machine, and a lock enforces it. It serves any number of workspaces.
+- A page follows its workspace's latest build. Finished builds stay readable until a new build starts.
 - The server trusts the local workspace. Do not expose the port to an untrusted network.
