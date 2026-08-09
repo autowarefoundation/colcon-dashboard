@@ -2,10 +2,18 @@
 
 const $ = s => document.querySelector(s);
 
-// the workspace this page shows; every browser tab can show a different one
-const WS = new URLSearchParams(location.search).get('ws');
-const wsParam = (joiner = '?') =>
-  WS ? `${joiner}ws=${encodeURIComponent(WS)}` : '';
+// the workspace and, optionally, a pinned historical build this page shows
+const PAGE_PARAMS = new URLSearchParams(location.search);
+const WS = PAGE_PARAMS.get('ws');
+const PINNED_BUILD = PAGE_PARAMS.get('build');
+function wsParam(joiner = '?') {
+  let s = '';
+  if (WS) {
+    s = `${joiner}ws=${encodeURIComponent(WS)}`;
+    if (PINNED_BUILD) s += `&build=${encodeURIComponent(PINNED_BUILD)}`;
+  }
+  return s;
+}
 const SVGNS = 'http://www.w3.org/2000/svg';
 
 function svgEl(tag, attrs, parent) {
@@ -2070,6 +2078,97 @@ function initWsPicker() {
   if (!WS) openWsPicker();
 }
 
+/* ---- build picker: browse and manage previous builds ---- */
+
+function buildHref(id) {
+  let s = `?ws=${encodeURIComponent(WS)}`;
+  if (id) s += `&build=${encodeURIComponent(id)}`;
+  return s;
+}
+
+async function openBuildPicker() {
+  if (!WS) return;
+  $('#bpick').hidden = false;
+  const list = $('#blist');
+  list.innerHTML = '<div class="wsempty">loading…</div>';
+  let d;
+  try {
+    d = await (await fetch(`/api/builds${wsParam()}`)).json();
+  } catch (e) {
+    list.innerHTML = '<div class="wsempty">The server does not answer.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  const builds = d.builds || [];
+  const latest = builds.length ? builds[0].id : null;
+  const live = document.createElement('a');
+  live.className = 'wsrow' + (!PINNED_BUILD ? ' cur' : '');
+  live.href = buildHref(null);
+  live.innerHTML = '<span class="wpath">latest</span>' +
+                   '<span class="tag">live</span>';
+  list.appendChild(live);
+  for (const b of builds) {
+    const a = document.createElement('a');
+    a.className = 'wsrow' + (PINNED_BUILD === b.id ? ' cur' : '');
+    a.href = buildHref(b.id);
+    a.innerHTML =
+      `<span class="wpath">${b.id}</span>` +
+      (b.id === latest ? '<span class="tag">latest</span>' : '') +
+      `<span class="wmeta">${fmtBytes(b.size)}</span>` +
+      `<button class="del" title="delete this build's logs">🗑</button>`;
+    const del = a.querySelector('.del');
+    del.onclick = async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!del.classList.contains('sure')) {  // ask once, then act
+        del.classList.add('sure');
+        del.textContent = 'delete?';
+        setTimeout(() => {
+          del.classList.remove('sure');
+          del.textContent = '🗑';
+        }, 2500);
+        return;
+      }
+      const r = await (await fetch(
+        `/api/builds/delete?ws=${encodeURIComponent(WS)}` +
+        `&build=${encodeURIComponent(b.id)}`, { method: 'POST' })).json();
+      toast(r.ok ? `Deleted <b>${b.id}</b>, freed ${fmtBytes(r.freed)}.`
+                 : `Not deleted: ${r.error}`, r.ok ? 'info' : '');
+      openBuildPicker();
+    };
+    list.appendChild(a);
+  }
+}
+
+function initBuildPicker() {
+  $('#buildid').onclick = openBuildPicker;
+  if (PINNED_BUILD) $('#buildid').classList.add('pinned');
+  const overlay = $('#bpick');
+  overlay.addEventListener('click', ev => {
+    if (ev.target === overlay) overlay.hidden = true;
+  });
+  const prune = $('#bprune');
+  prune.onclick = async () => {
+    if (!prune.classList.contains('sure')) {
+      prune.classList.add('sure');
+      prune.textContent = 'Really delete all but the last 3?';
+      setTimeout(() => {
+        prune.classList.remove('sure');
+        prune.textContent = 'Keep the last 3, delete the rest';
+      }, 3000);
+      return;
+    }
+    prune.classList.remove('sure');
+    prune.textContent = 'Keep the last 3, delete the rest';
+    const r = await (await fetch(
+      `/api/builds/prune?ws=${encodeURIComponent(WS)}&keep=3`,
+      { method: 'POST' })).json();
+    toast(r.ok ? `Deleted ${r.deleted} builds, freed ${fmtBytes(r.freed)}.`
+               : `Not deleted: ${r.error}`, r.ok ? 'info' : '');
+    openBuildPicker();
+  };
+}
+
 function initStop() {
   const overlay = $('#confirm');
   const text = overlay.querySelector('.ctext');
@@ -2123,6 +2222,7 @@ initViews();
 initPanZoom();
 initStop();
 initWsPicker();
+initBuildPicker();
 openPane(BUILD_PANE);  // the pinned whole-build terminal view
 pollState();
 setInterval(pollState, 1000);

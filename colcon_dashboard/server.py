@@ -16,6 +16,7 @@ import ast
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -353,9 +354,10 @@ class EventLog:
 # ---------------------------------------------------------------------------
 
 class BuildMonitor:
-    def __init__(self, workspace, log_base="log"):
+    def __init__(self, workspace, log_base="log", pin_build=None):
         self.workspace = os.path.realpath(workspace)
         self.log_base = os.path.join(self.workspace, log_base)
+        self.pin_build = pin_build  # a fixed historical build, or None
         self.index = PackageIndex(self.workspace)
         self.lock = threading.Lock()
         self.state_json = json.dumps({"error": "scanning..."})
@@ -368,6 +370,7 @@ class BuildMonitor:
         self.seq = 0
         self.last_request = time.time()
         self._prev_cpu = {}
+        self._builds_cache = None
 
     def sample_system(self):
         """CPU %, per-core %, memory and swap from /proc; None if unavailable."""
@@ -416,6 +419,9 @@ class BuildMonitor:
     # -- build dir resolution ------------------------------------------------
 
     def resolve_latest(self):
+        if self.pin_build:  # a fixed historical build
+            p = os.path.join(self.log_base, self.pin_build)
+            return p if os.path.isdir(p) else None
         latest = os.path.join(self.log_base, "latest_build")
         if os.path.isdir(latest):
             return os.path.realpath(latest)
@@ -429,13 +435,31 @@ class BuildMonitor:
 
     def list_builds(self):
         try:
-            builds = sorted(
+            names = sorted(
                 (d for d in os.listdir(self.log_base) if d.startswith("build_")),
                 reverse=True,
             )
         except OSError:
-            builds = []
-        return {"builds": builds, "latest": self.build_id}
+            names = []
+        now = time.time()
+        if self._builds_cache and now - self._builds_cache[0] < 30 \
+                and self._builds_cache[1] == names:
+            return self._builds_cache[2]
+        builds = []
+        for name in names:
+            size = 0
+            for dp, _dn, fns in os.walk(os.path.join(self.log_base, name)):
+                for fn in fns:
+                    try:
+                        size += os.stat(os.path.join(dp, fn)).st_size
+                    except OSError:
+                        pass
+            builds.append({"id": name, "time": parse_build_id_time(name),
+                           "size": size})
+        result = {"builds": builds, "latest": self.build_id,
+                  "pinned": self.pin_build}
+        self._builds_cache = (now, names, result)
+        return result
 
     # -- graph reduction -----------------------------------------------------
 
@@ -678,7 +702,7 @@ class Handler(BaseHTTPRequestHandler):
         ws = q.get("ws", [None])[0]
         if not ws:
             return None
-        return self.registry.monitor(ws)
+        return self.registry.monitor(ws, q.get("build", [None])[0])
 
     def do_POST(self):
         url = urlparse(self.path)
@@ -703,7 +727,67 @@ class Handler(BaseHTTPRequestHandler):
             self.registry.set_favorite(
                 os.path.realpath(os.path.expanduser(ws)), fav)
             return self._send(200, json.dumps({"ok": True}))
+        if path in ("/api/builds/delete", "/api/builds/prune"):
+            return self._manage_builds(path, q)
         self._send(404, json.dumps({"error": "not found"}))
+
+    def _manage_builds(self, path, q):
+        ws = q.get("ws", [None])[0]
+        if not ws:
+            return self._send(400, json.dumps({"error": "no workspace"}))
+        ws = os.path.realpath(os.path.expanduser(ws))
+        log_dir = os.path.realpath(os.path.join(ws, self.registry.log_base))
+        if not os.path.isdir(log_dir):
+            return self._send(400, json.dumps({"error": "no log directory"}))
+        live = self.registry.monitor(ws)
+        active_build = None
+        if live is not None:
+            try:
+                with live.lock:
+                    st = json.loads(live.state_json)
+                if st.get("active"):
+                    active_build = st.get("build_id")
+            except ValueError:
+                pass
+
+        def remove(build):
+            target = os.path.realpath(os.path.join(log_dir, build))
+            if not target.startswith(log_dir + os.sep):
+                return 0
+            size = 0
+            for dp, _dn, fns in os.walk(target):
+                for fn in fns:
+                    try:
+                        size += os.stat(os.path.join(dp, fn)).st_size
+                    except OSError:
+                        pass
+            shutil.rmtree(target, ignore_errors=True)
+            self.registry.drop_pinned(ws, build)
+            return size
+
+        if path == "/api/builds/delete":
+            build = q.get("build", [None])[0]
+            if not build or not re.fullmatch(r"build_[\w.-]+", build):
+                return self._send(400, json.dumps({"error": "bad build id"}))
+            if build == active_build:
+                return self._send(400, json.dumps(
+                    {"error": "the build runs now"}))
+            freed = remove(build)
+            result = {"ok": True, "deleted": 1, "freed": freed}
+        else:
+            keep = max(1, query_int(q, "keep", 3))
+            try:
+                names = sorted((d for d in os.listdir(log_dir)
+                                if d.startswith("build_")), reverse=True)
+            except OSError:
+                names = []
+            victims = [n for n in names[keep:] if n != active_build]
+            freed = sum(remove(n) for n in victims)
+            result = {"ok": True, "deleted": len(victims), "freed": freed}
+        self.registry.stats_cache.pop(ws, None)
+        if live is not None:
+            live._builds_cache = None
+        return self._send(200, json.dumps(result))
 
     def do_GET(self):
         url = urlparse(self.path)
@@ -861,21 +945,29 @@ class Registry:
         self.stats_cache[ws] = (now, out)
         return out
 
-    def monitor(self, ws):
+    def monitor(self, ws, build=None):
         try:
             ws = os.path.realpath(os.path.expanduser(ws))
         except (OSError, ValueError):
             return None
         if not os.path.isdir(ws):
             return None
+        if build and not re.fullmatch(r"build_[\w.-]+", build):
+            return None
+        key = (ws, build)
         with self.lock:
-            mon = self.monitors.get(ws)
+            mon = self.monitors.get(key)
             if mon is None:
-                mon = BuildMonitor(ws, self.log_base)
-                self.monitors[ws] = mon
+                mon = BuildMonitor(ws, self.log_base, pin_build=build)
+                self.monitors[key] = mon
                 threading.Thread(target=mon.run, daemon=True).start()
         self.touch(ws)
         return mon
+
+    def drop_pinned(self, ws, build):
+        with self.lock:
+            mon = self.monitors.pop((ws, build), None)
+        return mon is not None
 
     def overview(self):
         with self.lock:
@@ -891,7 +983,7 @@ class Registry:
                      "exists": os.path.isdir(r["path"])}
             if entry["exists"]:
                 entry.update(self.stats(r["path"]))
-            mon = monitors.get(r["path"])
+            mon = monitors.get((r["path"], None))
             if mon is not None:
                 try:
                     with mon.lock:
