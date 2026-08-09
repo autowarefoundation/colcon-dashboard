@@ -6,19 +6,20 @@ The server is one Python file. It uses only the standard library. It works on an
 
 ## Install
 
-The package has two parts: the `colcon-mission-control` command, and a colcon plugin that starts the dashboard on every `colcon build`.
+The package has two parts: the `colcon-mission-control` command, and a colcon plugin that can start the dashboard when `colcon build` runs.
 
-For the command, install with pipx:
+On Ubuntu, install the apt package from the PPA. This is the official method. It puts the plugin in the same Python environment as the apt colcon, where colcon finds it:
 
 ```bash
-pipx install colcon-mission-control
+sudo add-apt-repository ppa:xmfcx/colcon-mission-control
+sudo apt install python3-colcon-mission-control
 ```
 
-The plugin loads only when the package is in the same Python environment as colcon itself:
+For other setups, install from PyPI into the environment that runs colcon:
 
 - colcon in a virtualenv or a conda environment: `pip install colcon-mission-control` in that environment.
 - colcon installed with pipx: `pipx inject colcon-common-extensions colcon-mission-control`.
-- colcon from apt: the system Python is guarded, so skip the plugin. Install with pipx and start the dashboard yourself: `colcon-mission-control <workspace>`.
+- For the `colcon-mission-control` command alone, without the plugin: `pipx install colcon-mission-control`.
 
 To install from a checkout, replace the package name with the path to this repository.
 
@@ -31,14 +32,24 @@ $ colcon build --event-handlers mission_control+
 [mission-control] dashboard: http://127.0.0.1:8635/
 ```
 
-The plugin stays off by default, so a plain `colcon build` starts no server. To start the dashboard on every build, set `COLCON_MISSION_CONTROL=1` in your environment, or enable the handler in `~/.colcon/defaults.yaml`:
+The plugin stays off by default, so a plain `colcon build` starts no server.
+
+For daily use, turn it on once. Pick one of these:
+
+Add this line to your `~/.bashrc`:
+
+```bash
+export COLCON_MISSION_CONTROL=1
+```
+
+Or enable the handler in `~/.colcon/defaults.yaml`:
 
 ```yaml
 build:
   event-handlers: [mission_control+]
 ```
 
-The command line toggle wins over the environment default in both directions.
+After that, every `colcon build` starts the dashboard, or reuses the one that already runs for the workspace. The command line toggle wins over the environment default in both directions.
 
 Each workspace gets exactly one server, on a stable port derived from the workspace path. A second `colcon build` reuses it, and a file lock refuses duplicate servers. The server keeps running after the build, so the page stays available for the next build and for post-mortems.
 
