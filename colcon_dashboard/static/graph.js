@@ -1,7 +1,7 @@
+import { on } from './bus.js';
 import { fitGraph, setViewBox } from './camera.js';
-import { startForce } from './force.js';
-import { enter3d } from './g3d.js';
 import { GS, runGraphSearch } from './gsearch.js';
+import { mode } from './modes.js';
 import { App } from './state.js';
 import { $, fmtDur, svgEl } from './util.js';
 
@@ -166,8 +166,7 @@ export function renderGraph() {
   if (GS.q) runGraphSearch();  // recompute matches for the new node set
   if (App.vb) setViewBox(App.vb);
   else fitGraph();
-  if (App.layoutMode === 'force') startForce();
-  else if (App.layoutMode === '3d') enter3d();
+  mode().onLayout?.();
 }
 
 export function computeDoomed() {
@@ -402,3 +401,10 @@ export function showNodeTooltip(name, ev) {
   tip.hidden = false;
 }
 export function hideTooltip() { $('#tooltip').hidden = true; }
+
+on('graph', () => {
+  computePrefix();
+  buildGraphView();
+});
+
+on('state', () => updateNodes());

@@ -1,3 +1,4 @@
+import { on } from './bus.js';
 import { openPane, pollPane, STATE_DOT } from './dock.js';
 import { App } from './state.js';
 import { wsParam } from './util.js';
@@ -55,3 +56,7 @@ export function pollAllPanes() {
     if (p.name === App.activePane || busy || p.offset === -1) pollPane(p);
   }
 }
+
+on('analyze-pkg', (pkg, question) => startAnalysis(pkg, question));
+
+on('state', updatePaneHeads);

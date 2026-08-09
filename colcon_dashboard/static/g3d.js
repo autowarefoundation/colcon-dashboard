@@ -1,8 +1,9 @@
+import { emit, on } from './bus.js';
 import { breakFollow } from './camera.js';
-import { openPane } from './dock.js';
-import { Force, forcePhysics, startForce } from './force.js';
+import { Force, forcePhysics, startForce, stopForce, update3dPlanes } from './force.js';
 import { chainOf, FLOW_SPACING, FLOW_SPEED, hideTooltip, label, showNodeTooltip } from './graph.js';
 import { GS } from './gsearch.js';
+import { registerMode } from './modes.js';
 import { App } from './state.js';
 import { $ } from './util.js';
 
@@ -402,7 +403,7 @@ export function bind3d() {
     hideTooltip();
   });
   cv.addEventListener('click', () => {
-    if (G3.moved <= 4 && G3.downNode) openPane(G3.downNode);
+    if (G3.moved <= 4 && G3.downNode) emit('open-pkg', G3.downNode);
   });
   cv.addEventListener('wheel', ev => {
     ev.preventDefault();
@@ -411,3 +412,26 @@ export function bind3d() {
       G3.dist * (ev.deltaY > 0 ? 1.15 : 1 / 1.15)));
   }, { passive: false });
 }
+
+registerMode('3d', {
+  activate: () => enter3d(),
+  deactivate: exit3d,
+  onLayout: () => enter3d(),
+  show: () => { if (!G3.raf) enter3d(0.15, true); },
+  hide: () => { stopForce(); exit3d(); },
+  fit: fit3d,
+  followFrontier: frontier3d,
+  onState: () => update3dPlanes(),
+  resize: resize3d,
+  focusPkg: name => {
+    const n = Force.nodes.find(f => f.name === name);
+    if (!n) return;
+    G3.auto = false;  // keep the camera where we point it
+    G3.tx = n.cx; G3.ty = n.cy; G3.tz = n.cz;
+    G3.dist = 500;
+  },
+});
+
+on('theme-changed', () => {
+  if (G3.colors) tokens3d();  // refresh the 3D canvas palette
+});

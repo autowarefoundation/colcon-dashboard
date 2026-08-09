@@ -1,10 +1,8 @@
-import { zoomToPkg } from './camera.js';
-import { openPane } from './dock.js';
+import { emit, on } from './bus.js';
 import { hideTooltip, label, showNodeTooltip } from './graph.js';
 import { GS } from './gsearch.js';
 import { App } from './state.js';
 import { $, fmtDur, svgEl } from './util.js';
-import { setView } from './views.js';
 
 /* ---------------- gantt ---------------- */
 
@@ -108,9 +106,8 @@ export function initGanttPan() {
   const end = ev => {
     if (!drag) return;
     if (drag.moved <= 4 && drag.name && ev.type === 'pointerup') {
-      openPane(drag.name);
-      if (App.view === 'gantt') setView('split');  // bring the graph in
-      zoomToPkg(drag.name);
+      emit('open-pkg', drag.name);
+      emit('focus-pkg', drag.name);
     }
     drag = null;
     wrap.classList.remove('panning');
@@ -118,3 +115,7 @@ export function initGanttPan() {
   wrap.addEventListener('pointerup', end);
   wrap.addEventListener('pointercancel', end);
 }
+
+on('state', () => {
+  if (App.view !== 'graph' && (App.pollTick++ % 2 === 0)) drawGantt();
+});

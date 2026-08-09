@@ -1,10 +1,4 @@
-import { updatePaneHeads } from './ai.js';
-import { openPane } from './dock.js';
-import { update3dPlanes } from './force.js';
-import { drawGantt } from './gantt.js';
-import { updateNodes } from './graph.js';
-import { App } from './state.js';
-import { toast } from './toasts.js';
+import { on } from './bus.js';
 import { $, fmtGB } from './util.js';
 
 /* ---------------- header + tiles ---------------- */
@@ -97,18 +91,6 @@ export function applyState(s) {
   const seg = (cls, n) =>
     $(`#meter .seg.${cls}`).style.flexBasis = (s.total ? (100 * n / s.total) : 0) + '%';
   seg('done', done); seg('failed', failed); seg('aborted', aborted); seg('building', building);
-
-  updateNodes();
-  if (App.layoutMode === '3d') update3dPlanes();
-  updatePaneHeads();
-  if (App.view !== 'graph' && (App.pollTick++ % 2 === 0)) drawGantt();
-
-  for (const [name, p] of Object.entries(App.pkgs)) {
-    if (p.s === 'failed' && !App.failedSeen.has(name)) {
-      App.failedSeen.add(name);
-      toast(`<b>${name}</b> failed (rc ${p.rc ?? '?'}) — click to open its log`, '',
-            () => openPane(name));
-      openPane(name);
-    }
-  }
 }
+
+on('state', applyState);

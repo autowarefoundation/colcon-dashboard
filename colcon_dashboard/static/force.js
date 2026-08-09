@@ -1,7 +1,7 @@
-import { enter3d, exit3d } from './g3d.js';
-import { buildGraphView, edgePathD, label, syncGlow } from './graph.js';
+import { fitGraph, frontierView } from './camera.js';
+import { edgePathD, syncGlow } from './graph.js';
+import { registerMode } from './modes.js';
 import { App } from './state.js';
-import { $ } from './util.js';
 
 export const Force = {
   nodes: [], links: [], alpha: 0, raf: null, dragging: null,
@@ -249,20 +249,11 @@ export function forceTick() {
   Force.raf = requestAnimationFrame(forceTick);
 }
 
-export function updateForceCtl() {
-  $('#forceCtl').hidden =
-    !(App.view !== 'gantt' && App.layoutMode !== 'layered');
-}
-
-export function setLayoutMode(mode) {
-  const prev = App.layoutMode;
-  App.layoutMode = mode;
-  localStorage.setItem('cmc-layout', mode);
-  $('#layoutSelect').value = mode;
-  $('#graphwrap').classList.toggle('mode3d', mode === '3d');
-  updateForceCtl();
-  if (prev === '3d' && mode !== '3d') exit3d();
-  if (mode === 'force') startForce();
-  else if (mode === '3d') enter3d();
-  else { stopForce(); App.vb = null; buildGraphView(); }
-}
+registerMode('force', {
+  activate: () => startForce(),
+  onLayout: () => startForce(),
+  show: () => { if (!Force.raf) startForce(0.15); },
+  hide: stopForce,
+  fit: fitGraph,
+  followFrontier: frontierView,
+});

@@ -1,4 +1,4 @@
-import { G3, tokens3d } from './g3d.js';
+import { emit } from './bus.js';
 import { $ } from './util.js';
 
 /* ---------------- theme ---------------- */
@@ -37,5 +37,5 @@ export function applyTheme(mode) {
   if (mode === 'auto') delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = mode;
   $('#themeBtn').innerHTML = THEME_ICONS[mode] || THEME_ICONS.auto;
-  if (G3.colors) tokens3d();  // refresh the 3D canvas palette
+  emit('theme-changed');
 }

@@ -1,8 +1,6 @@
-import { frontierView } from './camera.js';
-import { activatePane, openPane, resetPane } from './dock.js';
-import { frontier3d } from './g3d.js';
-import { buildGraphView, computePrefix } from './graph.js';
-import { applyState, setBadge, updateSysMeters } from './header.js';
+import { emit } from './bus.js';
+import { setBadge, updateSysMeters } from './header.js';
+import { mode } from './modes.js';
 import { App } from './state.js';
 import { toast } from './toasts.js';
 import { $, fmtDur, wsParam } from './util.js';
@@ -36,20 +34,8 @@ export async function pollState() {
     App.buildId = s.build_id;
     App.failedSeen = new Set(
       Object.entries(s.packages).filter(([, p]) => p.s === 'failed').map(([n]) => n));
-    if (first && App.failedSeen.size) {
-      // a page opened on a failed build lands on the failures,
-      // earliest first: later failures are usually its cascade
-      const failed = Object.entries(s.packages)
-        .filter(([, p]) => p.s === 'failed')
-        .sort((a, b) => (a[1].t1 ?? 0) - (b[1].t1 ?? 0))
-        .slice(0, 6).map(([n]) => n);
-      for (const name of failed) openPane(name);
-      activatePane(failed[0]);
-    }
-    if (!first) {
-      toast(`New build started: <b>${s.build_id}</b>`, 'info');
-      for (const pane of App.panes.values()) resetPane(pane);
-    }
+    if (!first) toast(`New build started: <b>${s.build_id}</b>`, 'info');
+    emit('build-changed', s, first);
     await fetchGraph();
   }
   App.pkgs = s.packages;
@@ -59,14 +45,20 @@ export async function pollState() {
   App.buildStarted = s.build_started;
   App.elapsedBase = s.elapsed;
   App.elapsedAt = Date.now();
-  applyState(s);
+  emit('state', s);
+  for (const [name, p] of Object.entries(App.pkgs)) {
+    if (p.s === 'failed' && !App.failedSeen.has(name)) {
+      App.failedSeen.add(name);
+      emit('pkg-failed', name);
+    }
+  }
   if (App.followBuild && App.active && App.view !== 'gantt') {
-    App.layoutMode === '3d' ? frontier3d() : frontierView();
+    mode().followFrontier();
   }
   // jobs can register moments after the graph was fetched
   if (App.graphJobCount !== s.total && Date.now() - App.lastGraphFetch > 10000) {
     await fetchGraph();
-    applyState(s);
+    emit('state', s);
   }
 }
 
@@ -75,8 +67,7 @@ export async function fetchGraph() {
   App.graph = g.packages;
   App.lastGraphFetch = Date.now();
   App.graphJobCount = Object.values(g.packages).filter(p => p.in_build).length;
-  computePrefix();
-  buildGraphView();
+  emit('graph');
 }
 
 /* ---------------- boot ---------------- */

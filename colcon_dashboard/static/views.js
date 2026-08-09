@@ -1,8 +1,9 @@
-import { breakFollow, fitGraph, frontierView } from './camera.js';
-import { applySpread, Force, setLayoutMode, startForce, stopForce, updateForceCtl } from './force.js';
-import { enter3d, exit3d, fit3d, frontier3d, G3 } from './g3d.js';
+import { on } from './bus.js';
+import { breakFollow, zoomToPkg } from './camera.js';
+import { applySpread } from './force.js';
 import { drawGantt } from './gantt.js';
 import { buildGraphView } from './graph.js';
+import { mode } from './modes.js';
 import { App } from './state.js';
 import { $ } from './util.js';
 
@@ -32,9 +33,25 @@ export function setView(v) {
   updateForceCtl();
   dispatchEvent(new Event('resize'));  // both panels take their new sizes
   if (showGantt) drawGantt();
-  if (!showGraph) { stopForce(); exit3d(); }
-  else if (App.layoutMode === 'force' && !Force.raf) startForce(0.15);
-  else if (App.layoutMode === '3d' && !G3.raf) enter3d(0.15, true);
+  if (!showGraph) mode().hide?.();
+  else mode().show?.();
+}
+
+export function updateForceCtl() {
+  $('#forceCtl').hidden =
+    !(App.view !== 'gantt' && App.layoutMode !== 'layered');
+}
+
+export function setLayoutMode(m) {
+  const prev = mode();
+  App.layoutMode = m;
+  localStorage.setItem('cmc-layout', m);
+  $('#layoutSelect').value = m;
+  $('#graphwrap').classList.toggle('mode3d', m === '3d');
+  updateForceCtl();
+  const next = mode();
+  if (next !== prev) prev.deactivate?.();
+  next.activate?.();
 }
 
 export function initViews() {
@@ -44,14 +61,13 @@ export function initViews() {
   setView(localStorage.getItem('cmc-view') || 'split');
   $('#fitBtn').onclick = () => {
     breakFollow();
-    App.layoutMode === '3d' ? fit3d() : fitGraph();
+    mode().fit();
   };
   const fb = $('#followBuildBtn');
   fb.onclick = () => {
     App.followBuild = !App.followBuild;
     fb.classList.toggle('on', App.followBuild);
-    if (App.followBuild)
-      App.layoutMode === '3d' ? frontier3d() : frontierView();
+    if (App.followBuild) mode().followFrontier();
   };
   $('#layoutSelect').value = App.layoutMode;
   $('#graphwrap').classList.toggle('mode3d', App.layoutMode === '3d');
@@ -138,3 +154,10 @@ export function initViews() {
     addEventListener('pointerup', up);
   });
 }
+
+on('state', () => mode().onState?.());
+
+on('focus-pkg', name => {
+  if (App.view === 'gantt') setView('split');  // bring the graph in
+  zoomToPkg(name);
+});

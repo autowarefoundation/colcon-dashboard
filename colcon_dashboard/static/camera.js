@@ -1,7 +1,7 @@
-import { openPane } from './dock.js';
-import { Force, forceTick } from './force.js';
-import { G3 } from './g3d.js';
-import { clearFocus, hideTooltip, hoverFocus, showNodeTooltip } from './graph.js';
+import { emit } from './bus.js';
+import { Force, forceTick, stopForce } from './force.js';
+import { buildGraphView, clearFocus, hideTooltip, hoverFocus, showNodeTooltip } from './graph.js';
+import { mode, registerMode } from './modes.js';
 import { App } from './state.js';
 import { $ } from './util.js';
 
@@ -72,14 +72,8 @@ export function zoomToPkg(name) {
     setTimeout(() => bar.classList.remove('flash'), 2000);
     return;
   }
-  if (App.layoutMode === '3d') {
-    const n = Force.nodes.find(f => f.name === name);
-    if (!n) return;
-    G3.auto = false;  // keep the camera where we point it
-    G3.tx = n.cx; G3.ty = n.cy; G3.tz = n.cz;
-    G3.dist = 500;
-    return;
-  }
+  const focus = mode().focusPkg;
+  if (focus) return focus(name);
   const nd = App.lay?.nodes.get(name);
   if (!nd || !App.vb) return;
   const r = $('#graph').getBoundingClientRect();
@@ -98,7 +92,7 @@ export function initPanZoom() {
   let moved = 0;
   let downNode = null;  // pointer capture retargets `click`, so remember the node
   svg.addEventListener('click', () => {
-    if (moved <= 4 && downNode) openPane(downNode);
+    if (moved <= 4 && downNode) emit('open-pkg', downNode);
   });
   svg.addEventListener('pointerleave', () => { hideTooltip(); clearFocus(); });
   svg.addEventListener('wheel', ev => {
@@ -171,3 +165,9 @@ export function initPanZoom() {
   svg.addEventListener('pointerup', end);
   svg.addEventListener('pointercancel', end);
 }
+
+registerMode('layered', {
+  activate: () => { stopForce(); App.vb = null; buildGraphView(); },
+  fit: fitGraph,
+  followFrontier: frontierView,
+});
