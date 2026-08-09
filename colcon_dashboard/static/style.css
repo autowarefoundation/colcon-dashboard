@@ -268,6 +268,24 @@ body.offline #sysmeters { display: none; }
 }
 #viewbar .vtab.on { color: var(--ink); border-bottom-color: var(--accent); }
 #viewbar .hint { color: var(--muted); font-size: 11px; margin-left: auto; }
+#viewbar .vsep { width: 1px; align-self: stretch; margin: 4px 3px; background: var(--border); }
+#followBuildBtn.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+#scopeCtl { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
+#scopeCtl .seg { display: inline-flex; }
+#scopeCtl .seg button { border-radius: 0; margin-left: -1px; }
+#scopeCtl .seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+#scopeCtl .seg button:last-child { border-radius: 0 6px 6px 0; }
+#scopeCtl .seg button.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  position: relative;
+  z-index: 1;
+}
 
 /* ---- viz area ---- */
 #viz { flex: 1; position: relative; overflow: hidden; background: var(--page); user-select: none; -webkit-user-select: none; }

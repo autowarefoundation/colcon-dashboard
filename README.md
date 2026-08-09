@@ -124,8 +124,9 @@ Interaction:
 - Click a node to open its log pane.
 - The **find package** box highlights matching packages while the rest fades, in every layout and in the timeline. Enter and Shift+Enter jump through the matches.
 - Double-click a log tab in the dock to center the view on that package.
-- Drag to pan, scroll to zoom. **Fit** frames the whole graph. **Frontier** zooms to what builds now.
-- **This build / All packages** switches between the build's packages and the whole workspace.
+- Drag to pan, scroll to zoom. **Fit** frames the whole graph.
+- **⌖ follow build** keeps the camera on the packages that build now, so the action stays framed as the build moves through the graph. Pan or zoom by hand and the camera is yours again.
+- The **show** switch picks what the graph draws: only this build's packages, or the whole workspace.
 - When most package names share a prefix such as `autoware_`, the labels hide it. Tooltips keep the full name.
 
 ### Layout modes
@@ -136,7 +137,7 @@ The **layout** menu picks one of three modes, and the choice persists:
 - `force`: a live spring simulation with the same left-to-right anchoring. Drag nodes to rearrange. The simulation cools and stops by itself.
 - `3d`: the build as a wavefront. Building packages share one central plane, finished discs stack to its left, and waiting discs queue to the right by dependency depth. Packages glide through the blue plane as the build advances. Left-drag orbits, shift-drag or right-drag or middle-drag pans, the wheel zooms, and the camera rotates by itself until the first grab.
 
-Fit and Frontier drive the camera in every mode. In the force and 3D modes, a **spread** slider in the corner scales how far the simulation spreads the nodes.
+Fit and follow build drive the camera in every mode. In the force and 3D modes, a **spread** slider in the corner scales how far the simulation spreads the nodes.
 
 ### Timeline
 

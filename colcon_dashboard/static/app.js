@@ -141,6 +141,9 @@ async function pollState() {
   App.elapsedBase = s.elapsed;
   App.elapsedAt = Date.now();
   applyState(s);
+  if (App.followBuild && App.active && App.view === 'graph') {
+    App.layoutMode === '3d' ? frontier3d() : frontierView();
+  }
   // jobs can register moments after the graph was fetched
   if (App.graphJobCount !== s.total && Date.now() - App.lastGraphFetch > 10000) {
     await fetchGraph();
@@ -1108,6 +1111,7 @@ function bind3d() {
       tx: G3.tx, ty: G3.ty, tz: G3.tz,
     };
     G3.moved = 0;
+    if (G3.drag.pan) breakFollow();  // orbiting composes with follow, panning fights it
     cv.classList.add('panning');
     cv.setPointerCapture(ev.pointerId);
   });
@@ -1155,6 +1159,7 @@ function bind3d() {
   });
   cv.addEventListener('wheel', ev => {
     ev.preventDefault();
+    breakFollow();
     G3.dist = Math.max(300, Math.min(30000,
       G3.dist * (ev.deltaY > 0 ? 1.15 : 1 / 1.15)));
   }, { passive: false });
@@ -1305,8 +1310,15 @@ function frontierView() {
   if (bb) setViewBox(bb); else fitGraph();
 }
 
+function breakFollow() {
+  if (!App.followBuild) return;
+  App.followBuild = false;
+  $('#followBuildBtn').classList.remove('on');
+}
+
 /* double-click a dock tab: fly the selected view to that package */
 function zoomToPkg(name) {
+  breakFollow();
   if (App.view === 'gantt') {
     const wrap = $('#ganttwrap');
     const bar = $('#gantt').querySelector(
@@ -1408,6 +1420,7 @@ function initPanZoom() {
   svg.addEventListener('wheel', ev => {
     ev.preventDefault();
     if (!App.vb) return;
+    breakFollow();
     const [wx, wy] = clientToWorld(ev.clientX, ev.clientY);
     const vb = App.vb;
     const f = Math.min(Math.max((ev.deltaY > 0 ? 1.18 : 1 / 1.18),
@@ -1436,6 +1449,7 @@ function initPanZoom() {
         return;
       }
     }
+    breakFollow();  // a manual pan releases the build-follow camera
     drag = { x: ev.clientX, y: ev.clientY, vb: { ...App.vb } };
     svg.classList.add('panning');
     svg.setPointerCapture(ev.pointerId);
@@ -2125,9 +2139,11 @@ function initViews() {
       $('#ganttwrap').hidden = App.view !== 'gantt';
       const graphBtns = App.view === 'graph';
       $('#fitBtn').style.display = graphBtns ? '' : 'none';
-      $('#frontierBtn').style.display = graphBtns ? '' : 'none';
-      $('#scopeBtn').style.display = graphBtns ? '' : 'none';
+      $('#followBuildBtn').style.display = graphBtns ? '' : 'none';
+      $('#scopeCtl').style.display = graphBtns ? '' : 'none';
       $('#layoutSel').style.display = graphBtns ? '' : 'none';
+      document.querySelectorAll('.vsep.gonly')
+        .forEach(x => x.style.display = graphBtns ? '' : 'none');
       $('#gfollowBtn').style.display = App.view === 'gantt' ? '' : 'none';
       updateForceCtl();
       if (App.view === 'gantt') { stopForce(); exit3d(); drawGantt(); }
@@ -2135,9 +2151,17 @@ function initViews() {
       else if (App.layoutMode === '3d' && !G3.raf) enter3d(0.15, true);
     };
   }
-  $('#fitBtn').onclick = () => App.layoutMode === '3d' ? fit3d() : fitGraph();
-  $('#frontierBtn').onclick = () =>
-    App.layoutMode === '3d' ? frontier3d() : frontierView();
+  $('#fitBtn').onclick = () => {
+    breakFollow();
+    App.layoutMode === '3d' ? fit3d() : fitGraph();
+  };
+  const fb = $('#followBuildBtn');
+  fb.onclick = () => {
+    App.followBuild = !App.followBuild;
+    fb.classList.toggle('on', App.followBuild);
+    if (App.followBuild)
+      App.layoutMode === '3d' ? frontier3d() : frontierView();
+  };
   $('#layoutSelect').value = App.layoutMode;
   $('#graphwrap').classList.toggle('mode3d', App.layoutMode === '3d');
   const slider = $('#spreadSlider');
@@ -2163,12 +2187,16 @@ function initViews() {
       gf.classList.toggle('on', atEnd);
     }
   });
-  $('#scopeBtn').onclick = () => {
-    App.scope = App.scope === 'build' ? 'all' : 'build';
-    $('#scopeBtn').textContent = App.scope === 'build' ? 'This build' : 'All packages';
+  const setScope = scope => {
+    if (App.scope === scope) return;
+    App.scope = scope;
+    $('#scopeBuild').classList.toggle('on', scope === 'build');
+    $('#scopeAll').classList.toggle('on', scope === 'all');
     App.vb = null;  // refit to the new extent
     buildGraphView();
   };
+  $('#scopeBuild').onclick = () => setScope('build');
+  $('#scopeAll').onclick = () => setScope('all');
 
   const bar = $('#dockbar');
   bar.addEventListener('pointerdown', ev => {
