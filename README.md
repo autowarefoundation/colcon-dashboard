@@ -24,23 +24,32 @@ To install from a checkout, replace the package name with the path to this repos
 
 ## Quick start
 
-Run a build. The plugin starts the dashboard for the workspace and prints its address:
+Run a build with the dashboard switched on. The plugin starts it and prints its address:
 
 ```text
-$ colcon build
+$ colcon build --event-handlers mission_control+
 [mission-control] dashboard: http://127.0.0.1:8635/
 ```
 
+The plugin stays off by default, so a plain `colcon build` starts no server. To start the dashboard on every build, set `COLCON_MISSION_CONTROL=1` in your environment, or enable the handler in `~/.colcon/defaults.yaml`:
+
+```yaml
+build:
+  event-handlers: [mission_control+]
+```
+
+The command line toggle wins over the environment default in both directions.
+
 Each workspace gets exactly one server, on a stable port derived from the workspace path. A second `colcon build` reuses it, and a file lock refuses duplicate servers. The server keeps running after the build, so the page stays available for the next build and for post-mortems.
 
-You can also run it by hand, with or without a build:
+You can also run it by hand, with or without the plugin:
 
 ```bash
 colcon-mission-control ~/projects/autoware          # start, or print the running URL
 colcon-mission-control ~/projects/autoware --stop   # stop this workspace's server
+colcon-mission-control --list                       # all running servers
+colcon-mission-control --stop-all                   # stop every server
 ```
-
-To turn the plugin off: `--event-handlers mission_control-` for one build, or `export COLCON_MISSION_CONTROL=0` for all builds.
 
 The server follows `log/latest_build`. If a new build starts in the same workspace, the page switches to it and shows a notice.
 
@@ -138,6 +147,8 @@ Per-package logs come from `log/<build>/<package>/`. The server serves them incr
 | `--host` | `127.0.0.1` | Bind address. Use `0.0.0.0` to reach the page from another machine |
 | `--log-base` | `log` | Log directory, relative to the workspace |
 | `--stop` | | Stop the server that watches this workspace |
+| `--list` | | List the running servers of all workspaces |
+| `--stop-all` | | Stop the servers of all workspaces |
 
 ## API
 

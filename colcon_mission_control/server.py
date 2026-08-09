@@ -662,6 +662,32 @@ def instance_url(info):
     return f"http://{info.get('host', '127.0.0.1')}:{info['port']}/"
 
 
+def all_instances():
+    """The live servers of every workspace; stale entries get pruned."""
+    out = []
+    try:
+        names = sorted(os.listdir(CACHE_DIR))
+    except OSError:
+        return out
+    for name in names:
+        if not name.endswith(".json"):
+            continue
+        path = os.path.join(CACHE_DIR, name)
+        try:
+            with open(path) as f:
+                info = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if probe_instance(info):
+            out.append(info)
+        else:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+    return out
+
+
 def ensure_running(workspace, wait=4.0):
     """Reuse the workspace's server, or spawn a detached one.
 
@@ -698,7 +724,25 @@ def main():
                     help="log directory relative to the workspace (default: log)")
     ap.add_argument("--stop", action="store_true",
                     help="stop the server that watches this workspace")
+    ap.add_argument("--list", action="store_true", dest="list_servers",
+                    help="list the running servers of all workspaces")
+    ap.add_argument("--stop-all", action="store_true",
+                    help="stop the servers of all workspaces")
     args = ap.parse_args()
+
+    if args.list_servers or args.stop_all:
+        infos = all_instances()
+        if not infos:
+            print("no servers run")
+            return
+        for info in infos:
+            if args.stop_all:
+                os.kill(info["pid"], signal.SIGTERM)
+                print(f"stopped {info['workspace']} (pid {info['pid']})")
+            else:
+                print(f"{instance_url(info)}  pid {info['pid']}  "
+                      f"{info['workspace']}")
+        return
 
     workspace = os.path.realpath(args.workspace)
     if not os.path.isdir(workspace):
