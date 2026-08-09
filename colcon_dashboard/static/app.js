@@ -1577,9 +1577,19 @@ function hideTooltip() { $('#tooltip').hidden = true; }
 function drawGantt() {
   const svg = $('#gantt');
   const wrap = $('#ganttwrap');
+  const nowS0 = Date.now() / 1000;
+  const endOf = p => p.t1 || (App.active ? nowS0 : p.t0);
+  const rank = { failed: 0, aborted: 1, building: 2, done: 3, skipped: 4 };
+  const cmp = {
+    start: (a, b) => a[1].t0 - b[1].t0,
+    duration: (a, b) => (endOf(b[1]) - b[1].t0) - (endOf(a[1]) - a[1].t0),
+    end: (a, b) => endOf(a[1]) - endOf(b[1]),
+    status: (a, b) => (rank[a[1].s] ?? 9) - (rank[b[1].s] ?? 9)
+                      || a[1].t0 - b[1].t0,
+  }[App.ganttSort] || ((a, b) => a[1].t0 - b[1].t0);
   const rows = Object.entries(App.pkgs)
     .filter(([, p]) => p.t0)
-    .sort((a, b) => a[1].t0 - b[1].t0);
+    .sort(cmp);
   svg.innerHTML = '';
   if (!rows.length || !App.buildStarted) return;
 
@@ -2244,7 +2254,10 @@ function setView(v) {
   $('#layoutSel').style.display = showGraph ? '' : 'none';
   document.querySelectorAll('.vsep.gonly')
     .forEach(x => x.style.display = showGraph ? '' : 'none');
+  document.querySelectorAll('.vsep.bothonly')  // between the two control groups
+    .forEach(x => x.style.display = v === 'split' ? '' : 'none');
   $('#gfollowBtn').style.display = showGantt ? '' : 'none';
+  $('#gsortSel').style.display = showGantt ? '' : 'none';
   updateForceCtl();
   dispatchEvent(new Event('resize'));  // both panels take their new sizes
   if (showGantt) drawGantt();
@@ -2280,6 +2293,14 @@ function initViews() {
   };
   updateForceCtl();
   $('#layoutSelect').onchange = ev => setLayoutMode(ev.target.value);
+  App.ganttSort = localStorage.getItem('cmc-gsort') || 'start';
+  const gsort = $('#gsortSelect');
+  gsort.value = App.ganttSort;
+  gsort.onchange = () => {
+    App.ganttSort = gsort.value;
+    localStorage.setItem('cmc-gsort', gsort.value);
+    drawGantt();
+  };
   const gf = $('#gfollowBtn');
   const gwrap = $('#ganttwrap');
   gf.onclick = () => {

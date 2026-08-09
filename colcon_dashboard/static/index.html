@@ -91,7 +91,15 @@
   <button class="vtab on" data-view="graph">Dependency graph</button>
   <button class="vtab" data-view="gantt">Timeline</button>
   <button class="vtab" data-view="split">Side by side</button>
-  <span class="vsep gonly"></span>
+  <span class="vsep"></span>
+  <label id="gsortSel" style="display:none" title="timeline row order">order <select id="gsortSelect">
+    <option value="start">start time</option>
+    <option value="duration">duration</option>
+    <option value="end">end time</option>
+    <option value="status">status</option>
+  </select></label>
+  <button id="gfollowBtn" class="on" style="display:none" title="auto-scroll to the newest packages as they start">⤓ follow new</button>
+  <span class="vsep bothonly"></span>
   <button id="fitBtn" title="frame the whole graph">Fit</button>
   <button id="followBuildBtn" title="keep the camera on the packages that build now; pan or zoom to release">⌖ follow build</button>
   <label id="layoutSel" title="graph layout">layout <select id="layoutSelect">
@@ -106,7 +114,6 @@
       <button id="scopeAll">whole workspace</button>
     </span>
   </span>
-  <button id="gfollowBtn" class="on" style="display:none" title="auto-scroll to the newest packages as they start">⤓ follow new</button>
   <span class="searchwrap">
     <input id="gsearch" type="text" placeholder="find package" spellcheck="false"
            title="highlight matching packages; Enter jumps through them">

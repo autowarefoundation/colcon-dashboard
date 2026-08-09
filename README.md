@@ -118,7 +118,9 @@ Fit and follow build drive the camera in every mode. In the force and 3D modes, 
 
 ### Timeline
 
-A Gantt chart of every started package, sorted by start time, with a time axis and a dashed now line. Bar colors match the graph states.
+A Gantt chart of every started package, with a time axis and a dashed now line. Bar colors match the graph states.
+
+The **order** menu sorts the rows: by start time, by duration with the longest build first, by end time, or by status with failures on top. The choice persists.
 
 The chart makes the parallelism and the long serial chains visible. It auto-scrolls to the newest bars as they start. Scroll up to release, or use the **⤓ follow new** toggle. Drag anywhere to pan, like the graph.
 
