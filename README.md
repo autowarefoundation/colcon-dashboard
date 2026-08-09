@@ -82,7 +82,7 @@ The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / 
 
 The workspace picker lists your recent workspaces with their build count, log size, and last build time, and shows live progress for workspaces that build now. A star pins a favorite to the top. The picker also opens any path and scans your home directory for colcon workspaces.
 
-The build picker lists every build of the workspace with its log size. Open one and the whole dashboard shows that build, with the `build` query parameter in the address. The 🗑 buttons delete one build's logs, and a prune action keeps the last three. The server refuses to delete a build that runs now.
+The build picker lists every build of the workspace with its log size and its outcome: a passed, failed, or aborted chip, with the done, failed, aborted, and skipped package counts. The outcome comes from one pass over the build's `events.log`, cached in a small file inside the build folder. Open a build and the whole dashboard shows it, with the `build` query parameter in the address. The 🗑 buttons delete one build's logs, and a prune action keeps the last three. The server refuses to delete a build that runs now.
 
 The right side is the system strip. A colcon build can exhaust the machine, so pressure stays visible at all times:
 
@@ -152,8 +152,17 @@ The dock opens with a pinned **build log** tab: the whole build, as a terminal s
 - The **search** box filters as you type: matching lines highlight, Enter and Shift+Enter step through them, and the search stays live while the log streams.
 - A selector switches a package pane between the timestamped output, `stdout+stderr`, `stderr`, `stdout`, and the command log.
 - ANSI colors render as in a terminal: the 16 classic colors, 256-color, and truecolor, with palettes tuned per theme. Uncolored lines that match error or warning patterns still get color.
-- When a package fails, its pane opens by itself and a toast points to it.
+- When a package fails, its pane opens by itself and a toast points to it. A page opened on an already failed build opens the failed packages' panes too, earliest failure first.
 - Drag the bar above the dock to resize it.
+
+### AI failure analysis
+
+When the [claude CLI](https://claude.com/claude-code) is installed, the pane of a failed package shows an **✦ ask claude** button. It starts a headless `claude` run in the workspace, with the tail of the failed log as the prompt. A new ✦ pane streams the investigation live: the files it reads, the commands it runs, and the answer.
+
+- Nothing runs by itself. Each analysis starts with a click, and it spends your Claude usage.
+- The run gets read tools approved and no edit tools, and headless claude refuses actions that need more permission.
+- The transcript persists next to the package's logs, so it survives a server restart and reopens instantly.
+- The input box under the transcript asks follow-up questions in the same session, through `claude --resume`.
 
 ### Theme
 
@@ -196,6 +205,8 @@ Workspace endpoints take a `ws=<path>` query parameter. Add `build=<build id>` t
 | `/api/builds?ws=` | The `build_*` directories under the log base |
 | `/api/log/<pkg>?ws=&offset=N&file=streams` | A log chunk from byte `N`, plus the new offset |
 | `/api/buildlog?ws=&offset=N` | A chunk of the combined build log, same shape |
+| `/api/analyze/<pkg>?ws=&q=` (POST) | Starts an AI analysis of a failed package, or asks a follow-up |
+| `/api/analysis/<pkg>?ws=&offset=N` | The analysis transcript from byte `N`, plus a running flag |
 | `/api/stop` (POST) | Stops the server, like `colcon-dashboard --stop` |
 
 ## Limits

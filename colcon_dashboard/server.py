@@ -371,6 +371,7 @@ class BuildMonitor:
         self.last_request = time.time()
         self._prev_cpu = {}
         self._builds_cache = None
+        self.analyses = {}  # (build_dir, pkg) -> AIAnalysis
 
     def sample_system(self):
         """CPU %, per-core %, memory and swap from /proc; None if unavailable."""
@@ -669,6 +670,7 @@ class BuildMonitor:
             "total": len(packages),
             "packages": packages,
             "sys": self.sample_system(),
+            "ai": bool(CLAUDE_BIN),
             "seq": self.seq,
         }
 
@@ -746,6 +748,187 @@ class BuildMonitor:
             "reset": reset,
         }
 
+    # -- AI failure analysis -------------------------------------------------
+
+    def analysis(self, pkg, build=None):
+        """The AIAnalysis for one package of one build; None without claude."""
+        if not CLAUDE_BIN or "/" in pkg or ".." in pkg or not pkg:
+            return None
+        build_dir = self.build_dir
+        if build and re.fullmatch(r"build_[\w.-]+", build):
+            build_dir = os.path.join(self.log_base, build)
+        if not build_dir or not os.path.isdir(os.path.join(build_dir, pkg)):
+            return None
+        key = (build_dir, pkg)
+        with self.lock:
+            a = self.analyses.get(key)
+            if a is None:
+                a = self.analyses[key] = AIAnalysis(
+                    self.workspace, build_dir, pkg)
+        return a
+
+    def ai_prompt(self, pkg, build_dir):
+        src = self.index.packages.get(pkg, {}).get("path", "")
+        tail = b""
+        for fn in ("stderr.log", "stdout_stderr.log"):
+            path = os.path.join(build_dir, pkg, fn)
+            try:
+                with open(path, "rb") as f:
+                    f.seek(max(0, os.path.getsize(path) - 24 * 1024))
+                    tail = f.read()
+            except OSError:
+                continue
+            if tail.strip():
+                break
+        return (
+            f"The colcon build of the package '{pkg}' failed in this"
+            " workspace.\n"
+            + (f"The package source is in {src}.\n" if src else "")
+            + "Find the reason and answer briefly:\n"
+              "1. The exact error, with the file and line it points to.\n"
+              "2. The root cause.\n"
+              "3. A concrete fix.\n"
+              "Read source files when they help. Do not change any file.\n"
+              "The tail of the failed build log follows.\n\n"
+            + tail.decode("utf-8", "replace")
+        )
+
+
+# ---------------------------------------------------------------------------
+# AI failure analysis: shell out to the claude CLI when it is installed
+# ---------------------------------------------------------------------------
+
+def _find_claude():
+    """The claude CLI; ~/.local/bin is not on the systemd user PATH."""
+    found = shutil.which("claude")
+    if found:
+        return found
+    cand = os.path.join(os.path.expanduser("~"), ".local", "bin", "claude")
+    return cand if os.access(cand, os.X_OK) else None
+
+
+CLAUDE_BIN = _find_claude()
+AI_FILE = "claude-analysis.json"
+AI_DIM = "\x1b[90m"
+AI_BOLD = "\x1b[1m"
+AI_RESET = "\x1b[0m"
+
+
+class AIAnalysis:
+    """One claude CLI conversation about one package's failure.
+
+    The transcript accumulates in memory and persists next to the package's
+    logs, so a finished analysis survives a server restart. The saved session
+    id lets --resume turn the analysis into a conversation.
+    """
+
+    def __init__(self, workspace, build_dir, pkg):
+        self.workspace = workspace
+        self.build_dir = build_dir
+        self.pkg = pkg
+        self.lock = threading.Lock()
+        self.buf = b""
+        self.running = False
+        self.session_id = None
+        try:
+            with open(self._path()) as f:
+                d = json.load(f)
+            self.buf = d.get("text", "").encode()
+            self.session_id = d.get("session_id")
+        except (OSError, ValueError):
+            pass
+
+    def _path(self):
+        return os.path.join(self.build_dir, self.pkg, AI_FILE)
+
+    def _append(self, text):
+        with self.lock:
+            self.buf += text.encode()
+
+    def read(self, offset):
+        with self.lock:
+            size = len(self.buf)
+            reset = offset < 0 or offset > size
+            if reset:
+                offset = 0
+            data = self.buf[offset:size].decode("utf-8", "replace")
+        return {"size": size, "start": 0, "offset": size, "data": data,
+                "reset": reset, "running": self.running}
+
+    def start(self, prompt, resume, label):
+        with self.lock:
+            if self.running:
+                return False
+            self.running = True
+        threading.Thread(target=self._run, args=(prompt, resume, label),
+                         daemon=True).start()
+        return True
+
+    def _run(self, prompt, resume, label):
+        timer = None
+        try:
+            lead = "\n" if self.buf else ""
+            self._append(f"{lead}{AI_BOLD}❯ {label}{AI_RESET}\n\n")
+            cmd = [CLAUDE_BIN]
+            if resume and self.session_id:
+                cmd += ["--resume", self.session_id]
+            cmd += ["-p", prompt, "--output-format", "stream-json",
+                    "--verbose", "--allowedTools", "Read,Grep,Glob",
+                    "--max-turns", "16"]
+            proc = subprocess.Popen(
+                cmd, cwd=self.workspace, stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                text=True, errors="replace")
+            timer = threading.Timer(600, proc.kill)  # a hung run dies here
+            timer.start()
+            first = True
+            for line in proc.stdout:
+                try:
+                    msg = json.loads(line)
+                except ValueError:
+                    continue
+                t = msg.get("type")
+                if t in ("system", "result"):
+                    self.session_id = msg.get("session_id") or self.session_id
+                    if t == "result":
+                        secs = round((msg.get("duration_ms") or 0) / 1000)
+                        self._append(f"\n{AI_DIM}─ answered in {secs}s"
+                                     f" · ask a follow-up below"
+                                     f"{AI_RESET}\n")
+                elif t == "assistant":
+                    for block in (msg.get("message") or {}).get("content", []):
+                        if block.get("type") == "text":
+                            text = block.get("text", "").strip()
+                            if text:
+                                self._append(("" if first else "\n")
+                                             + text + "\n")
+                                first = False
+                        elif block.get("type") == "tool_use":
+                            arg = block.get("input") or {}
+                            hint = (arg.get("file_path") or arg.get("command")
+                                    or arg.get("pattern") or arg.get("path")
+                                    or "")
+                            hint = " ".join(str(hint).split())[:100]
+                            name = block.get("name", "tool")
+                            self._append(f"{AI_DIM}  → {name} {hint}"
+                                         f"{AI_RESET}\n")
+            rc = proc.wait()
+            if rc != 0:
+                self._append(f"{AI_DIM}claude exited with rc {rc}"
+                             f"{AI_RESET}\n")
+        except Exception as exc:
+            self._append(f"{AI_DIM}analysis failed: {exc}{AI_RESET}\n")
+        finally:
+            if timer is not None:
+                timer.cancel()
+            self.running = False
+            try:
+                with open(self._path(), "w") as f:
+                    json.dump({"text": self.buf.decode("utf-8", "replace"),
+                               "session_id": self.session_id}, f)
+            except OSError:
+                pass
+
 
 # ---------------------------------------------------------------------------
 # HTTP server
@@ -808,6 +991,31 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps({"ok": True}))
         if path in ("/api/builds/delete", "/api/builds/prune"):
             return self._manage_builds(path, q)
+        if path.startswith("/api/analyze/"):
+            if not CLAUDE_BIN:
+                return self._send(400, json.dumps(
+                    {"error": "the claude CLI is not installed"}))
+            mon = self._monitor(q)
+            if mon is None:
+                return self._send(400, json.dumps({"error": "no workspace"}))
+            pkg = path[len("/api/analyze/"):]
+            a = mon.analysis(pkg, q.get("build", [None])[0])
+            if a is None:
+                return self._send(400, json.dumps({"error": "bad request"}))
+            question = (q.get("q", [None])[0] or "").strip()
+            if question and a.session_id:
+                started = a.start(question, True, question)
+            elif a.buf and not question:
+                started = False  # an answer exists: just open it
+            else:
+                prompt = mon.ai_prompt(pkg, a.build_dir)
+                if question:  # a question, but no session to resume
+                    prompt += f"\n\nThe user asks: {question}"
+                started = a.start(
+                    prompt, False,
+                    question or f"why did {pkg} fail to build?")
+            return self._send(200, json.dumps(
+                {"ok": True, "started": started}))
         self._send(404, json.dumps({"error": "not found"}))
 
     def _manage_builds(self, path, q):
@@ -908,6 +1116,15 @@ class Handler(BaseHTTPRequestHandler):
                     query_int(q, "offset", -1),
                     limit=query_int(q, "limit", 0) or None,
                     align=bool(query_int(q, "align", 0)))))
+            if path.startswith("/api/analysis/"):
+                if not CLAUDE_BIN:
+                    return self._send(200, json.dumps({"ai": False}))
+                a = mon.analysis(path[len("/api/analysis/"):],
+                                 q.get("build", [None])[0])
+                if a is None:
+                    return self._send(400, json.dumps({"error": "bad request"}))
+                return self._send(200, json.dumps(
+                    a.read(query_int(q, "offset", -1))))
             if path.startswith("/api/log/"):
                 pkg = path[len("/api/log/"):]
                 which = q.get("file", ["combined"])[0]

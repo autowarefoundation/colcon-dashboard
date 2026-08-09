@@ -117,6 +117,16 @@ async function pollState() {
     App.buildId = s.build_id;
     App.failedSeen = new Set(
       Object.entries(s.packages).filter(([, p]) => p.s === 'failed').map(([n]) => n));
+    if (first && App.failedSeen.size) {
+      // a page opened on a failed build lands on the failures,
+      // earliest first: later failures are usually its cascade
+      const failed = Object.entries(s.packages)
+        .filter(([, p]) => p.s === 'failed')
+        .sort((a, b) => (a[1].t1 ?? 0) - (b[1].t1 ?? 0))
+        .slice(0, 6).map(([n]) => n);
+      for (const name of failed) openPane(name);
+      activatePane(failed[0]);
+    }
     if (!first) {
       toast(`New build started: <b>${s.build_id}</b>`, 'info');
       for (const pane of App.panes.values()) resetPane(pane);
@@ -125,6 +135,7 @@ async function pollState() {
   }
   App.pkgs = s.packages;
   App.active = s.active;
+  App.ai = !!s.ai;
   App.total = s.total;
   App.buildStarted = s.build_started;
   App.elapsedBase = s.elapsed;
@@ -1468,12 +1479,14 @@ function openPane(name) {
 
 function createPane(name) {
   const fixed = name === BUILD_PANE;
+  const ai = name.startsWith('ai:');
+  const pkg = ai ? name.slice(3) : name;
   $('#panes .placeholder')?.remove();
   const tab = document.createElement('div');
   tab.className = 'ltab';
   tab.innerHTML =
     `<span class="dot ${fixed ? 'c-building' : 'c-waiting'}"></span>` +
-    `<span>${fixed ? 'build log' : label(name)}</span>` +
+    `<span>${fixed ? 'build log' : (ai ? '✦ ' : '') + label(pkg)}</span>` +
     (fixed ? '' : `<button class="x" title="close">✕</button>`);
   tab.onclick = ev => {
     if (ev.target.classList.contains('x')) closePane(name);
@@ -1485,24 +1498,25 @@ function createPane(name) {
   pane.className = 'pane';
   pane.innerHTML = `
     <div class="phead">
-      <span class="pname">${fixed ? 'colcon build' : name}</span>
+      <span class="pname">${fixed ? 'colcon build' : (ai ? `✦ claude · ${pkg}` : name)}</span>
       <span class="chip">…</span>
       <span class="ph"></span>
       <span class="errn"></span>
+      ${fixed || ai ? '' : `<button class="askai" hidden title="explain this failure with the claude CLI">✦ ask claude</button>`}
       <span class="grow"></span>
       <input class="search" type="text" placeholder="search" spellcheck="false">
       <span class="scount"></span>
       <button class="sprev" title="previous match">↑</button>
       <button class="snext" title="next match">↓</button>
-      ${fixed ? '' : `<label>file <select class="fsel">
+      ${fixed || ai ? '' : `<label>file <select class="fsel">
         <option value="streams">output (timestamped)</option>
         <option value="combined">stdout+stderr</option>
         <option value="stderr">stderr</option>
         <option value="stdout">stdout</option>
         <option value="command">commands</option>
       </select></label>`}
-      <button class="tsbtn on" title="show or hide timestamps">🕒 ts</button>
-      <button class="earlier" style="display:none" title="load the whole log from the start">⤒ load all</button>
+      ${ai ? '' : `<button class="tsbtn on" title="show or hide timestamps">🕒 ts</button>
+      <button class="earlier" style="display:none" title="load the whole log from the start">⤒ load all</button>`}
       <button class="follow on" title="auto-scroll to the end">⤓ follow</button>
       ${fixed ? '' : `<button class="close" title="close pane">✕</button>`}
     </div>
@@ -1511,19 +1525,39 @@ function createPane(name) {
 
   const p = {
     name, el: pane, tabEl: tab, pre: pane.querySelector('pre'), fixed,
+    ai, pkg, running: false,
     offset: -1, buf: '', file: fixed ? 'combined' : 'streams',
     follow: true, lines: 0, fetching: false,
     sgr: newSgr(), start: null, noTrim: false, loadingEarlier: false,
     earlierBtn: pane.querySelector('.earlier'),
   };
-  p.earlierBtn.onclick = () => loadEarlier(p);
+  if (p.earlierBtn) p.earlierBtn.onclick = () => loadEarlier(p);
   const tsBtn = pane.querySelector('.tsbtn');
-  tsBtn.onclick = () => {
+  if (tsBtn) tsBtn.onclick = () => {
     const on = p.pre.classList.toggle('showts');
     tsBtn.classList.toggle('on', on);
     if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
   };
   initSearch(p);
+  pane.querySelector('.askai')?.addEventListener('click',
+    () => startAnalysis(name));
+  if (ai) {
+    const row = document.createElement('div');
+    row.className = 'askrow';
+    row.innerHTML =
+      `<input type="text" placeholder="ask claude a follow-up question…" spellcheck="false">
+       <button>ask</button>`;
+    const input = row.querySelector('input');
+    const send = () => {
+      const t = input.value.trim();
+      if (!t || p.running) return;
+      input.value = '';
+      startAnalysis(pkg, t);
+    };
+    row.querySelector('button').onclick = send;
+    input.onkeydown = ev => { if (ev.key === 'Enter') send(); };
+    pane.appendChild(row);
+  }
   pane.querySelector('.fsel')?.addEventListener('change', ev => {
     p.file = ev.target.value;
     resetPane(p);
@@ -1557,7 +1591,7 @@ function resetPane(p) {
 }
 
 function updateEarlierBtn(p) {
-  p.earlierBtn.style.display = p.start > 0 ? '' : 'none';
+  if (p.earlierBtn) p.earlierBtn.style.display = p.start > 0 ? '' : 'none';
 }
 
 /* ---- per-pane log search ---- */
@@ -1824,9 +1858,20 @@ async function pollPane(p) {
   try {
     const url = p.fixed
       ? `/api/buildlog?offset=${p.offset}${wsParam('&')}`
-      : `/api/log/${encodeURIComponent(p.name)}?offset=${p.offset}` +
-        `&file=${p.file}${wsParam('&')}`;
+      : p.ai
+        ? `/api/analysis/${encodeURIComponent(p.pkg)}?offset=${p.offset}` +
+          wsParam('&')
+        : `/api/log/${encodeURIComponent(p.name)}?offset=${p.offset}` +
+          `&file=${p.file}${wsParam('&')}`;
     const r = await (await fetch(url)).json();
+    if (p.ai) {
+      p.running = !!r.running;
+      const chip = p.el.querySelector('.chip');
+      chip.textContent = p.running ? 'thinking…' : (r.size ? 'answered' : 'ready');
+      chip.className = 'chip ' + (p.running ? 'building' : 'done');
+      p.tabEl.querySelector('.dot').className =
+        'dot ' + (p.running ? 'c-building' : 'c-done');
+    }
     if (r.reset) {
       p.pre.textContent = '';
       p.buf = '';
@@ -1871,8 +1916,25 @@ function appendLog(p, data) {
   if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
 }
 
+/* ---- AI failure analysis: shell out to the claude CLI on the server ---- */
+
+async function startAnalysis(pkg, question) {
+  openPane('ai:' + pkg);
+  try {
+    await fetch(`/api/analyze/${encodeURIComponent(pkg)}${wsParam()}` +
+      (question ? `&q=${encodeURIComponent(question)}` : ''),
+      { method: 'POST' });
+  } catch (e) { /* transient */ }
+  const p = App.panes.get('ai:' + pkg);
+  if (p) {
+    p.running = true;  // poll eagerly until the first response says otherwise
+    pollPane(p);
+  }
+}
+
 function updatePaneHeads() {
   for (const [name, p] of App.panes) {
+    if (p.ai) continue;  // its chip updates from /api/analysis responses
     if (p.fixed) {
       const chip = p.el.querySelector('.chip');
       chip.textContent = App.active ? 'live' : 'stopped';
@@ -1886,6 +1948,8 @@ function updatePaneHeads() {
     const s = st ? st.s : 'waiting';
     chip.textContent = s + (st?.rc != null && s === 'failed' ? ` rc ${st.rc}` : '');
     chip.className = 'chip ' + s;
+    const ask = p.el.querySelector('.askai');
+    if (ask) ask.hidden = !(App.ai && s === 'failed');
     p.el.querySelector('.ph').textContent =
       st && st.s === 'building'
         ? (st.ph || '') + (st.pct != null ? ` ${st.pct}%` : '') : '';
@@ -1898,7 +1962,9 @@ function updatePaneHeads() {
 function pollAllPanes() {
   for (const p of App.panes.values()) {
     const st = App.pkgs[p.name];
-    const busy = p.fixed ? App.active : st && (st.s === 'building' || st.t1 == null);
+    const busy = p.fixed ? App.active
+      : p.ai ? p.running
+      : st && (st.s === 'building' || st.t1 == null);
     // active pane always; background panes only while their package still writes
     if (p.name === App.activePane || busy || p.offset === -1) pollPane(p);
   }
