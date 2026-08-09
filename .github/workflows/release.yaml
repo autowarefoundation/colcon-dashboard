@@ -40,3 +40,52 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  ppa:
+    needs: build
+    runs-on: ubuntu-latest
+    # the ppa environment holds the uploader key and pauses for approval
+    environment:
+      name: ppa
+      url: https://launchpad.net/~xmfcx/+archive/ubuntu/colcon-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y devscripts debhelper dh-python dput \
+            pybuild-plugin-pyproject python3-all
+      - name: Import the upload key
+        env:
+          PPA_GPG_PRIVATE_KEY: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent || true
+          printf '%s\n' "$PPA_GPG_PRIVATE_KEY" | gpg --batch --import
+      - name: Build, sign, and upload the source packages
+        env:
+          PPA_GPG_PASSPHRASE: ${{ secrets.PPA_GPG_PASSPHRASE }}
+        run: |
+          keyid=$(gpg --batch --list-secret-keys --with-colons \
+                  | awk -F: '/^sec/{print $5; exit}')
+          printf '%s\n' "$PPA_GPG_PASSPHRASE" > "$RUNNER_TEMP/pf"
+          for series in noble; do
+            version="${GITHUB_REF_NAME}ppa1~${series}1"
+            cat > debian/changelog <<EOF
+          colcon-dashboard (${version}) ${series}; urgency=medium
+
+            * New upstream release.
+
+           -- Mete Fatih Cırıt <mfc@autoware.org>  $(date -R)
+          EOF
+            dpkg-buildpackage -S -sa -us -uc
+            debsign -k"$keyid" \
+              -p"gpg --batch --pinentry-mode loopback --passphrase-file $RUNNER_TEMP/pf" \
+              "../colcon-dashboard_${version}_source.changes"
+            dput ppa:xmfcx/colcon-dashboard \
+              "../colcon-dashboard_${version}_source.changes"
+            git checkout -- debian/changelog
+          done
+          rm -f "$RUNNER_TEMP/pf"
