@@ -13,14 +13,13 @@ Rules-Requires-Root: no
 
 Package: python3-colcon-dashboard
 Architecture: all
-Depends: ${misc:Depends}, ${python3:Depends}, python3-colcon-core
+Depends: ${misc:Depends}, ${python3:Depends}
 Description: live web dashboard for colcon builds
  Colcon Dashboard serves a single-page dashboard for a colcon
  workspace: a state-colored dependency graph with layered, force, and 3D
  layouts, a Gantt timeline, isolated per-package log panes with terminal
  colors, and CPU, RAM, and swap meters with a per-core heatmap.
  .
- The package registers a colcon plugin. Enable it for one build with
- --event-handlers dashboard+ or for every build with
- COLCON_DASHBOARD=1, or start the dashboard by hand with the
- colcon-dashboard command.
+ One server per machine serves every workspace. Start it with the
+ colcon-dashboard command, or install it as a systemd user service
+ with colcon-dashboard --install-service.

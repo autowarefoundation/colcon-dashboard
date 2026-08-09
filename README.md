@@ -6,70 +6,47 @@ The server is one Python file. It uses only the standard library. It works on an
 
 ## Install
 
-The package has two parts: the `colcon-dashboard` command, and a colcon plugin that can start the dashboard when `colcon build` runs.
+```bash
+pipx install colcon-dashboard
+colcon-dashboard --install-service
+```
 
-On Ubuntu, install the apt package from the PPA. This is the official method. It puts the plugin in the same Python environment as the apt colcon, where colcon finds it:
+The service starts the server at login and restarts it on failure. Open <http://127.0.0.1:8642/> and pick your workspace. That is the whole setup.
+
+On Ubuntu, the apt package from the PPA does the same job and updates with the system:
 
 ```bash
 sudo add-apt-repository ppa:xmfcx/colcon-dashboard
 sudo apt install python3-colcon-dashboard
-```
-
-For other setups, install from PyPI into the environment that runs colcon:
-
-- colcon in a virtualenv or a conda environment: `pip install colcon-dashboard` in that environment.
-- colcon installed with pipx: `pipx inject colcon-common-extensions colcon-dashboard`.
-- For the `colcon-dashboard` command alone, without the plugin: `pipx install colcon-dashboard`.
-
-To install from a checkout, replace the package name with the path to this repository.
-
-To keep the server always available, install it as a systemd user service:
-
-```bash
 colcon-dashboard --install-service
 ```
 
-The service starts at login and restarts on failure.
+Plain `pip install colcon-dashboard` works in any Python 3.8+ environment. To install from a checkout, replace the package name with the path to this repository. Without the service, `colcon-dashboard` starts the server by hand.
 
 ## Quick start
 
-Run a build with the dashboard switched on. The plugin starts it and prints the address of your workspace's page:
+Build as you always do, and open your workspace's page:
 
 ```text
-$ colcon build --event-handlers dashboard+
-[colcon-dashboard] dashboard: http://127.0.0.1:8642/?ws=%2Fhome%2Fuser%2Fws
+$ colcon build
+$ colcon-dashboard .
+http://127.0.0.1:8642/?ws=%2Fhome%2Fuser%2Fws
 ```
 
-The plugin stays off by default, so a plain `colcon build` starts no server.
-
-For daily use, turn it on once. Pick one of these:
-
-Add this line to your `~/.bashrc`:
-
-```bash
-export COLCON_DASHBOARD=1
-```
-
-Or enable the handler in `~/.colcon/defaults.yaml`:
-
-```yaml
-build:
-  event-handlers: [dashboard+]
-```
-
-After that, every `colcon build` starts the dashboard server, or reuses the one that already runs. The command line toggle wins over the environment default in both directions.
+The dashboard needs nothing from colcon: it reads the log files colcon already writes, so any build shows up, from any terminal, with any options.
 
 One server runs per machine, on port 8642, and serves every workspace. The page's `ws` query parameter picks the workspace, so each browser tab can show a different one. A file lock refuses duplicate servers, and the server keeps running after the build, so the pages stay available for the next build and for post-mortems.
 
 Click the workspace path in the header to open the workspace picker: your recent workspaces, a path box, and a scan of your home directory for colcon workspaces.
 
-You can also run it by hand, with or without the plugin:
+The command line:
 
 ```bash
 colcon-dashboard                              # start the server, or print its URL
 colcon-dashboard ~/projects/autoware          # same, and open this workspace
 colcon-dashboard --list                       # the known workspaces and their URLs
 colcon-dashboard --stop                       # stop the server
+colcon-dashboard --install-service            # install the systemd user service
 ```
 
 The server follows `log/latest_build`. If a new build starts in the same workspace, the page switches to it and shows a notice.

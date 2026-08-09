@@ -27,9 +27,6 @@ Issues = "https://github.com/autowarefoundation/colcon-dashboard/issues"
 [project.scripts]
 colcon-dashboard = "colcon_dashboard.server:main"
 
-[project.entry-points."colcon_core.event_handler"]
-dashboard = "colcon_dashboard.event_handler:DashboardEventHandler"
-
 [tool.setuptools]
 packages = ["colcon_dashboard"]
 

@@ -1369,37 +1369,6 @@ def register_workspace(info, workspace, timeout=2.0):
         return False
 
 
-def ensure_running(workspace=None, wait=4.0):
-    """Reuse the machine's server, or spawn a detached one.
-
-    Returns (url, started) - url is None when the server did not come up.
-    """
-    if workspace:
-        workspace = os.path.realpath(workspace)
-    info = read_server()
-    started = False
-    if not probe_server(info):
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        log_file = open(os.path.join(CACHE_DIR, "spawn.log"), "ab")
-        subprocess.Popen(
-            [sys.executable, "-m", "colcon_dashboard"],
-            stdout=log_file, stderr=subprocess.STDOUT,
-            stdin=subprocess.DEVNULL, start_new_session=True)
-        started = True
-        deadline = time.time() + wait
-        info = None
-        while time.time() < deadline:
-            time.sleep(0.2)
-            info = read_server()
-            if probe_server(info):
-                break
-        else:
-            return None, started
-    if workspace:
-        register_workspace(info, workspace)
-    return server_url(info, workspace), started
-
-
 SERVICE_UNIT = """\
 [Unit]
 Description=Colcon Dashboard
