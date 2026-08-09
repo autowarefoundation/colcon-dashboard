@@ -90,7 +90,11 @@
   <button class="vtab" data-view="gantt">Timeline</button>
   <button id="fitBtn" title="fit whole graph">Fit</button>
   <button id="frontierBtn" title="zoom to what is building now">Frontier</button>
-  <button id="layoutBtn" title="switch between the layered layout and a live force simulation (drag nodes to rearrange)">Layout: layered</button>
+  <label id="layoutSel" title="graph layout">layout <select id="layoutSelect">
+    <option value="layered">layered</option>
+    <option value="force">force</option>
+    <option value="3d">3D</option>
+  </select></label>
   <button id="scopeBtn" title="toggle between this build's packages and the whole workspace">This build</button>
   <button id="gfollowBtn" class="on" style="display:none" title="auto-scroll to the newest packages as they start">⤓ follow new</button>
   <span class="hint" id="prefixHint"></span>
@@ -100,6 +104,10 @@
   <div id="graphwrap"><svg id="graph"></svg><canvas id="graph3d"></canvas></div>
   <div id="ganttwrap" hidden><svg id="gantt"></svg></div>
   <div id="tooltip" hidden></div>
+  <div id="forceCtl" hidden title="how far the simulation spreads the nodes">
+    <label for="spreadSlider">spread</label>
+    <input id="spreadSlider" type="range" min="0.4" max="2.5" step="0.05" value="1">
+  </div>
 </main>
 
 <div id="dockbar" title="drag to resize"></div>

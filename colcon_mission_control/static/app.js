@@ -455,9 +455,21 @@ function updateNodes() {
 
 const Force = {
   nodes: [], links: [], alpha: 0, raf: null, dragging: null,
-  REPULSE: 950, LINK_DIST: 155, LINK_S: 0.5, AX: 0.045, AY: 0.005,
-  FRICTION: 0.6, DECAY: 0.972, MAXD2: 950 * 950, THETA2: 0.72,
+  REPULSE: 1600, LINK_DIST: 200, LINK_S: 0.5, AX: 0.035, AY: 0.0035,
+  FRICTION: 0.6, DECAY: 0.972, MAXD2: 1300 * 1300, THETA2: 0.72,
+  BASE: { REPULSE: 1600, LINK_DIST: 200, MAXD: 1300 },
 };
+
+function applySpread(m, reheat = true) {
+  Force.REPULSE = Force.BASE.REPULSE * m;
+  Force.LINK_DIST = Force.BASE.LINK_DIST * Math.sqrt(m);
+  Force.MAXD2 = (Force.BASE.MAXD * Math.sqrt(m)) ** 2;
+  if (reheat && App.layoutMode !== 'layered') {
+    Force.alpha = Math.max(Force.alpha, 0.5);
+    if (App.layoutMode === 'force' && !Force.raf)
+      Force.raf = requestAnimationFrame(forceTick);
+  }
+}
 
 function startForce(alpha = 1, is3d = false, keep = false) {
   if (!App.lay || !App.lay.nodes.size) return;
@@ -469,7 +481,7 @@ function startForce(alpha = 1, is3d = false, keep = false) {
       if (!n.cz) n.cz = Math.random() * 300 - 150;
     } else n.cz = 0;
     n.vx = 0; n.vy = 0; n.vz = 0; n.fx = null; n.fy = null;
-    n.r = Math.max(32, n.w * 0.58);
+    n.r = Math.max(36, n.w * 0.7);
   }
   const deg = new Map();
   for (const e of App.edgeList) {
@@ -643,7 +655,7 @@ function forcePhysics() {
   }
 
   // label-aware collision: ellipses, wide and flat like the node boxes
-  const CELL = 190, YW = 2.0, grid = new Map();
+  const CELL = 230, YW = 2.0, grid = new Map();
   F.nodes.forEach((n, i) => {
     const k = Math.floor(n.cx / CELL) + ':' + Math.floor(n.cy * YW / CELL);
     (grid.get(k) || grid.set(k, []).get(k)).push(i);
@@ -690,12 +702,18 @@ function svgCoords(ev) {
   return clientToWorld(ev.clientX, ev.clientY);
 }
 
+function updateForceCtl() {
+  $('#forceCtl').hidden =
+    !(App.view === 'graph' && App.layoutMode !== 'layered');
+}
+
 function setLayoutMode(mode) {
   const prev = App.layoutMode;
   App.layoutMode = mode;
   localStorage.setItem('cmc-layout', mode);
-  $('#layoutBtn').textContent = 'Layout: ' + mode;
+  $('#layoutSelect').value = mode;
   $('#graphwrap').classList.toggle('mode3d', mode === '3d');
+  updateForceCtl();
   if (prev === '3d' && mode !== '3d') exit3d();
   if (mode === 'force') startForce();
   else if (mode === '3d') enter3d();
@@ -1866,8 +1884,9 @@ function initViews() {
       $('#fitBtn').style.display = graphBtns ? '' : 'none';
       $('#frontierBtn').style.display = graphBtns ? '' : 'none';
       $('#scopeBtn').style.display = graphBtns ? '' : 'none';
-      $('#layoutBtn').style.display = graphBtns ? '' : 'none';
+      $('#layoutSel').style.display = graphBtns ? '' : 'none';
       $('#gfollowBtn').style.display = App.view === 'gantt' ? '' : 'none';
+      updateForceCtl();
       if (App.view === 'gantt') { stopForce(); exit3d(); drawGantt(); }
       else if (App.layoutMode === 'force' && !Force.raf) startForce(0.15);
       else if (App.layoutMode === '3d' && !G3.raf) enter3d(0.15, true);
@@ -1876,11 +1895,17 @@ function initViews() {
   $('#fitBtn').onclick = () => App.layoutMode === '3d' ? fit3d() : fitGraph();
   $('#frontierBtn').onclick = () =>
     App.layoutMode === '3d' ? frontier3d() : frontierView();
-  $('#layoutBtn').textContent = 'Layout: ' + App.layoutMode;
+  $('#layoutSelect').value = App.layoutMode;
   $('#graphwrap').classList.toggle('mode3d', App.layoutMode === '3d');
-  const MODES = ['layered', 'force', '3d'];
-  $('#layoutBtn').onclick = () =>
-    setLayoutMode(MODES[(MODES.indexOf(App.layoutMode) + 1) % MODES.length]);
+  const slider = $('#spreadSlider');
+  slider.value = localStorage.getItem('cmc-spread') || '1';
+  applySpread(parseFloat(slider.value), false);
+  slider.oninput = () => {
+    localStorage.setItem('cmc-spread', slider.value);
+    applySpread(parseFloat(slider.value));
+  };
+  updateForceCtl();
+  $('#layoutSelect').onchange = ev => setLayoutMode(ev.target.value);
   const gf = $('#gfollowBtn');
   const gwrap = $('#ganttwrap');
   gf.onclick = () => {
