@@ -68,7 +68,7 @@ The server follows `log/latest_build`. If a new build starts in the same workspa
 
 ### Header
 
-The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count.
+The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The ⏻ button stops the server for this workspace, after a confirmation.
 
 The right side is the system strip. A colcon build can exhaust the machine, so pressure stays visible at all times:
 
@@ -173,6 +173,7 @@ Per-package logs come from `log/<build>/<package>/`. The server serves them incr
 | `/api/builds` | The `build_*` directories under the log base |
 | `/api/log/<pkg>?offset=N&file=streams` | A log chunk from byte `N`, plus the new offset |
 | `/api/buildlog?offset=N` | A chunk of the combined build log, same shape |
+| `/api/stop` (POST) | Stops the server, like `colcon-dashboard --stop` |
 
 ## Limits
 

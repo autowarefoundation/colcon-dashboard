@@ -36,6 +36,7 @@
     </div>
   </div>
   <button id="themeBtn" title="theme: system / light / dark">◐</button>
+  <button id="stopBtn" title="stop this dashboard server">⏻</button>
 </header>
 
 <section id="stats">
@@ -119,6 +120,16 @@
 </section>
 
 <div id="toasts"></div>
+
+<div id="confirm" hidden>
+  <div class="cbox">
+    <div class="ctext"></div>
+    <div class="cbtns">
+      <button class="ok danger">Stop the server</button>
+      <button class="cancel">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <script src="app.js"></script>
 </body>

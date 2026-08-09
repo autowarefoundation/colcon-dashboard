@@ -347,6 +347,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   color: var(--ink2);
 }
 #forceCtl input { width: 140px; accent-color: var(--accent); }
+#forceCtl[hidden] { display: none; }
 
 /* tooltip */
 #tooltip {
@@ -511,6 +512,35 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 .ab10 { background: var(--t10); } .ab11 { background: var(--t11); }
 .ab12 { background: var(--t12); } .ab13 { background: var(--t13); }
 .ab14 { background: var(--t14); } .ab15 { background: var(--t15); }
+
+/* confirmation overlay */
+#confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+#confirm[hidden] { display: none; }
+#confirm .cbox {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  padding: 18px 20px;
+  max-width: 420px;
+  font-size: 13px;
+  color: var(--ink);
+}
+#confirm .cbtns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
+#confirm .cbtns[hidden] { display: none; }
+#confirm button.danger {
+  color: #fff;
+  background: var(--critical);
+  border-color: var(--critical);
+}
 
 /* toasts */
 #toasts {

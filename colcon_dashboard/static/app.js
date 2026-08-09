@@ -1953,9 +1953,33 @@ function tickElapsed() {
   $('#t-elapsed').textContent = fmtDur(e);
 }
 
+function initStop() {
+  const overlay = $('#confirm');
+  const text = overlay.querySelector('.ctext');
+  const btns = overlay.querySelector('.cbtns');
+  $('#stopBtn').onclick = () => {
+    text.textContent =
+      `Stop the dashboard server for ${$('#ws').textContent || 'this workspace'}? ` +
+      'The page goes offline until you start the server again.';
+    btns.hidden = false;
+    overlay.hidden = false;
+  };
+  overlay.querySelector('.cancel').onclick = () => { overlay.hidden = true; };
+  overlay.addEventListener('click', ev => {
+    if (ev.target === overlay) overlay.hidden = true;
+  });
+  overlay.querySelector('.ok').onclick = async () => {
+    try { await fetch('/api/stop', { method: 'POST' }); } catch (e) { /* dying */ }
+    text.textContent = 'Server stopped. Start it again with colcon-dashboard, ' +
+      'or run a build with the plugin switched on.';
+    btns.hidden = true;
+  };
+}
+
 initTheme();
 initViews();
 initPanZoom();
+initStop();
 openPane(BUILD_PANE);  // the pinned whole-build terminal view
 pollState();
 setInterval(pollState, 1000);

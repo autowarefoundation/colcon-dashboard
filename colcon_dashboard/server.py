@@ -665,6 +665,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def do_POST(self):
+        path = unquote(urlparse(self.path).path)
+        if path == "/api/stop":
+            self._send(200, json.dumps({"ok": True}))
+            # a handler thread may signal the serve_forever loop to end
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+            return
+        self._send(404, json.dumps({"error": "not found"}))
+
     def do_GET(self):
         mon = self.monitor
         url = urlparse(self.path)
@@ -873,6 +882,7 @@ def main():
                 print(f"another server is starting for {workspace}")
             return
 
+    ThreadingHTTPServer.daemon_threads = True  # a stop request must not hang
     port = args.port if args.port else default_port(workspace)
     try:
         server = ThreadingHTTPServer((args.host, port), Handler)
