@@ -949,6 +949,49 @@ def ensure_running(workspace=None, wait=4.0):
     return server_url(info, workspace), started
 
 
+SERVICE_UNIT = """\
+[Unit]
+Description=Colcon Dashboard
+
+[Service]
+ExecStart={exe} -m colcon_dashboard
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+"""
+
+
+def install_service():
+    """Install and start the systemd user service."""
+    unit_dir = os.path.join(os.path.expanduser("~"), ".config",
+                            "systemd", "user")
+    os.makedirs(unit_dir, exist_ok=True)
+    unit_path = os.path.join(unit_dir, "colcon-dashboard.service")
+    with open(unit_path, "w") as f:
+        f.write(SERVICE_UNIT.format(exe=sys.executable))
+    print(f"wrote {unit_path}")
+    info = read_server()
+    if probe_server(info):  # hand the lock to the service
+        os.kill(info["pid"], signal.SIGTERM)
+        time.sleep(0.5)
+        print(f"stopped the running server (pid {info['pid']})")
+    for cmd in (["systemctl", "--user", "daemon-reload"],
+                ["systemctl", "--user", "enable", "--now",
+                 "colcon-dashboard.service"]):
+        r = subprocess.run(cmd)
+        if r.returncode != 0:
+            raise SystemExit(f"failed: {' '.join(cmd)}")
+    deadline = time.time() + 6
+    while time.time() < deadline:
+        time.sleep(0.3)
+        info = read_server()
+        if probe_server(info):
+            print(f"service running: {server_url(info)}")
+            return
+    print("the service started, but the server does not answer yet")
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="Colcon Dashboard - live colcon build dashboard")
@@ -964,7 +1007,13 @@ def main():
     ap.add_argument("--stop-all", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--list", action="store_true", dest="list_workspaces",
                     help="list the known workspaces")
+    ap.add_argument("--install-service", action="store_true",
+                    help="install and start the systemd user service")
     args = ap.parse_args()
+
+    if args.install_service:
+        install_service()
+        return
 
     info = read_server()
     alive = probe_server(info)

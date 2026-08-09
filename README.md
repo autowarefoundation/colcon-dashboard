@@ -23,6 +23,14 @@ For other setups, install from PyPI into the environment that runs colcon:
 
 To install from a checkout, replace the package name with the path to this repository.
 
+To keep the server always available, install it as a systemd user service:
+
+```bash
+colcon-dashboard --install-service
+```
+
+The service starts at login and restarts on failure.
+
 ## Quick start
 
 Run a build with the dashboard switched on. The plugin starts it and prints the address of your workspace's page:
@@ -164,6 +172,7 @@ Per-package logs come from `log/<build>/<package>/`. The server serves them incr
 | `--log-base` | `log` | Log directory, relative to a workspace |
 | `--stop` | | Stop the server |
 | `--list` | | List the known workspaces and their URLs |
+| `--install-service` | | Install and start the systemd user service |
 
 ## API
 
