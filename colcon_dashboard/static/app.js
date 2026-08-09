@@ -1978,6 +1978,14 @@ function fmtAgo(ts) {
   return `${Math.round(s / 86400)} d ago`;
 }
 
+function fmtBytes(n) {
+  if (!n) return '0';
+  const units = ['B', 'K', 'M', 'G', 'T'];
+  let i = 0;
+  while (n >= 1024 && i < 4) { n /= 1024; i++; }
+  return n.toFixed(n >= 10 || i === 0 ? 0 : 1) + units[i];
+}
+
 function renderWsList(items) {
   const list = $('#wslist');
   list.innerHTML = '';
@@ -1992,11 +2000,23 @@ function renderWsList(items) {
     a.href = `?ws=${encodeURIComponent(w.path)}`;
     const bits = [];
     if (w.active) bits.push(`<span class="live">building ${w.done ?? '?'}/${w.total ?? '?'}</span>`);
+    if (w.builds) bits.push(`${w.builds} builds · ${fmtBytes(w.log_size)} logs`);
+    if (w.last_build) bits.push(`built ${fmtAgo(w.last_build)}`);
     if (w.found) bits.push('found');
-    if (w.last_used) bits.push(fmtAgo(w.last_used));
     if (w.exists === false) bits.push('missing');
-    a.innerHTML = `<span class="wpath">${w.path}</span>` +
-                  `<span class="wmeta">${bits.join(' · ')}</span>`;
+    a.innerHTML =
+      `<button class="star${w.fav ? ' on' : ''}" title="favorite">★</button>` +
+      `<span class="wpath">${w.path}</span>` +
+      `<span class="wmeta">${bits.join(' · ')}</span>`;
+    a.querySelector('.star').onclick = async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      try {
+        await fetch(`/api/favorite?ws=${encodeURIComponent(w.path)}` +
+                    `&fav=${w.fav ? 0 : 1}`, { method: 'POST' });
+      } catch (e) { /* server gone */ }
+      openWsPicker();
+    };
     list.appendChild(a);
   }
 }
@@ -2037,8 +2057,10 @@ function initWsPicker() {
     try {
       const d = await (await fetch('/api/discover')).json();
       const known = new Set(wsItems.map(w => w.path));
-      for (const p of d.workspaces || []) {
-        if (!known.has(p)) wsItems.push({ path: p, exists: true, found: true });
+      for (const w of d.workspaces || []) {
+        if (!known.has(w.path)) {
+          wsItems.push({ ...w, exists: true, found: true });
+        }
       }
       renderWsList(wsItems);
     } catch (e) { /* server gone */ }

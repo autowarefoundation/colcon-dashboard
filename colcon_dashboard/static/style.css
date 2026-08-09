@@ -556,15 +556,25 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 #wslist { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .wsrow {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
+  gap: 10px;
   padding: 7px 10px;
   border: 1px solid var(--grid);
   border-radius: 7px;
   text-decoration: none;
   color: var(--ink);
 }
+.wsrow .wpath { flex: 1; }
+.wsrow .star {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font-size: 14px;
+  color: var(--baseline);
+  cursor: pointer;
+}
+.wsrow .star:hover { color: var(--warning); }
+.wsrow .star.on { color: var(--warning); }
 .wsrow:hover { border-color: var(--accent); background: var(--page); }
 .wsrow.cur { border-color: var(--accent); }
 .wsrow .wpath { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }

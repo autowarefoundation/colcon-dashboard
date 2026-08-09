@@ -695,6 +695,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, json.dumps({"error": "not a directory"}))
             return self._send(200, json.dumps(
                 {"ok": True, "workspace": mon.workspace}))
+        if path == "/api/favorite":
+            ws = q.get("ws", [None])[0]
+            if not ws:
+                return self._send(400, json.dumps({"error": "no workspace"}))
+            fav = q.get("fav", ["1"])[0] not in ("0", "false")
+            self.registry.set_favorite(
+                os.path.realpath(os.path.expanduser(ws)), fav)
+            return self._send(200, json.dumps({"ok": True}))
         self._send(404, json.dumps({"error": "not found"}))
 
     def do_GET(self):
@@ -708,8 +716,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/workspaces":
             return self._send(200, json.dumps(self.registry.overview()))
         if path == "/api/discover":
-            return self._send(200, json.dumps(
-                {"workspaces": discover_workspaces()}))
+            found = [{"path": p, **self.registry.stats(p)}
+                     for p in discover_workspaces()]
+            found.sort(key=lambda w: -(w.get("builds") or 0))  # by use
+            return self._send(200, json.dumps({"workspaces": found}))
 
         if path.startswith("/api/"):
             mon = self._monitor(q)
@@ -779,6 +789,7 @@ class Registry:
         self.log_base = log_base
         self.lock = threading.Lock()
         self.monitors = {}
+        self.stats_cache = {}
         try:
             with open(REGISTRY_FILE) as f:
                 self.recents = json.load(f)
@@ -799,10 +810,56 @@ class Registry:
             if head and head["path"] == ws and \
                     time.time() - head["last_used"] < 60:
                 return
+            old = next((r for r in self.recents if r["path"] == ws), None)
             self.recents = [r for r in self.recents if r["path"] != ws]
-            self.recents.insert(0, {"path": ws, "last_used": time.time()})
+            entry = {"path": ws, "last_used": time.time()}
+            if old and old.get("fav"):
+                entry["fav"] = True
+            self.recents.insert(0, entry)
             del self.recents[24:]
             self._save()
+
+    def set_favorite(self, ws, fav):
+        with self.lock:
+            for r in self.recents:
+                if r["path"] == ws:
+                    r["fav"] = bool(fav)
+                    break
+            else:
+                self.recents.insert(
+                    0, {"path": ws, "last_used": time.time(),
+                        "fav": bool(fav)})
+            self._save()
+
+    def stats(self, ws):
+        """Build count, log size, and last build time, cached briefly."""
+        now = time.time()
+        cached = self.stats_cache.get(ws)
+        if cached and now - cached[0] < 60:
+            return cached[1]
+        out = {"builds": 0, "log_size": 0, "last_build": None}
+        log_dir = os.path.join(ws, self.log_base)
+        newest = None
+        try:
+            for name in os.listdir(log_dir):
+                if name.startswith("build_"):
+                    out["builds"] += 1
+                    t = parse_build_id_time(name)
+                    if t and (newest is None or t > newest):
+                        newest = t
+        except OSError:
+            pass
+        out["last_build"] = newest
+        total = 0
+        for dirpath, _dirnames, filenames in os.walk(log_dir):
+            for fn in filenames:
+                try:
+                    total += os.stat(os.path.join(dirpath, fn)).st_size
+                except OSError:
+                    pass
+        out["log_size"] = total
+        self.stats_cache[ws] = (now, out)
+        return out
 
     def monitor(self, ws):
         try:
@@ -824,10 +881,16 @@ class Registry:
         with self.lock:
             recents = [dict(r) for r in self.recents]
             monitors = dict(self.monitors)
+        # favorites first, then the most recently used
+        recents.sort(key=lambda r: (not r.get("fav"),
+                                    -(r.get("last_used") or 0)))
         out = []
         for r in recents:
             entry = {"path": r["path"], "last_used": r.get("last_used"),
+                     "fav": bool(r.get("fav")),
                      "exists": os.path.isdir(r["path"])}
+            if entry["exists"]:
+                entry.update(self.stats(r["path"]))
             mon = monitors.get(r["path"])
             if mon is not None:
                 try:
