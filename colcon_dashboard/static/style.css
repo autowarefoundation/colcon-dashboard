@@ -105,6 +105,12 @@ button.on { color: var(--accent); border-color: var(--accent); }
 }
 .badge.live { color: var(--good); border-color: var(--good); }
 .badge.live .dot { animation: blink 1.6s ease-in-out infinite; }
+.badge.complete {
+  color: #fff;
+  background: var(--good);
+  border-color: var(--good);
+  font-weight: 700;
+}
 .badge.failed { color: var(--critical); border-color: var(--critical); }
 .badge.off { color: #fff; border-color: #fff; font-size: 12px; }
 
@@ -473,6 +479,19 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   border-bottom: 1px solid var(--grid);
   scrollbar-width: thin;
 }
+#closeAll {
+  order: 1;  /* stays after the tabs, which append before it */
+  align-self: center;
+  margin-left: 6px;
+  border: none;
+  background: none;
+  font-size: 10.5px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+#closeAll:hover { color: var(--critical); }
+#closeAll[hidden] { display: none; }
 .ltab {
   display: inline-flex;
   align-items: center;

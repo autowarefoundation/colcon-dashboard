@@ -165,7 +165,8 @@ async function fetchGraph() {
 function setBadge(cls, text) {
   const b = $('#livebadge');
   b.className = 'badge ' + (cls === 'live' ? 'live'
-    : cls === 'failed' ? 'failed' : cls === 'offline' ? 'off' : '');
+    : cls === 'failed' ? 'failed' : cls === 'complete' ? 'complete'
+    : cls === 'offline' ? 'off' : '');
   b.innerHTML = `<span class="dot">●</span> ${text}`;
   document.body.classList.toggle('offline', cls === 'offline');
 }
@@ -245,7 +246,7 @@ function applyState(s) {
   $('#workers').textContent = s.workers ? `${s.workers} workers` : '';
   if (s.active) setBadge('live', 'LIVE');
   else if (failed) setBadge('failed', 'FAILED');
-  else if (done === s.total && s.total > 0) setBadge('idle', 'COMPLETE');
+  else if (done === s.total && s.total > 0) setBadge('complete', 'COMPLETE');
   else setBadge('idle', 'STOPPED');
 
   $('#t-done').textContent = done;
@@ -1687,6 +1688,10 @@ function openPane(name) {
   activatePane(name);
 }
 
+function updateCloseAll() {
+  $('#closeAll').hidden = ![...App.panes.values()].some(p => !p.fixed);
+}
+
 function createPane(name) {
   const fixed = name === BUILD_PANE;
   const ai = name.startsWith('ai:');
@@ -1805,6 +1810,7 @@ function createPane(name) {
   });
   pane.querySelector('.close')?.addEventListener('click', () => closePane(name));
   App.panes.set(name, p);
+  updateCloseAll();
   pollPane(p);
 }
 
@@ -1967,6 +1973,7 @@ function closePane(name) {
   p.el.remove();
   p.tabEl.remove();
   App.panes.delete(name);
+  updateCloseAll();
   if (App.activePane === name) {
     const last = [...App.panes.keys()].pop();
     if (last) activatePane(last);
@@ -2623,6 +2630,10 @@ initWsPicker();
 initBuildPicker();
 initGraphSearch();
 initGanttPan();
+$('#closeAll').onclick = () => {
+  for (const name of [...App.panes.keys()]) closePane(name);
+  activatePane(BUILD_PANE);
+};
 $('#sysBtn').onclick = () => document.body.classList.toggle('showsys');
 openPane(BUILD_PANE);  // the pinned whole-build terminal view
 pollState();

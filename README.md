@@ -161,6 +161,7 @@ The dock opens with a pinned **build log** tab: the whole build, as a terminal s
 - A selector switches a package pane between the timestamped output, `stdout+stderr`, `stderr`, `stdout`, and the command log.
 - ANSI colors render as in a terminal: the 16 classic colors, 256-color, and truecolor, with palettes tuned per theme. Uncolored lines that match error or warning patterns still get color.
 - When a package fails, its pane opens by itself and a toast points to it. A page opened on an already failed build opens the failed packages' panes too, earliest failure first.
+- **✕ close all** at the end of the tab strip closes every tab except the build log.
 - Drag the bar above the dock to resize it.
 
 ### AI failure analysis
