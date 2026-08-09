@@ -80,7 +80,7 @@ The right side is the system strip. A colcon build can exhaust the machine, so p
 
 The meter fills as the build advances: green for done, animated blue stripes for building, red for failed, orange for aborted.
 
-The tiles count each state: done of total, building, ready, waiting (plus a blocked count after a failure), failed, aborted, and skipped. Elapsed time and the rate in packages per minute sit at the end.
+The tiles count each state: done out of the total, building, ready, waiting (plus a blocked count after a failure), failed, aborted, and skipped. Elapsed time and the rate in packages per minute sit at the end.
 
 ### Dependency graph
 
@@ -89,11 +89,11 @@ Every package in the build, laid out left to right by dependency depth. An edge 
 Node states combine color, border, and motion:
 
 - **Done**: a green wash.
-- **Building**: a blue box that slowly breathes, desynced per node. The box fills left to right with a deeper blue as make reports `[ 42%]` progress, and the label stays legible on top.
-- **Ready**: a dashed blue border. All dependencies are done, and the package starts as soon as a worker frees.
+- **Building**: a blue box that slowly breathes, each node in its own rhythm. The box fills left to right with a deeper blue as make reports `[ 42%]` progress, and the label stays legible on top.
+- **Ready**: a dashed blue border. All dependencies are done, and the package starts as soon as a worker becomes free.
 - **Next up**: a slow pulse. This waiting package starts when the packages that build now finish, because no deeper dependency blocks it.
 - **Waiting**: quiet gray. **Skipped**: gray with a struck label.
-- **Failed**: solid red. Everything downstream of a failure turns red-dashed with red edges. This blast radius stays distinct from packages that were merely abandoned when the build stopped.
+- **Failed**: solid red. Everything downstream of a failure turns red-dashed with red edges. This blast radius looks different from the packages that the stop only abandoned, which stay gray.
 - **Aborted**: orange. The package was building when the build stopped.
 
 Edges take color from their endpoints:
@@ -125,11 +125,11 @@ Fit and Frontier drive the camera in every mode. In the force and 3D modes, a **
 
 A Gantt chart of every started package, sorted by start time, with a time axis and a dashed now line. Bar colors match the graph states.
 
-The chart makes the parallelism and the long serial chains visible. It auto-scrolls to the newest bars as they start; scroll up to release, or use the **⤓ follow new** toggle.
+The chart makes the parallelism and the long serial chains visible. It auto-scrolls to the newest bars as they start. Scroll up to release, or use the **⤓ follow new** toggle.
 
 ### Log panes
 
-The dock opens with a pinned **build log** tab: the whole build as a terminal would show it, with `Starting >>>` and `Finished <<<` lines between every package's output. Click any package in the graph or the timeline to open its own tab next to it. Each tab has its own scrollback, so logs never interleave.
+The dock opens with a pinned **build log** tab: the whole build, as a terminal shows it, with `Starting >>>` and `Finished <<<` lines between every package's output. Click any package in the graph or the timeline to open its own tab next to it. Each tab has its own scrollback, so logs never interleave.
 
 - A pane follows new output until you scroll up. The **⤓ follow** button re-engages.
 - Panes open at the tail for an instant start. **⤒ load all** fetches the whole history in one click.
@@ -171,7 +171,8 @@ Per-package logs come from `log/<build>/<package>/`. The server serves them incr
 | `/api/state` | Job states, counts, timings, build metadata |
 | `/api/graph` | Direct dependency edges for the graph views |
 | `/api/builds` | The `build_*` directories under the log base |
-| `/api/log/<pkg>?offset=N&file=combined` | A log chunk from byte `N`, plus the new offset |
+| `/api/log/<pkg>?offset=N&file=streams` | A log chunk from byte `N`, plus the new offset |
+| `/api/buildlog?offset=N` | A chunk of the combined build log, same shape |
 
 ## Limits
 
