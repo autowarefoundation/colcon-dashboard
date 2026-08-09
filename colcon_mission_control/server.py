@@ -8,18 +8,28 @@ live dependency graph, a timeline, and isolated per-package log panes.
 Zero dependencies: Python 3.8+ standard library only. Works on any colcon
 workspace:
 
-    python3 server.py [WORKSPACE] [--port 8642] [--host 127.0.0.1]
+    colcon-mission-control [WORKSPACE] [--port N] [--host 127.0.0.1] [--stop]
 """
 
 import argparse
 import ast
+import hashlib
 import json
 import os
 import re
+import signal
+import subprocess
+import sys
 import threading
 import time
+import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime
+
+try:
+    import fcntl
+except ImportError:  # non-Unix: run without the single-instance lock
+    fcntl = None
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -387,8 +397,8 @@ class BuildMonitor:
             with self.lock:
                 self.state_json = json.dumps(
                     {"error": "no colcon build logs found under "
-                              f"{self.log_base}", "sys": self.sample_system(),
-                     "seq": self.seq})
+                              f"{self.log_base}", "workspace": self.workspace,
+                     "sys": self.sample_system(), "seq": self.seq})
             return
         build_id = os.path.basename(build_dir)
         if build_id != self.build_id:
@@ -610,33 +620,149 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(200, body, MIME.get(ext, "application/octet-stream"))
 
 
+# ---------------------------------------------------------------------------
+# Single instance per workspace
+# ---------------------------------------------------------------------------
+
+CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache",
+                         "colcon-mission-control")
+
+
+def instance_path(workspace):
+    key = hashlib.sha1(workspace.encode()).hexdigest()[:12]
+    return os.path.join(CACHE_DIR, key + ".json")
+
+
+def default_port(workspace):
+    return 8600 + int(hashlib.sha1(workspace.encode()).hexdigest()[:8], 16) % 300
+
+
+def read_instance(workspace):
+    try:
+        with open(instance_path(workspace)) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def probe_instance(info, timeout=0.8):
+    """True when the recorded server is alive and watches this workspace."""
+    if not info or "port" not in info:
+        return False
+    url = f"http://{info.get('host', '127.0.0.1')}:{info['port']}/api/state"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            state = json.load(r)
+        return state.get("workspace") == info.get("workspace")
+    except (OSError, ValueError):
+        return False
+
+
+def instance_url(info):
+    return f"http://{info.get('host', '127.0.0.1')}:{info['port']}/"
+
+
+def ensure_running(workspace, wait=4.0):
+    """Reuse the workspace's server, or spawn a detached one.
+
+    Returns (url, started) - url is None when the server did not come up.
+    """
+    workspace = os.path.realpath(workspace)
+    info = read_instance(workspace)
+    if probe_instance(info):
+        return instance_url(info), False
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    log_file = open(os.path.join(CACHE_DIR, "spawn.log"), "ab")
+    subprocess.Popen(
+        [sys.executable, "-m", "colcon_mission_control", workspace],
+        stdout=log_file, stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL, start_new_session=True)
+    deadline = time.time() + wait
+    while time.time() < deadline:
+        time.sleep(0.2)
+        info = read_instance(workspace)
+        if probe_instance(info):
+            return instance_url(info), True
+    return None, True
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="Colcon Mission Control - live colcon build dashboard")
     ap.add_argument("workspace", nargs="?", default=".",
                     help="colcon workspace root (default: current directory)")
-    ap.add_argument("--port", type=int, default=8642)
+    ap.add_argument("--port", type=int, default=None,
+                    help="HTTP port (default: a stable per-workspace port)")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--log-base", default="log",
                     help="log directory relative to the workspace (default: log)")
+    ap.add_argument("--stop", action="store_true",
+                    help="stop the server that watches this workspace")
     args = ap.parse_args()
 
     workspace = os.path.realpath(args.workspace)
     if not os.path.isdir(workspace):
         raise SystemExit(f"not a directory: {workspace}")
 
+    if args.stop:
+        info = read_instance(workspace)
+        if info and probe_instance(info):
+            os.kill(info["pid"], signal.SIGTERM)
+            print(f"stopped the server for {workspace} (pid {info['pid']})")
+        else:
+            print(f"no server runs for {workspace}")
+        return
+
+    # one server per workspace: hold an exclusive lock on the instance file
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    lock_file = open(instance_path(workspace), "a+")
+    if fcntl is not None:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            lock_file.seek(0)
+            try:
+                info = json.loads(lock_file.read() or "{}")
+            except ValueError:
+                info = {}
+            if "port" in info:
+                print(f"already running for {workspace}: {instance_url(info)}")
+            else:
+                print(f"another server is starting for {workspace}")
+            return
+
+    port = args.port if args.port else default_port(workspace)
+    try:
+        server = ThreadingHTTPServer((args.host, port), Handler)
+    except OSError:
+        if args.port:
+            raise SystemExit(f"port {args.port} is in use")
+        server = ThreadingHTTPServer((args.host, 0), Handler)  # any free port
+    port = server.server_address[1]
+
+    lock_file.seek(0)
+    lock_file.truncate()
+    json.dump({"workspace": workspace, "host": args.host, "port": port,
+               "pid": os.getpid()}, lock_file)
+    lock_file.flush()
+
     monitor = BuildMonitor(workspace, args.log_base)
     threading.Thread(target=monitor.run, daemon=True).start()
     Handler.monitor = monitor
 
-    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     print("Colcon Mission Control")
     print(f"  workspace: {workspace}")
-    print(f"  url:       http://{args.host}:{args.port}/")
+    print(f"  url:       http://{args.host}:{port}/")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        try:
+            os.unlink(instance_path(workspace))
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":

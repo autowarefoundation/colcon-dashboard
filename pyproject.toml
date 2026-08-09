@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "colcon-mission-control"
+version = "0.1.0"
+description = "Live web dashboard for colcon builds: dependency graph, timeline, per-package logs, system pressure"
+readme = "README.md"
+requires-python = ">=3.8"
+
+[project.scripts]
+colcon-mission-control = "colcon_mission_control.server:main"
+
+[project.entry-points."colcon_core.event_handler"]
+mission_control = "colcon_mission_control.event_handler:MissionControlEventHandler"
+
+[tool.setuptools]
+packages = ["colcon_mission_control"]
+
+[tool.setuptools.package-data]
+colcon_mission_control = ["static/*"]

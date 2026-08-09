@@ -4,16 +4,41 @@ A live web dashboard for `colcon build`. It shows how many packages are done, bu
 
 The server is one Python file. It uses only the standard library. It works on any colcon workspace, because it reads the `events.log` and `logger_all.log` files that colcon writes under `log/` for every build.
 
-## Quick start
+## Install
 
-1. Start a build in your workspace, or use a workspace that already has build logs.
-2. Start the server with the workspace path:
+Install with pip, into the same Python that runs colcon:
 
 ```bash
-python3 server.py ~/projects/autoware
+pip install /path/to/colcon-mission-control
 ```
 
-3. Open <http://127.0.0.1:8642/> in a browser.
+On Ubuntu with the apt colcon, pip refuses to touch the system Python. Install into your user site instead:
+
+```bash
+python3 -m pip install --user --break-system-packages /path/to/colcon-mission-control
+```
+
+The install registers a colcon plugin and the `colcon-mission-control` command.
+
+## Quick start
+
+Run a build. The plugin starts the dashboard for the workspace and prints its address:
+
+```text
+$ colcon build
+[mission-control] dashboard: http://127.0.0.1:8635/
+```
+
+Each workspace gets exactly one server, on a stable port derived from the workspace path. A second `colcon build` reuses it, and a file lock refuses duplicate servers. The server keeps running after the build, so the page stays available for the next build and for post-mortems.
+
+You can also run it by hand, with or without a build:
+
+```bash
+colcon-mission-control ~/projects/autoware          # start, or print the running URL
+colcon-mission-control ~/projects/autoware --stop   # stop this workspace's server
+```
+
+To turn the plugin off: `--event-handlers mission_control-` for one build, or `export COLCON_MISSION_CONTROL=0` for all builds.
 
 The server follows `log/latest_build`. If a new build starts in the same workspace, the page switches to it and shows a notice.
 
@@ -107,9 +132,10 @@ Per-package logs come from `log/<build>/<package>/`. The server serves them incr
 | Flag | Default | Meaning |
 |---|---|---|
 | `workspace` | `.` | Colcon workspace root (positional) |
-| `--port` | `8642` | HTTP port |
+| `--port` | stable per-workspace port | HTTP port. The default falls back to a free port when taken |
 | `--host` | `127.0.0.1` | Bind address. Use `0.0.0.0` to reach the page from another machine |
 | `--log-base` | `log` | Log directory, relative to the workspace |
+| `--stop` | | Stop the server that watches this workspace |
 
 ## API
 
@@ -122,6 +148,6 @@ Per-package logs come from `log/<build>/<package>/`. The server serves them incr
 
 ## Limits
 
-- One server watches one workspace. Start a second server on another port for a second workspace.
+- One server watches one workspace, and a lock enforces it. Each workspace gets its own server and port.
 - The page follows the latest build. Finished builds stay readable until a new build starts.
 - The server trusts the local workspace. Do not expose the port to an untrusted network.
