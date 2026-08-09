@@ -57,7 +57,7 @@ build:
   event-handlers: [dashboard+]
 ```
 
-After that, every `colcon build` starts the dashboard, or reuses the one that already runs for the workspace. The command line toggle wins over the environment default in both directions.
+After that, every `colcon build` starts the dashboard server, or reuses the one that already runs. The command line toggle wins over the environment default in both directions.
 
 One server runs per machine, on port 8642, and serves every workspace. The page's `ws` query parameter picks the workspace, so each browser tab can show a different one. A file lock refuses duplicate servers, and the server keeps running after the build, so the pages stay available for the next build and for post-mortems.
 
@@ -78,7 +78,7 @@ The server follows `log/latest_build`. If a new build starts in the same workspa
 
 ### Header
 
-The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The workspace path opens the workspace picker. The build id opens the build picker. The ⏻ button stops the server, after a confirmation.
+The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The workspace path opens the workspace picker. The build id opens the build picker. The power button stops the server, after a confirmation. When the server stops answering, the whole top panel turns red.
 
 The workspace picker lists your recent workspaces with their build count, log size, and last build time, and shows live progress for workspaces that build now. A star pins a favorite to the top. The picker also opens any path and scans your home directory for colcon workspaces.
 
@@ -89,6 +89,7 @@ The right side is the system strip. A colcon build can exhaust the machine, so p
 - A per-core heatmap, one cell per core. Cell color runs from the idle gray to full blue at 100% use. Hover a cell for the exact number.
 - CPU, RAM, and swap meters. A fill turns amber under pressure (CPU 85%, RAM 75%, swap 30%) and red near the limit (96%, 90%, 70%). At red the label also turns red and bold.
 - Hover the CPU meter for the load average. Hover the RAM meter for the exact percentage.
+- In a narrow window the strip folds behind a chart button and drops down on demand.
 
 ### Progress strip
 
@@ -156,7 +157,7 @@ The dock opens with a pinned **build log** tab: the whole build, as a terminal s
 
 ### Theme
 
-The page follows the system theme. The ◐ button cycles system, light, and dark. Every view recolors instantly, including the 3D canvas.
+The page follows the system theme. The theme button cycles system, light, and dark. Every view recolors instantly, including the 3D canvas.
 
 ## How it works
 
@@ -180,7 +181,7 @@ Per-package logs come from `log/<build>/<package>/`. The server serves them incr
 
 ## API
 
-Workspace endpoints take a `ws=<path>` query parameter.
+Workspace endpoints take a `ws=<path>` query parameter. Add `build=<build id>` to read an older build.
 
 | Endpoint | Returns |
 |---|---|
@@ -200,5 +201,5 @@ Workspace endpoints take a `ws=<path>` query parameter.
 ## Limits
 
 - One server per machine, and a lock enforces it. It serves any number of workspaces.
-- A page follows its workspace's latest build. Finished builds stay readable until a new build starts.
+- A page follows its workspace's latest build, unless its address pins an older one. Finished builds stay readable until their logs get deleted.
 - The server trusts the local workspace. Do not expose the port to an untrusted network.
