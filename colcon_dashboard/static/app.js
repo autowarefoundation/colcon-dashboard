@@ -62,7 +62,9 @@ async function pollState() {
   try {
     s = await (await fetch('/api/state')).json();
   } catch (e) {
-    setBadge('offline', App.stopped ? 'STOPPED' : 'OFFLINE');
+    setBadge('offline', App.stopped
+      ? 'STOPPED — the server was shut down'
+      : 'OFFLINE — the server does not answer');
     return;
   }
   if (s.error) {
@@ -109,8 +111,10 @@ async function fetchGraph() {
 
 function setBadge(cls, text) {
   const b = $('#livebadge');
-  b.className = 'badge ' + (cls === 'live' ? 'live' : cls === 'failed' ? 'failed' : '');
+  b.className = 'badge ' + (cls === 'live' ? 'live'
+    : cls === 'failed' ? 'failed' : cls === 'offline' ? 'off' : '');
   b.innerHTML = `<span class="dot">●</span> ${text}`;
+  document.body.classList.toggle('offline', cls === 'offline');
 }
 
 function fmtDur(sec) {

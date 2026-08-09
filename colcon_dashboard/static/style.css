@@ -106,6 +106,25 @@ button.on { color: var(--accent); border-color: var(--accent); }
 .badge.live { color: var(--good); border-color: var(--good); }
 .badge.live .dot { animation: blink 1.6s ease-in-out infinite; }
 .badge.failed { color: var(--critical); border-color: var(--critical); }
+.badge.off { color: #fff; border-color: #fff; font-size: 12px; }
+
+/* the server is gone: the whole top panel turns red */
+body.offline #topbar {
+  background: var(--critical);
+  border-bottom-color: var(--critical);
+}
+body.offline #topbar .brand,
+body.offline #topbar .brand .hex,
+body.offline #topbar .meta,
+body.offline #topbar .meta .mono {
+  color: #fff;
+}
+body.offline #topbar button {
+  color: #fff;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+body.offline #sysmeters { display: none; }
 @keyframes blink { 50% { opacity: 0.25; } }
 #topbar .spacer { flex: 1; }
 
