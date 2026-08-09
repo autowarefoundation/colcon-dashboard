@@ -536,6 +536,8 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 }
 #confirm .cbtns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
 #confirm .cbtns[hidden] { display: none; }
+#confirm button[disabled] { opacity: 0.6; cursor: wait; }
+#confirm code { font-family: var(--mono); background: var(--page); padding: 0 4px; border-radius: 4px; }
 #confirm button.danger {
   color: #fff;
   background: var(--critical);

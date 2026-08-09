@@ -62,7 +62,7 @@ async function pollState() {
   try {
     s = await (await fetch('/api/state')).json();
   } catch (e) {
-    setBadge('offline', 'OFFLINE');
+    setBadge('offline', App.stopped ? 'STOPPED' : 'OFFLINE');
     return;
   }
   if (s.error) {
@@ -1968,11 +1968,36 @@ function initStop() {
   overlay.addEventListener('click', ev => {
     if (ev.target === overlay) overlay.hidden = true;
   });
-  overlay.querySelector('.ok').onclick = async () => {
+  const ok = overlay.querySelector('.ok');
+  ok.onclick = async () => {
+    ok.disabled = true;
+    ok.textContent = 'Stopping…';
     try { await fetch('/api/stop', { method: 'POST' }); } catch (e) { /* dying */ }
-    text.textContent = 'Server stopped. Start it again with colcon-dashboard, ' +
-      'or run a build with the plugin switched on.';
-    btns.hidden = true;
+    // believe it only when the server really stops answering
+    const deadline = Date.now() + 6000;
+    let gone = false;
+    while (Date.now() < deadline) {
+      try {
+        await fetch('/api/state', { cache: 'no-store' });
+      } catch (e) {
+        gone = true;
+        break;
+      }
+      await new Promise(r => setTimeout(r, 300));
+    }
+    ok.disabled = false;
+    ok.textContent = 'Stop the server';
+    if (gone) {
+      App.stopped = true;
+      setBadge('offline', 'STOPPED');
+      text.innerHTML = '<b>Server stopped.</b> The page is now offline. ' +
+        'Start the server again with <code>colcon-dashboard</code>, ' +
+        'or run a build with the plugin switched on, then reload this page.';
+      btns.hidden = true;
+    } else {
+      text.textContent =
+        'The server still answers. Try colcon-dashboard --stop in a terminal.';
+    }
   };
 }
 
