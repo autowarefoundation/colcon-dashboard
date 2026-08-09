@@ -78,7 +78,11 @@ The server follows `log/latest_build`. If a new build starts in the same workspa
 
 ### Header
 
-The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The workspace path opens the workspace picker. The ⏻ button stops the server, after a confirmation.
+The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The workspace path opens the workspace picker. The build id opens the build picker. The ⏻ button stops the server, after a confirmation.
+
+The workspace picker lists your recent workspaces with their build count, log size, and last build time, and shows live progress for workspaces that build now. A star pins a favorite to the top. The picker also opens any path and scans your home directory for colcon workspaces.
+
+The build picker lists every build of the workspace with its log size. Open one and the whole dashboard shows that build, with the `build` query parameter in the address. The 🗑 buttons delete one build's logs, and a prune action keeps the last three. The server refuses to delete a build that runs now.
 
 The right side is the system strip. A colcon build can exhaust the machine, so pressure stays visible at all times:
 
@@ -183,6 +187,9 @@ Workspace endpoints take a `ws=<path>` query parameter.
 | `/api/workspaces` | The recent workspaces, with live build info where known |
 | `/api/discover` | Colcon workspaces found under the home directory |
 | `/api/register?ws=` (POST) | Registers a workspace, like opening it in the page |
+| `/api/favorite?ws=&fav=1` (POST) | Pins or unpins a workspace |
+| `/api/builds/delete?ws=&build=` (POST) | Deletes one build's logs |
+| `/api/builds/prune?ws=&keep=3` (POST) | Deletes all but the newest builds |
 | `/api/state?ws=` | Job states, counts, timings, build metadata |
 | `/api/graph?ws=` | Direct dependency edges for the graph views |
 | `/api/builds?ws=` | The `build_*` directories under the log base |
