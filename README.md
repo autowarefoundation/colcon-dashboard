@@ -9,14 +9,16 @@ The server is one Python file. It uses only the standard library. It works on an
 Install with pip, into the same Python that runs colcon:
 
 ```bash
-pip install /path/to/colcon-mission-control
+pip install colcon-mission-control
 ```
 
 On Ubuntu with the apt colcon, pip refuses to touch the system Python. Install into your user site instead:
 
 ```bash
-python3 -m pip install --user --break-system-packages /path/to/colcon-mission-control
+python3 -m pip install --user --break-system-packages colcon-mission-control
 ```
+
+To install from a checkout, replace the package name with the path to this repository.
 
 The install registers a colcon plugin and the `colcon-mission-control` command.
 

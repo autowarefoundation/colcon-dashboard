@@ -8,6 +8,21 @@ version = "0.1.0"
 description = "Live web dashboard for colcon builds: dependency graph, timeline, per-package logs, system pressure"
 readme = "README.md"
 requires-python = ">=3.8"
+authors = [{ name = "Mete Fatih Cırıt", email = "mfc@autoware.org" }]
+license = { text = "Apache-2.0" }
+keywords = ["colcon", "ros", "ros2", "build", "dashboard", "autoware"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Build Tools",
+]
+
+[project.urls]
+Repository = "https://github.com/autowarefoundation/colcon-mission-control"
+Issues = "https://github.com/autowarefoundation/colcon-mission-control/issues"
 
 [project.scripts]
 colcon-mission-control = "colcon_mission_control.server:main"
