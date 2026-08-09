@@ -25,7 +25,7 @@ Repository = "https://github.com/autowarefoundation/colcon-dashboard"
 Issues = "https://github.com/autowarefoundation/colcon-dashboard/issues"
 
 [project.scripts]
-colcon-dashboard = "colcon_dashboard.server:main"
+colcon-dashboard = "colcon_dashboard.cli:main"
 
 [tool.setuptools]
 packages = ["colcon_dashboard"]

@@ -2,7 +2,7 @@
 
 A live web dashboard for `colcon build`. It shows how many packages are done, building, ready, waiting, or failed. It draws the dependency graph and colors each node as the build moves through it. Each package gets its own log pane, so logs never mix.
 
-The server is one Python file. It uses only the standard library. It works on any colcon workspace, because it reads the `events.log` and `logger_all.log` files that colcon writes under `log/` for every build.
+The server uses only the Python standard library, with zero dependencies. It works on any colcon workspace, because it reads the `events.log` and `logger_all.log` files that colcon writes under `log/` for every build.
 
 ## Install
 
