@@ -1377,7 +1377,9 @@ function createPane(name) {
         <option value="stderr">stderr</option>
         <option value="stdout">stdout</option>
         <option value="command">commands</option>
+        <option value="streams">streams (timestamps)</option>
       </select></label>`}
+      <button class="tsbtn" title="show or hide timestamps">🕒 ts</button>
       <button class="earlier" style="display:none" title="load the whole log from the start">⤒ load all</button>
       <button class="follow on" title="auto-scroll to the end">⤓ follow</button>
       ${fixed ? '' : `<button class="close" title="close pane">✕</button>`}
@@ -1392,6 +1394,12 @@ function createPane(name) {
     earlierBtn: pane.querySelector('.earlier'),
   };
   p.earlierBtn.onclick = () => loadEarlier(p);
+  const tsBtn = pane.querySelector('.tsbtn');
+  tsBtn.onclick = () => {
+    const on = p.pre.classList.toggle('showts');
+    tsBtn.classList.toggle('on', on);
+    if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
+  };
   pane.querySelector('.fsel')?.addEventListener('change', ev => {
     p.file = ev.target.value;
     resetPane(p);
@@ -1557,7 +1565,21 @@ function sgrSpan(st) {
   return s;
 }
 
+const TS_RE = /^\[\s*\d+(?:\.\d+)?s?\] /;
+
 function renderLogLine(p, line, frag) {
+  const tm = TS_RE.exec(line);
+  let tsSpan = null;
+  if (tm) {
+    tsSpan = document.createElement('span');
+    tsSpan.className = 'ts';
+    tsSpan.textContent = tm[0];
+    line = line.slice(tm[0].length);
+  }
+  const emit = node => {
+    if (tsSpan) frag.appendChild(tsSpan);
+    frag.appendChild(node);
+  };
   const base = ERR_RE.test(line) ? 'l-err' : WARN_RE.test(line) ? 'l-warn' : null;
   if (!line.includes('\x1b') &&
       !(p.sgr.bold || p.sgr.fg || p.sgr.bg)) {  // fast path: no color state
@@ -1565,9 +1587,9 @@ function renderLogLine(p, line, frag) {
       const s = document.createElement('span');
       s.className = base;
       s.textContent = line + '\n';
-      frag.appendChild(s);
+      emit(s);
     } else {
-      frag.appendChild(document.createTextNode(line + '\n'));
+      emit(document.createTextNode(line + '\n'));
     }
     return;
   }
@@ -1587,7 +1609,7 @@ function renderLogLine(p, line, frag) {
     }
   }
   holder.appendChild(document.createTextNode('\n'));
-  frag.appendChild(holder);
+  emit(holder);
 }
 
 async function pollPane(p) {

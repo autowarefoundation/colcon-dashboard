@@ -436,6 +436,8 @@ svg.focus .pktg:not(.hl) { opacity: 0.08; }
 }
 .pane pre .l-err { color: var(--critical); font-weight: 600; }
 .pane pre .l-warn { color: color-mix(in srgb, var(--warning) 70%, var(--ink)); }
+.pane pre .ts { color: var(--muted); }
+.pane pre:not(.showts) .ts { display: none; }
 
 /* terminal palette for ANSI-colored log output (theme-tuned) */
 :root {

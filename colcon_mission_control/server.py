@@ -52,6 +52,7 @@ LOG_FILES = {
     "stdout": "stdout.log",
     "stderr": "stderr.log",
     "command": "command.log",
+    "streams": "streams.log",
 }
 
 
@@ -300,7 +301,7 @@ class EventLog:
                     job["pct"] = min(100, int(pm.group(1)))
             line = payload_line(payload)
             if line is not None:
-                self.buildlog.append(f"[{name}] {line}")
+                self.buildlog.append(f"[{t:9.3f}s] [{name}] {line}")
         elif event == b"JobQueued":
             job = self._job(name)
             job["queued"] = t
@@ -314,7 +315,7 @@ class EventLog:
             job = self._job(name)
             job["started"] = t
             job["pct"] = None
-            self.buildlog.append(f"Starting >>> {name}")
+            self.buildlog.append(f"[{t:9.3f}s] Starting >>> {name}")
         elif event == b"JobEnded":
             job = self._job(name)
             job["ended"] = t
@@ -323,12 +324,13 @@ class EventLog:
                 job["rc"] = rm.group(1).decode() if rm.group(1) else int(rm.group(2))
             dur = t - (job["started"] if job["started"] is not None else t)
             if job["rc"] == 0:
-                self.buildlog.append(f"Finished <<< {name} [{dur:.1f}s]")
+                self.buildlog.append(f"[{t:9.3f}s] Finished <<< {name} [{dur:.1f}s]")
             elif job["rc"] == "SIGINT":
-                self.buildlog.append(f"Aborted  <<< {name} [{dur:.1f}s]")
+                self.buildlog.append(f"[{t:9.3f}s] Aborted  <<< {name} [{dur:.1f}s]")
             else:
                 self.buildlog.append(
-                    f"Failed   <<< {name} [{dur:.1f}s] (exit code {job['rc']})")
+                    f"[{t:9.3f}s] Failed   <<< {name} [{dur:.1f}s] "
+                    f"(exit code {job['rc']})")
         elif event == b"JobProgress":
             pm = PROGRESS_RE.search(payload)
             if pm:
