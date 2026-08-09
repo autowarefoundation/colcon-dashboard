@@ -79,6 +79,8 @@ button.on { color: var(--accent); border-color: var(--accent); }
   background: var(--surface);
   border-bottom: 1px solid var(--grid);
   flex: none;
+  flex-wrap: wrap;   /* a squeezed window wraps rather than crushing the chips */
+  row-gap: 6px;
 }
 #topbar .brand { font-size: 14px; white-space: nowrap; }
 #topbar .brand b { font-weight: 650; }
@@ -90,9 +92,23 @@ button.on { color: var(--accent); border-color: var(--accent); }
   min-width: 0;
   color: var(--ink2);
   font-size: 12px;
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
 #topbar .meta .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #ws { max-width: 34vw; }
+@media (max-width: 900px) {
+  #topbar { gap: 10px; }
+  #topbar .brand { display: none; }  /* the chips need the room more */
+  #ws { max-width: 58vw; }
+  /* dissolve the meta box: the chips and the badge pack one shared
+     wrap flow instead of each block hoarding its own row */
+  #topbar .meta { display: contents; }
+  /* the buttons stay pinned to the top right corner */
+  #topbar { position: relative; padding-right: 128px; }
+  #topbar .hbtns { position: absolute; top: 6px; right: 12px; }
+}
+.hbtns { display: flex; align-items: center; gap: 12px; }
 .badge {
   font-size: 11px;
   font-weight: 650;
@@ -145,8 +161,9 @@ body.offline #sysmeters { display: none; }
 #sysmeters { display: flex; gap: 14px; align-items: center; }
 #sysmeters[hidden] { display: none !important; }
 #sysBtn { display: none; }
-@media (max-width: 1250px) {
-  /* a narrow window folds the meters behind a toggle */
+@media (max-width: 1450px) {
+  /* without generous room the meters fold behind a toggle: the inline
+     strip is wide enough to wrap the whole header when squeezed */
   #sysBtn { display: inline-block; }
   body.showsys #sysBtn { color: var(--accent); border-color: var(--accent); }
   #sysmeters {
@@ -531,8 +548,10 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   font-size: 11px;
   color: var(--ink2);
   border-bottom: 1px solid var(--grid);
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
-.pane .phead .pname { font-family: var(--mono); font-weight: 650; color: var(--ink); }
+.pane .phead .pname { font-family: var(--mono); font-weight: 650; color: var(--ink); white-space: nowrap; }
 .pane .phead .chip {
   padding: 0 7px;
   border-radius: 999px;
@@ -568,6 +587,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   border-radius: 6px;
   padding: 2px 8px;
   width: 150px;
+  max-width: 34vw;   /* shrink before the head has to wrap */
 }
 .pane .phead .search:focus { outline: none; border-color: var(--accent); }
 .pane .phead .scount { font-size: 10.5px; color: var(--muted); min-width: 34px; text-align: center; }
