@@ -1629,6 +1629,7 @@ function createPane(name) {
       </select></label>`}
       ${ai ? '' : `<button class="tsbtn on" title="show or hide timestamps">🕒 ts</button>
       <button class="earlier" style="display:none" title="load the whole log from the start">⤒ load all</button>`}
+      <button class="wrapbtn" title="soft-wrap long lines">↩ wrap</button>
       <button class="follow on" title="auto-scroll to the end">⤓ follow</button>
       ${fixed ? '' : `<button class="close" title="close pane">✕</button>`}
     </div>
@@ -1648,6 +1649,17 @@ function createPane(name) {
   if (tsBtn) tsBtn.onclick = () => {
     const on = p.pre.classList.toggle('showts');
     tsBtn.classList.toggle('on', on);
+    if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
+  };
+  const wrapBtn = pane.querySelector('.wrapbtn');
+  if (ai || localStorage.getItem('cmc-wrap') === '1') {
+    p.pre.classList.add('wrap');  // prose panes always start wrapped
+    wrapBtn.classList.add('on');
+  }
+  wrapBtn.onclick = () => {
+    const on = p.pre.classList.toggle('wrap');
+    wrapBtn.classList.toggle('on', on);
+    if (!ai) localStorage.setItem('cmc-wrap', on ? '1' : '0');
     if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
   };
   initSearch(p);

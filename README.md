@@ -151,6 +151,7 @@ The dock opens with a pinned **build log** tab: the whole build, as a terminal s
 - A pane follows new output until you scroll up. The **⤓ follow** button re-engages.
 - Panes open at the tail for an instant start. **⤒ load all** fetches the whole history in one click.
 - Every line carries a timestamp: build-relative in the build log, job-relative in package panes. The **🕒 ts** button hides them.
+- The **↩ wrap** button soft-wraps long lines. The choice sticks for future panes, and AI panes start wrapped because prose reads badly on one line.
 - The **search** box filters as you type: matching lines highlight, Enter and Shift+Enter step through them, and the search stays live while the log streams.
 - A selector switches a package pane between the timestamped output, `stdout+stderr`, `stderr`, `stdout`, and the command log.
 - ANSI colors render as in a terminal: the 16 classic colors, 256-color, and truecolor, with palettes tuned per theme. Uncolored lines that match error or warning patterns still get color.
