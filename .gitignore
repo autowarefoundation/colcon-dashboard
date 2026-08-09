@@ -4,3 +4,8 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+debian/.debhelper/
+debian/python3-colcon-mission-control/
+debian/files
+debian/*.substvars
+debian/debhelper-build-stamp
