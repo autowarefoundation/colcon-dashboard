@@ -1377,11 +1377,11 @@ function createPane(name) {
       <button class="sprev" title="previous match">↑</button>
       <button class="snext" title="next match">↓</button>
       ${fixed ? '' : `<label>file <select class="fsel">
+        <option value="streams">output (timestamped)</option>
         <option value="combined">stdout+stderr</option>
         <option value="stderr">stderr</option>
         <option value="stdout">stdout</option>
         <option value="command">commands</option>
-        <option value="streams">streams (timestamps)</option>
       </select></label>`}
       <button class="tsbtn on" title="show or hide timestamps">🕒 ts</button>
       <button class="earlier" style="display:none" title="load the whole log from the start">⤒ load all</button>
@@ -1393,7 +1393,8 @@ function createPane(name) {
 
   const p = {
     name, el: pane, tabEl: tab, pre: pane.querySelector('pre'), fixed,
-    offset: -1, buf: '', file: 'combined', follow: true, lines: 0, fetching: false,
+    offset: -1, buf: '', file: fixed ? 'combined' : 'streams',
+    follow: true, lines: 0, fetching: false,
     sgr: newSgr(), start: null, noTrim: false, loadingEarlier: false,
     earlierBtn: pane.querySelector('.earlier'),
   };
