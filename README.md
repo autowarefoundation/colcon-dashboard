@@ -143,11 +143,11 @@ Fit and follow build drive the camera in every mode. In the force and 3D modes, 
 
 A Gantt chart of every started package, sorted by start time, with a time axis and a dashed now line. Bar colors match the graph states.
 
-The chart makes the parallelism and the long serial chains visible. It auto-scrolls to the newest bars as they start. Scroll up to release, or use the **⤓ follow new** toggle.
+The chart makes the parallelism and the long serial chains visible. It auto-scrolls to the newest bars as they start. Scroll up to release, or use the **⤓ follow new** toggle. Drag anywhere to pan, like the graph.
 
 Click a bar or a package name and its log pane opens while the graph flies to that package. From the pure timeline this switches to the side-by-side view, so the graph comes in without losing the timeline.
 
-**Side by side** shows the graph and the timeline together, over a drag bar. The split ratio persists.
+**Side by side** shows the graph and the timeline together, over a drag bar. It is the default view, and the split ratio and the view choice persist.
 
 ### Log panes
 
