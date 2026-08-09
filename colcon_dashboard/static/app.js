@@ -1292,6 +1292,40 @@ function frontierView() {
   const bb = bboxOf(hot);
   if (bb) setViewBox(bb); else fitGraph();
 }
+
+/* double-click a dock tab: fly the selected view to that package */
+function zoomToPkg(name) {
+  if (App.view === 'gantt') {
+    const wrap = $('#ganttwrap');
+    const bar = $('#gantt').querySelector(
+      `.gbar[data-name="${CSS.escape(name)}"]`);
+    if (!bar) return;
+    wrap.scrollTop = Math.max(0, bar.y.baseVal.value - wrap.clientHeight / 2);
+    wrap.scrollLeft = Math.max(0, bar.x.baseVal.value - wrap.clientWidth / 2);
+    bar.classList.add('flash');
+    setTimeout(() => bar.classList.remove('flash'), 2000);
+    return;
+  }
+  if (App.layoutMode === '3d') {
+    const n = Force.nodes.find(f => f.name === name);
+    if (!n) return;
+    G3.auto = false;  // keep the camera where we point it
+    G3.tx = n.cx; G3.ty = n.cy; G3.tz = n.cz;
+    G3.dist = 500;
+    return;
+  }
+  const nd = App.lay?.nodes.get(name);
+  if (!nd || !App.vb) return;
+  const r = $('#graph').getBoundingClientRect();
+  const w = 700;
+  const h = w * (r.height && r.width ? r.height / r.width : 0.66);
+  setViewBox({ x: nd.x + nd.w / 2 - w / 2, y: nd.y - h / 2, w, h });
+  const el = App.nodeEls.get(name);
+  if (el) {
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 2000);
+  }
+}
 function initPanZoom() {
   const svg = $('#graph');
   let moved = 0;
@@ -1492,6 +1526,12 @@ function createPane(name) {
     if (ev.target.classList.contains('x')) closePane(name);
     else activatePane(name);
   };
+  tab.ondblclick = () => {
+    if (fixed) App.layoutMode === '3d' ? fit3d() : fitGraph();
+    else zoomToPkg(pkg);
+  };
+  tab.title = fixed ? 'double-click to fit the whole graph'
+                    : 'double-click to find this package in the graph';
   $('#logtabs').appendChild(tab);
 
   const pane = document.createElement('div');

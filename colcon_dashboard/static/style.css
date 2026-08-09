@@ -453,6 +453,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   border-radius: 7px 7px 0 0;
   cursor: pointer;
   white-space: nowrap;
+  user-select: none;  /* double-click zooms; it must not select the label */
 }
 .ltab.on { background: var(--surface); color: var(--ink); border-color: var(--baseline); }
 .ltab .dot { width: 7px; height: 7px; border-radius: 50%; }
@@ -521,6 +522,12 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 .pane pre .hit-cur {
   background: color-mix(in srgb, var(--warning) 45%, transparent);
   outline: 1px solid var(--warning);
+}
+
+/* a double-clicked tab flashes its package in the graph or timeline */
+.node.flash .box, .gbar.flash { animation: pkgflash 0.5s ease-in-out 4; }
+@keyframes pkgflash {
+  50% { stroke: var(--accent); stroke-width: 3.5; }
 }
 
 /* AI failure analysis */
