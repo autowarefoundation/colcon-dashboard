@@ -1341,17 +1341,22 @@ const STATE_DOT = { done: 'c-done', building: 'c-building', ready: 'c-ready',
   waiting: 'c-waiting', failed: 'c-failed', aborted: 'c-aborted',
   skipped: 'c-skipped', blocked: 'c-failed' };
 
+const BUILD_PANE = ' build';  // the pinned whole-build terminal view
+
 function openPane(name) {
   if (!App.panes.has(name)) createPane(name);
   activatePane(name);
 }
 
 function createPane(name) {
+  const fixed = name === BUILD_PANE;
   $('#panes .placeholder')?.remove();
   const tab = document.createElement('div');
   tab.className = 'ltab';
-  tab.innerHTML = `<span class="dot c-waiting"></span><span>${label(name)}</span>` +
-                  `<button class="x" title="close">✕</button>`;
+  tab.innerHTML =
+    `<span class="dot ${fixed ? 'c-building' : 'c-waiting'}"></span>` +
+    `<span>${fixed ? 'build log' : label(name)}</span>` +
+    (fixed ? '' : `<button class="x" title="close">✕</button>`);
   tab.onclick = ev => {
     if (ev.target.classList.contains('x')) closePane(name);
     else activatePane(name);
@@ -1362,32 +1367,32 @@ function createPane(name) {
   pane.className = 'pane';
   pane.innerHTML = `
     <div class="phead">
-      <span class="pname">${name}</span>
+      <span class="pname">${fixed ? 'colcon build' : name}</span>
       <span class="chip">…</span>
       <span class="ph"></span>
       <span class="errn"></span>
       <span class="grow"></span>
-      <label>file <select class="fsel">
+      ${fixed ? '' : `<label>file <select class="fsel">
         <option value="combined">stdout+stderr</option>
         <option value="stderr">stderr</option>
         <option value="stdout">stdout</option>
         <option value="command">commands</option>
-      </select></label>
+      </select></label>`}
       <button class="follow on" title="auto-scroll to the end">⤓ follow</button>
-      <button class="close" title="close pane">✕</button>
+      ${fixed ? '' : `<button class="close" title="close pane">✕</button>`}
     </div>
     <pre tabindex="0"></pre>`;
   $('#panes').appendChild(pane);
 
   const p = {
-    name, el: pane, tabEl: tab, pre: pane.querySelector('pre'),
+    name, el: pane, tabEl: tab, pre: pane.querySelector('pre'), fixed,
     offset: -1, buf: '', file: 'combined', follow: true, lines: 0, fetching: false,
     sgr: newSgr(),
   };
-  pane.querySelector('.fsel').onchange = ev => {
+  pane.querySelector('.fsel')?.addEventListener('change', ev => {
     p.file = ev.target.value;
     resetPane(p);
-  };
+  });
   const followBtn = pane.querySelector('.follow');
   followBtn.onclick = () => {
     p.follow = !p.follow;
@@ -1401,7 +1406,7 @@ function createPane(name) {
       followBtn.classList.toggle('on', atEnd);
     }
   });
-  pane.querySelector('.close').onclick = () => closePane(name);
+  pane.querySelector('.close')?.addEventListener('click', () => closePane(name));
   App.panes.set(name, p);
   pollPane(p);
 }
@@ -1424,7 +1429,7 @@ function activatePane(name) {
 
 function closePane(name) {
   const p = App.panes.get(name);
-  if (!p) return;
+  if (!p || p.fixed) return;
   p.el.remove();
   p.tabEl.remove();
   App.panes.delete(name);
@@ -1540,8 +1545,10 @@ async function pollPane(p) {
   if (p.fetching) return;
   p.fetching = true;
   try {
-    const r = await (await fetch(
-      `/api/log/${encodeURIComponent(p.name)}?offset=${p.offset}&file=${p.file}`)).json();
+    const url = p.fixed
+      ? `/api/buildlog?offset=${p.offset}`
+      : `/api/log/${encodeURIComponent(p.name)}?offset=${p.offset}&file=${p.file}`;
+    const r = await (await fetch(url)).json();
     if (r.reset) { p.pre.textContent = ''; p.buf = ''; p.lines = 0; p.sgr = newSgr(); }
     p.offset = r.offset;
     if (r.data) appendLog(p, r.data);
@@ -1567,6 +1574,14 @@ function appendLog(p, data) {
 
 function updatePaneHeads() {
   for (const [name, p] of App.panes) {
+    if (p.fixed) {
+      const chip = p.el.querySelector('.chip');
+      chip.textContent = App.active ? 'live' : 'stopped';
+      chip.className = 'chip ' + (App.active ? 'building' : 'aborted');
+      p.tabEl.querySelector('.dot').className =
+        'dot ' + (App.active ? 'c-building' : 'c-skipped');
+      continue;
+    }
     const st = App.pkgs[name];
     const chip = p.el.querySelector('.chip');
     const s = st ? st.s : 'waiting';
@@ -1584,7 +1599,7 @@ function updatePaneHeads() {
 function pollAllPanes() {
   for (const p of App.panes.values()) {
     const st = App.pkgs[p.name];
-    const busy = st && (st.s === 'building' || st.t1 == null);
+    const busy = p.fixed ? App.active : st && (st.s === 'building' || st.t1 == null);
     // active pane always; background panes only while their package still writes
     if (p.name === App.activePane || busy || p.offset === -1) pollPane(p);
   }
@@ -1679,6 +1694,7 @@ function tickElapsed() {
 initTheme();
 initViews();
 initPanZoom();
+openPane(BUILD_PANE);  // the pinned whole-build terminal view
 pollState();
 setInterval(pollState, 1000);
 setInterval(pollAllPanes, 1200);

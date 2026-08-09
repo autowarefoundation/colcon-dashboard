@@ -175,6 +175,57 @@ def parse_namespace(logger_path):
 
 
 # ---------------------------------------------------------------------------
+# Combined build log - the terminal view, synthesized from the event stream
+# ---------------------------------------------------------------------------
+
+LINE_PAYLOAD_RE = re.compile(
+    rb"'line': (b'(?:[^'\\]|\\.)*'|b\"(?:[^\"\\]|\\.)*\")")
+
+
+def payload_line(payload):
+    """The output line carried by a StdoutLine/StderrLine event, or None."""
+    m = LINE_PAYLOAD_RE.search(payload)
+    if not m:
+        return None
+    try:
+        raw = ast.literal_eval(m.group(1).decode("latin-1"))
+        return raw.decode("utf-8", "replace").rstrip("\n")
+    except (ValueError, SyntaxError):
+        return None
+
+
+class BuildLogBuffer:
+    """Append-only text buffer with a byte-offset API and a size cap."""
+
+    MAX = 48 * 1024 * 1024
+    TRIM = 8 * 1024 * 1024
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._buf = bytearray()
+        self._base = 0  # logical offset of _buf[0]
+
+    def append(self, text):
+        with self._lock:
+            self._buf += (text + "\n").encode("utf-8", "replace")
+            if len(self._buf) > self.MAX:
+                del self._buf[:self.TRIM]
+                self._base += self.TRIM
+
+    def read(self, offset, cap=512 * 1024):
+        with self._lock:
+            size = self._base + len(self._buf)
+            reset = False
+            if offset < 0 or offset > size or offset < self._base:
+                offset = max(self._base, size - 128 * 1024)
+                reset = True
+            start = offset - self._base
+            data = bytes(self._buf[start:start + cap])
+        return {"size": size, "offset": offset + len(data),
+                "data": data.decode("utf-8", "replace"), "reset": reset}
+
+
+# ---------------------------------------------------------------------------
 # events.log tailer - the ground truth for job states
 # ---------------------------------------------------------------------------
 
@@ -188,6 +239,7 @@ class EventLog:
         self.last_t = 0.0
         self.shutdown = False
         self.graph_dirty = True
+        self.buildlog = BuildLogBuffer()
 
     def _job(self, name):
         job = self.jobs.get(name)
@@ -238,6 +290,9 @@ class EventLog:
                 pm = PCT_RE.search(payload)
                 if pm:
                     job["pct"] = min(100, int(pm.group(1)))
+            line = payload_line(payload)
+            if line is not None:
+                self.buildlog.append(f"[{name}] {line}")
         elif event == b"JobQueued":
             job = self._job(name)
             job["queued"] = t
@@ -251,12 +306,21 @@ class EventLog:
             job = self._job(name)
             job["started"] = t
             job["pct"] = None
+            self.buildlog.append(f"Starting >>> {name}")
         elif event == b"JobEnded":
             job = self._job(name)
             job["ended"] = t
             rm = RC_RE.search(payload)
             if rm:
                 job["rc"] = rm.group(1).decode() if rm.group(1) else int(rm.group(2))
+            dur = t - (job["started"] if job["started"] is not None else t)
+            if job["rc"] == 0:
+                self.buildlog.append(f"Finished <<< {name} [{dur:.1f}s]")
+            elif job["rc"] == "SIGINT":
+                self.buildlog.append(f"Aborted  <<< {name} [{dur:.1f}s]")
+            else:
+                self.buildlog.append(
+                    f"Failed   <<< {name} [{dur:.1f}s] (exit code {job['rc']})")
         elif event == b"JobProgress":
             pm = PROGRESS_RE.search(payload)
             if pm:
@@ -594,6 +658,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, mon.graph_json)
         if path == "/api/builds":
             return self._send(200, json.dumps(mon.list_builds()))
+        if path == "/api/buildlog":
+            try:
+                offset = int(q.get("offset", ["-1"])[0])
+            except ValueError:
+                offset = -1
+            ev = mon.events
+            if ev is None:
+                return self._send(200, json.dumps(
+                    {"size": 0, "offset": 0, "data": "", "reset": False}))
+            return self._send(200, json.dumps(ev.buildlog.read(offset)))
         if path.startswith("/api/log/"):
             pkg = path[len("/api/log/"):]
             which = q.get("file", ["combined"])[0]
