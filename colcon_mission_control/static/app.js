@@ -861,7 +861,13 @@ function draw3d(now) {
   G3.refS = G3.F / G3.dist;  // apparent scale at the camera target
   ctx.setTransform(G3.dpr, 0, 0, G3.dpr, 0, 0);
   ctx.clearRect(0, 0, G3.cw, G3.ch);
-  const chain = G3.hovered ? chainOf(G3.hovered) : null;
+  const chainNow = G3.hovered ? chainOf(G3.hovered) : null;
+  if (chainNow) G3.lastChain = chainNow;
+  G3.dimEase = (G3.dimEase || 0) + ((chainNow ? 1 : 0) - (G3.dimEase || 0)) * 0.12;
+  if (!chainNow && G3.dimEase < 0.02) G3.lastChain = null;
+  const chain = G3.dimEase > 0.02 ? G3.lastChain : null;
+  const dimMul = 1 - 0.9 * G3.dimEase;    // eased focus dim
+  const discMul = 1 - 0.65 * G3.dimEase;
   const proj = new Map();
   for (const [name, n] of App.lay.nodes) {
     const pr = project3d(n.cx, n.cy, n.cz);
@@ -893,7 +899,7 @@ function draw3d(now) {
         else ctx.lineTo(pr[0], pr[1]);
         sMax = Math.max(sMax, pr[2]);
       }
-      ctx.globalAlpha = Math.min(0.3, sMax / G3.refS * 0.22) * (chain ? 0.35 : 1);
+      ctx.globalAlpha = Math.min(0.3, sMax / G3.refS * 0.22) * (chain ? discMul : 1);
       ctx.stroke();
     }
   }
@@ -908,7 +914,7 @@ function draw3d(now) {
     else if (cls.includes('active')) { col = c.accent; alpha = 0.55; w = 1.3; }
     else if (cls.includes('edone')) { col = c.good; alpha = 0.3; }
     let al = alpha * Math.min(1, (a[2] + b[2]) / (2 * G3.refS) * 1.05);
-    if (chain && !(chain.has(e.a) && chain.has(e.b))) al *= 0.1;
+    if (chain && !(chain.has(e.a) && chain.has(e.b))) al *= dimMul;
     ctx.globalAlpha = al;
     ctx.strokeStyle = col;
     ctx.lineWidth = w;
@@ -928,6 +934,8 @@ function draw3d(now) {
                            P.na.cz + (P.nb.cz - P.na.cz) * t);
       if (!pr) continue;
       ctx.globalAlpha = 0.85 * Math.min(1, pr[2] / G3.refS * 1.1);
+      if (chain && !(chain.has(P.na.name) && chain.has(P.nb.name)))
+        ctx.globalAlpha *= dimMul;
       ctx.beginPath();
       ctx.arc(pr[0], pr[1], Math.max(0.8, 2.4 * pr[2] * 3), 0, 6.2832);
       ctx.fill();
@@ -945,7 +953,7 @@ function draw3d(now) {
     const doomed = App.doomedSet?.has(name);
     const isNext = App.nextSet?.has(name);
     let alpha = Math.min(1, s / G3.refS * 1.15);
-    if (chain && !chain.has(name)) alpha *= 0.1;
+    if (chain && !chain.has(name)) alpha *= dimMul;
     if (stKey === 'excluded') alpha *= 0.35;
 
     ctx.globalAlpha = alpha;
@@ -1043,14 +1051,24 @@ function bind3d() {
       return;
     }
     const hit = pick3d(...cvCoords(ev));
-    G3.hovered = hit;
+    if (hit !== G3.hoverTarget) {  // hover intent, like the SVG graph
+      G3.hoverTarget = hit;
+      clearTimeout(G3.hoverTimer);
+      if (hit) G3.hoverTimer = setTimeout(() => { G3.hovered = hit; }, 280);
+      else G3.hovered = null;
+    }
     if (hit) showNodeTooltip(hit, ev);
     else hideTooltip();
   });
   const up = () => { G3.drag = null; cv.classList.remove('panning'); };
   cv.addEventListener('pointerup', up);
   cv.addEventListener('pointercancel', up);
-  cv.addEventListener('pointerleave', () => { G3.hovered = null; hideTooltip(); });
+  cv.addEventListener('pointerleave', () => {
+    clearTimeout(G3.hoverTimer);
+    G3.hoverTarget = null;
+    G3.hovered = null;
+    hideTooltip();
+  });
   cv.addEventListener('click', () => {
     if (G3.moved <= 4 && G3.downNode) openPane(G3.downNode);
   });
@@ -1106,6 +1124,28 @@ function setEdgeFlow(e, on) {
 }
 
 let chainActive = null;
+let chainPending = null;
+
+function scheduleChain(name) {
+  // hover intent: only focus after the pointer rests on a node for a moment,
+  // so sweeping the mouse across the graph does not strobe the dimming
+  if (chainActive === name) {
+    clearTimeout(chainPending);
+    chainPending = null;
+    return;
+  }
+  clearTimeout(chainPending);
+  chainPending = setTimeout(() => {
+    chainPending = null;
+    highlightChain(name);
+  }, 280);
+}
+
+function cancelChain() {
+  clearTimeout(chainPending);
+  chainPending = null;
+  clearChain();
+}
 function highlightChain(name) {
   if (chainActive === name) return;
   chainActive = name;
@@ -1162,7 +1202,7 @@ function initPanZoom() {
   svg.addEventListener('click', () => {
     if (moved <= 4 && downNode) openPane(downNode);
   });
-  svg.addEventListener('pointerleave', () => { hideTooltip(); clearChain(); });
+  svg.addEventListener('pointerleave', () => { hideTooltip(); cancelChain(); });
   svg.addEventListener('wheel', ev => {
     ev.preventDefault();
     if (!App.vb) return;
@@ -1217,8 +1257,8 @@ function initPanZoom() {
       return;
     }
     const g = ev.target.closest('.node');
-    if (g) { showNodeTooltip(g.dataset.name, ev); highlightChain(g.dataset.name); }
-    else { hideTooltip(); clearChain(); }
+    if (g) { showNodeTooltip(g.dataset.name, ev); scheduleChain(g.dataset.name); }
+    else { hideTooltip(); cancelChain(); }
   });
   const end = () => {
     if (Force.dragging) { Force.dragging.fx = Force.dragging.fy = null; Force.dragging = null; }

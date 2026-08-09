@@ -237,6 +237,8 @@ button.on { color: var(--accent); border-color: var(--accent); }
 
 /* graph nodes */
 .edge { fill: none; stroke: var(--grid); stroke-width: 1; }
+.node, .pktg { transition: opacity 0.4s ease; }
+.edge { transition: opacity 0.4s ease, stroke-opacity 0.4s ease; }
 svg.focus .edge { stroke-opacity: 0.15; }
 svg.focus .edge.hl { stroke: var(--accent); stroke-width: 1.6; stroke-opacity: 1; }
 .node { cursor: pointer; }
