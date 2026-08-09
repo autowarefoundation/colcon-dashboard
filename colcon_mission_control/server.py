@@ -212,7 +212,9 @@ class BuildLogBuffer:
                 del self._buf[:self.TRIM]
                 self._base += self.TRIM
 
-    def read(self, offset, cap=512 * 1024):
+    def read(self, offset, cap=512 * 1024, limit=None, align=False):
+        if limit:
+            cap = min(cap, limit)
         with self._lock:
             size = self._base + len(self._buf)
             reset = False
@@ -221,7 +223,13 @@ class BuildLogBuffer:
                 reset = True
             start = offset - self._base
             data = bytes(self._buf[start:start + cap])
-        return {"size": size, "offset": offset + len(data),
+        end = offset + len(data)
+        if (reset or align) and offset > 0 and data:
+            i = data.find(b"\n")  # do not start mid-line
+            if i >= 0:
+                offset += i + 1
+                data = data[i + 1:]
+        return {"size": size, "start": offset, "offset": end,
                 "data": data.decode("utf-8", "replace"), "reset": reset}
 
 
@@ -591,7 +599,7 @@ class BuildMonitor:
 
     # -- log serving ---------------------------------------------------------
 
-    def read_log(self, pkg, which, offset, build=None):
+    def read_log(self, pkg, which, offset, build=None, limit=None, align=False):
         if which not in LOG_FILES or "/" in pkg or ".." in pkg or not pkg:
             return None
         build_dir = self.build_dir
@@ -603,19 +611,30 @@ class BuildMonitor:
         try:
             size = os.path.getsize(path)
         except OSError:
-            return {"size": 0, "offset": 0, "data": "", "reset": False}
+            return {"size": 0, "start": 0, "offset": 0, "data": "",
+                    "reset": False}
         reset = False
         if offset < 0:  # initial request: tail the last 128 KiB
             offset = max(0, size - 128 * 1024)
             reset = True
         if offset > size:
             offset, reset = 0, True
+        cap = 512 * 1024
+        if limit:
+            cap = min(cap, limit)
         with open(path, "rb") as f:
             f.seek(offset)
-            raw = f.read(512 * 1024)
+            raw = f.read(cap)
+        end = offset + len(raw)
+        if (reset or align) and offset > 0 and raw:
+            i = raw.find(b"\n")  # do not start mid-line
+            if i >= 0:
+                offset += i + 1
+                raw = raw[i + 1:]
         return {
             "size": size,
-            "offset": offset + len(raw),
+            "start": offset,
+            "offset": end,
             "data": raw.decode("utf-8", errors="replace"),
             "reset": reset,
         }
@@ -658,25 +677,28 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, mon.graph_json)
         if path == "/api/builds":
             return self._send(200, json.dumps(mon.list_builds()))
-        if path == "/api/buildlog":
+        def int_q(key, default):
             try:
-                offset = int(q.get("offset", ["-1"])[0])
-            except ValueError:
-                offset = -1
+                return int(q.get(key, [default])[0])
+            except (ValueError, TypeError):
+                return default
+
+        if path == "/api/buildlog":
             ev = mon.events
             if ev is None:
                 return self._send(200, json.dumps(
-                    {"size": 0, "offset": 0, "data": "", "reset": False}))
-            return self._send(200, json.dumps(ev.buildlog.read(offset)))
+                    {"size": 0, "start": 0, "offset": 0, "data": "",
+                     "reset": False}))
+            return self._send(200, json.dumps(ev.buildlog.read(
+                int_q("offset", -1), limit=int_q("limit", 0) or None,
+                align=bool(int_q("align", 0)))))
         if path.startswith("/api/log/"):
             pkg = path[len("/api/log/"):]
             which = q.get("file", ["combined"])[0]
-            try:
-                offset = int(q.get("offset", ["-1"])[0])
-            except ValueError:
-                offset = -1
             build = q.get("build", [None])[0]
-            result = mon.read_log(pkg, which, offset, build)
+            result = mon.read_log(
+                pkg, which, int_q("offset", -1), build,
+                limit=int_q("limit", 0) or None, align=bool(int_q("align", 0)))
             if result is None:
                 return self._send(400, json.dumps({"error": "bad request"}))
             return self._send(200, json.dumps(result))

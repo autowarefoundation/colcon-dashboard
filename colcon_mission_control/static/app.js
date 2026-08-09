@@ -1378,6 +1378,7 @@ function createPane(name) {
         <option value="stdout">stdout</option>
         <option value="command">commands</option>
       </select></label>`}
+      <button class="earlier" style="display:none" title="load the whole log from the start">⤒ load all</button>
       <button class="follow on" title="auto-scroll to the end">⤓ follow</button>
       ${fixed ? '' : `<button class="close" title="close pane">✕</button>`}
     </div>
@@ -1387,8 +1388,10 @@ function createPane(name) {
   const p = {
     name, el: pane, tabEl: tab, pre: pane.querySelector('pre'), fixed,
     offset: -1, buf: '', file: 'combined', follow: true, lines: 0, fetching: false,
-    sgr: newSgr(),
+    sgr: newSgr(), start: null, noTrim: false, loadingEarlier: false,
+    earlierBtn: pane.querySelector('.earlier'),
   };
+  p.earlierBtn.onclick = () => loadEarlier(p);
   pane.querySelector('.fsel')?.addEventListener('change', ev => {
     p.file = ev.target.value;
     resetPane(p);
@@ -1416,7 +1419,53 @@ function resetPane(p) {
   p.buf = '';
   p.lines = 0;
   p.sgr = newSgr();
+  p.start = null;
+  p.noTrim = false;
   p.pre.textContent = '';
+}
+
+function updateEarlierBtn(p) {
+  p.earlierBtn.style.display = p.start > 0 ? '' : 'none';
+}
+
+async function loadEarlier(p) {
+  // prepend the whole history before p.start, keeping the view in place
+  if (p.loadingEarlier || !p.start) return;
+  p.loadingEarlier = true;
+  p.earlierBtn.textContent = '⤒ loading…';
+  const base = p.fixed
+    ? `/api/buildlog?`
+    : `/api/log/${encodeURIComponent(p.name)}?file=${p.file}&`;
+  try {
+    const parts = [];
+    let start = p.start;
+    while (start > 0) {
+      const from = Math.max(0, start - 512 * 1024);
+      const r = await (await fetch(
+        `${base}offset=${from}&limit=${start - from}` +
+        `&align=${from > 0 ? 1 : 0}`)).json();
+      parts.unshift(r.data);
+      if (!(r.start < start)) break;  // no progress: stop
+      start = r.start;
+    }
+    const all = parts.join('');
+    if (all) {
+      const frag = document.createDocumentFragment();
+      const ctx = { sgr: newSgr() };  // ANSI state starts fresh at line zero
+      const lines = all.split('\n');
+      if (lines[lines.length - 1] === '') lines.pop();
+      for (const line of lines) renderLogLine(ctx, line, frag);
+      const before = p.pre.scrollHeight;
+      p.pre.insertBefore(frag, p.pre.firstChild);
+      p.pre.scrollTop += p.pre.scrollHeight - before;
+      p.lines += lines.length;
+      p.noTrim = true;  // keep the history the user asked for
+    }
+    p.start = start;
+    updateEarlierBtn(p);
+  } catch (e) { /* transient */ }
+  p.earlierBtn.textContent = '⤒ load all';
+  p.loadingEarlier = false;
 }
 
 function activatePane(name) {
@@ -1549,7 +1598,18 @@ async function pollPane(p) {
       ? `/api/buildlog?offset=${p.offset}`
       : `/api/log/${encodeURIComponent(p.name)}?offset=${p.offset}&file=${p.file}`;
     const r = await (await fetch(url)).json();
-    if (r.reset) { p.pre.textContent = ''; p.buf = ''; p.lines = 0; p.sgr = newSgr(); }
+    if (r.reset) {
+      p.pre.textContent = '';
+      p.buf = '';
+      p.lines = 0;
+      p.sgr = newSgr();
+      p.noTrim = false;
+      p.start = r.start ?? 0;
+      updateEarlierBtn(p);
+    } else if (p.start == null) {
+      p.start = r.start ?? 0;
+      updateEarlierBtn(p);
+    }
     p.offset = r.offset;
     if (r.data) appendLog(p, r.data);
   } catch (e) { /* transient */ }
@@ -1565,7 +1625,7 @@ function appendLog(p, data) {
   for (const line of lines) renderLogLine(p, line, frag);
   p.lines += lines.length;
   p.pre.appendChild(frag);
-  while (p.lines > 6000 && p.pre.firstChild) {
+  while (!p.noTrim && p.lines > 6000 && p.pre.firstChild) {
     p.pre.removeChild(p.pre.firstChild);
     p.lines--;
   }
