@@ -71,7 +71,7 @@ jobs:
           keyid=$(gpg --batch --list-secret-keys --with-colons \
                   | awk -F: '/^sec/{print $5; exit}')
           printf '%s\n' "$PPA_GPG_PASSPHRASE" > "$RUNNER_TEMP/pf"
-          for series in noble; do
+          for series in jammy noble resolute stonking; do
             version="${GITHUB_REF_NAME}ppa1~${series}1"
             cat > debian/changelog <<EOF
           colcon-dashboard (${version}) ${series}; urgency=medium
