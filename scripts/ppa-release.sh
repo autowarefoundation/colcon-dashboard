@@ -5,21 +5,31 @@
 # GPG passphrase, so this script runs on the maintainer's machine, not in CI.
 #
 #   scripts/ppa-release.sh                  # noble, ppa:xmfcx/colcon-dashboard
-#   SERIES="noble jammy" scripts/ppa-release.sh
+#   SERIES="noble=24.04 jammy=22.04" scripts/ppa-release.sh
 #   PPA=ppa:someone/else scripts/ppa-release.sh
+#
+# SERIES entries are <codename>=<release number>; the number becomes the
+# ~ubuntuNN.NN.1 version suffix (numbers sort reliably across series,
+# codenames wrap around the alphabet).
 
 set -euo pipefail
 
 PPA=${PPA:-ppa:xmfcx/colcon-dashboard}
-SERIES=${SERIES:-noble}
+SERIES=${SERIES:-noble=24.04}
 
 version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
 
 restore() { git checkout --quiet debian/changelog; }
 trap restore EXIT
 
-for series in $SERIES; do
-    deb_version="${version}ppa1~${series}1"
+for entry in $SERIES; do
+    series="${entry%%=*}"
+    release="${entry#*=}"
+    if [ "$series" = "$release" ]; then
+        echo "SERIES entries must be <codename>=<release>, got '$entry'" >&2
+        exit 1
+    fi
+    deb_version="${version}ppa1~ubuntu${release}.1"
     cat > debian/changelog <<EOF
 colcon-dashboard (${deb_version}) ${series}; urgency=medium
 

@@ -71,8 +71,11 @@ jobs:
           keyid=$(gpg --batch --list-secret-keys --with-colons \
                   | awk -F: '/^sec/{print $5; exit}')
           printf '%s\n' "$PPA_GPG_PASSPHRASE" > "$RUNNER_TEMP/pf"
-          for series in jammy noble resolute stonking; do
-            version="${GITHUB_REF_NAME}ppa1~${series}1"
+          # ~ubuntuNN.NN.1 suffixes: release numbers sort reliably across
+          # series; codenames wrap around the alphabet.
+          for entry in jammy=22.04 noble=24.04 resolute=26.04 stonking=26.10; do
+            series="${entry%%=*}"
+            version="${GITHUB_REF_NAME}ppa1~ubuntu${entry#*=}.1"
             cat > debian/changelog <<EOF
           colcon-dashboard (${version}) ${series}; urgency=medium
 
