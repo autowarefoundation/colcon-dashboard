@@ -1,0 +1,8 @@
+# The server is stdlib-only and the frontend has no npm packages, so
+# the workflow actions are the only dependencies to keep updated.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
