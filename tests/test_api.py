@@ -21,6 +21,12 @@ from colcon_dashboard.registry import Registry
 from colcon_dashboard.web import Handler
 from tests.helpers import ended, event_line, make_build, queued, started
 
+# pybuild blocks network during deb builds by exporting
+# http_proxy=http://127.0.0.1:9/, and urllib proxies even loopback
+# requests; these must reach the test server directly.
+urllib.request.install_opener(
+    urllib.request.build_opener(urllib.request.ProxyHandler({})))
+
 BUILD_ID = "build_2026-08-09_10-00-00"
 
 
