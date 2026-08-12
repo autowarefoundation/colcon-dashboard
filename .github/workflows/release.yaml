@@ -54,7 +54,29 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential devscripts debhelper \
-            dh-python dput pybuild-plugin-pyproject python3-all
+            dh-python dput pybuild-plugin-pyproject python3-all \
+            python3-paramiko
+      - name: Configure sftp uploads
+        env:
+          PPA_SSH_PRIVATE_KEY: ${{ secrets.PPA_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PPA_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # pin the host key against the fingerprint documented at
+          # https://ubuntu.com/docs/launchpad/user/reference/ssh-fingerprints/
+          ssh-keyscan -t rsa ppa.launchpad.net > "$RUNNER_TEMP/hostkey"
+          ssh-keygen -lf "$RUNNER_TEMP/hostkey" \
+            | grep -qF 'SHA256:MGq+4hxD7RduVTcfwlwwboZnsgJC6SL/NltM8ye+gNg'
+          cat "$RUNNER_TEMP/hostkey" >> ~/.ssh/known_hosts
+          cat > ~/.dput.cf <<EOF
+          [ppa-sftp]
+          fqdn = ppa.launchpad.net
+          method = sftp
+          login = xmfcx
+          incoming = ~xmfcx/colcon-dashboard/ubuntu
+          EOF
       - name: Import the upload key
         env:
           PPA_GPG_PRIVATE_KEY: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
@@ -87,10 +109,8 @@ jobs:
             debsign -k"$keyid" \
               -p"gpg --batch --pinentry-mode loopback --passphrase-file $RUNNER_TEMP/pf" \
               "../colcon-dashboard_${version}_source.changes"
-            # Launchpad's FTP endpoint 550s transiently; dput skips
-            # already-uploaded files on retry.
             for attempt in 1 2 3; do
-              dput ppa:xmfcx/colcon-dashboard \
+              dput ppa-sftp \
                 "../colcon-dashboard_${version}_source.changes" && break
               test "$attempt" != 3 || exit 1
               sleep 30
