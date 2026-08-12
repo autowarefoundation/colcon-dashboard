@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "colcon-dashboard"
-version = "0.8.1"
+version = "0.8.2"
 description = "Live web dashboard for colcon builds: dependency graph, timeline, per-package logs, system pressure"
 readme = "README.md"
 requires-python = ">=3.8"
