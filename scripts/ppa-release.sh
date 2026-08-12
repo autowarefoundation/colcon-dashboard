@@ -17,7 +17,7 @@ set -euo pipefail
 PPA=${PPA:-ppa:xmfcx/colcon-dashboard}
 SERIES=${SERIES:-noble=24.04}
 
-version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' colcon_dashboard/__init__.py)
 
 restore() { git checkout --quiet debian/changelog; }
 trap restore EXIT

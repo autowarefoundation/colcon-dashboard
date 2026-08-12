@@ -25,7 +25,7 @@ jobs:
           python -m build
       - name: Check that the tag matches the package version
         run: |
-          version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' colcon_dashboard/__init__.py)
           test "$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != version $version"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
@@ -99,7 +99,7 @@ jobs:
           PPA_GPG_PASSPHRASE: ${{ secrets.PPA_GPG_PASSPHRASE }}
           SERIES: ${{ inputs.series || 'jammy=22.04 noble=24.04 resolute=26.04 stonking=26.10' }}
         run: |
-          upstream=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          upstream=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' colcon_dashboard/__init__.py)
           if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$upstream" != "$GITHUB_REF_NAME" ]; then
             echo "tag $GITHUB_REF_NAME != version $upstream"; exit 1
           fi
