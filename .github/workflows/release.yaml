@@ -84,8 +84,14 @@ jobs:
             debsign -k"$keyid" \
               -p"gpg --batch --pinentry-mode loopback --passphrase-file $RUNNER_TEMP/pf" \
               "../colcon-dashboard_${version}_source.changes"
-            dput ppa:xmfcx/colcon-dashboard \
-              "../colcon-dashboard_${version}_source.changes"
+            # Launchpad's FTP endpoint 550s transiently; dput skips
+            # already-uploaded files on retry.
+            for attempt in 1 2 3; do
+              dput ppa:xmfcx/colcon-dashboard \
+                "../colcon-dashboard_${version}_source.changes" && break
+              test "$attempt" != 3 || exit 1
+              sleep 30
+            done
             git checkout -- debian/changelog
           done
           rm -f "$RUNNER_TEMP/pf"
