@@ -4,9 +4,15 @@ on:
   push:
     tags:
       - "[0-9]*.[0-9]*.[0-9]*"
+  workflow_dispatch:
+    inputs:
+      series:
+        description: "codename=release entries to upload (PPA only, version from pyproject)"
+        default: "jammy=22.04 noble=24.04 resolute=26.04 stonking=26.10"
 
 jobs:
   build:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +49,8 @@ jobs:
 
   ppa:
     needs: build
+    # run on manual dispatch too, where build is skipped
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.build.result == 'success')
     runs-on: ubuntu-latest
     # the ppa environment holds the uploader key and pauses for approval
     environment:
@@ -89,15 +97,20 @@ jobs:
       - name: Build, sign, and upload the source packages
         env:
           PPA_GPG_PASSPHRASE: ${{ secrets.PPA_GPG_PASSPHRASE }}
+          SERIES: ${{ inputs.series || 'jammy=22.04 noble=24.04 resolute=26.04 stonking=26.10' }}
         run: |
+          upstream=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$upstream" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME != version $upstream"; exit 1
+          fi
           keyid=$(gpg --batch --list-secret-keys --with-colons \
                   | awk -F: '/^sec/{print $5; exit}')
           printf '%s\n' "$PPA_GPG_PASSPHRASE" > "$RUNNER_TEMP/pf"
           # ~ubuntuNN.NN.1 suffixes: release numbers sort reliably across
           # series; codenames wrap around the alphabet.
-          for entry in jammy=22.04 noble=24.04 resolute=26.04 stonking=26.10; do
+          for entry in $SERIES; do
             series="${entry%%=*}"
-            version="${GITHUB_REF_NAME}ppa1~ubuntu${entry#*=}.1"
+            version="${upstream}ppa1~ubuntu${entry#*=}.1"
             cat > debian/changelog <<EOF
           colcon-dashboard (${version}) ${series}; urgency=medium
 
