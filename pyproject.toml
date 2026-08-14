@@ -1,5 +1,5 @@
 # Packaging metadata is in setup.cfg, and the version is in
-# colcon_dashboard/__init__.py — see the note in setup.cfg.
+# colcon_dashboard/__init__.py - see the note in setup.cfg.
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"

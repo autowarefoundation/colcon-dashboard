@@ -110,10 +110,10 @@ export function initNotify() {
     btn.classList.toggle('on', notifyMode !== 'off');
     btn.innerHTML = BELL_ICONS[notifyMode] || BELL_ICONS.off;
     btn.title = notifyMode === 'off'
-      ? 'notifications off — click to notify when the build finishes'
+      ? 'notifications off - click to notify when the build finishes'
       : notifyMode === 'on'
-        ? 'notifications on — click to also play a chime'
-        : 'notifications + chime — click to switch off';
+        ? 'notifications on - click to also play a chime'
+        : 'notifications + chime - click to switch off';
   };
   btn.onclick = () => {
     notifyMode = MODES[(MODES.indexOf(notifyMode) + 1) % MODES.length];

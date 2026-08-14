@@ -13,8 +13,8 @@ export async function pollState() {
     s = await (await fetch(`/api/state${wsParam()}`)).json();
   } catch (e) {
     setBadge('offline', App.stopped
-      ? 'STOPPED — the server was shut down'
-      : 'OFFLINE — the server does not answer');
+      ? 'STOPPED - the server was shut down'
+      : 'OFFLINE - the server does not answer');
     emit('state-lost');
     return;
   }

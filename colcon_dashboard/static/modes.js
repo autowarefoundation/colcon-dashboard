@@ -1,7 +1,7 @@
 import { App } from './state.js';
 
 /* The layout modes (layered / force / 3d) implement one interface, and
-   the implementing module registers itself. Every method is optional —
+   the implementing module registers itself. Every method is optional -
    call through mode().x?.():
      activate()        the mode was just selected
      deactivate()      another mode was selected

@@ -72,7 +72,7 @@ export function showUpdateNote(update) {
   note.id = 'updnote';
   note.innerHTML =  // the versions come from a remote response: escape
     `colcon-dashboard <b>${esc(update.latest)}</b> is available ` +
-    `(installed ${esc(update.current)}) — ` +
+    `(installed ${esc(update.current)}) - ` +
     `<a href="https://github.com/autowarefoundation/colcon-dashboard/releases"` +
     ` target="_blank" rel="noopener">release notes</a>` +
     `<button class="dismiss" title="hide until the next release">✕</button>`;
