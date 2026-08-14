@@ -11,7 +11,7 @@ pipx install colcon-dashboard
 colcon-dashboard --install-service
 ```
 
-The service starts the server at login and restarts it on failure. Open <http://127.0.0.1:8642/> and pick your workspace. That is the whole setup.
+The service starts the server at login and restarts it on failure. Open <http://127.0.0.1:8642/> and pick your workspace. That is the whole setup. Upgrade later with `pipx upgrade colcon-dashboard`, then run `colcon-dashboard --restart-service` to load the new version.
 
 On Ubuntu, the apt package from the PPA does the same job and updates with the system:
 
@@ -58,7 +58,7 @@ The server follows `log/latest_build`. If a new build starts in the same workspa
 
 ## Configuration
 
-The server reads `~/.config/colcon-dashboard/config.ini` at startup. The file is optional, and a command line flag always wins over it. This is how service users set the port or the bind address, because the systemd unit passes no flags. When the file does not exist, the server (and `--install-service`) writes a template with every key commented out — open it and uncomment what you need. After a change, run `colcon-dashboard --restart-service`.
+The server reads `~/.config/colcon-dashboard/config.ini` at startup. The file is optional, and a command line flag always wins over it. This is how service users set the port or the bind address, because the systemd unit passes no flags. When the file does not exist, the server (and `--install-service`) writes a template with every key commented out. Open it and uncomment what you need. After a change, run `colcon-dashboard --restart-service`.
 
 ```ini
 [server]
