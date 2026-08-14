@@ -33,6 +33,63 @@ def config_path():
     return os.path.join(base, "colcon-dashboard", "config.ini")
 
 
+TEMPLATE = """\
+# colcon-dashboard configuration.
+# Every key is optional and shown with its default; the command line
+# always wins. Uncomment a key to change it, then restart the server
+# (colcon-dashboard --restart-service when it runs as a service).
+
+[server]
+# The bind address. 0.0.0.0 serves the dashboard to your network.
+#host = 127.0.0.1
+
+# The HTTP port.
+#port = 8642
+
+# The log directory colcon writes, relative to each workspace.
+#log_base = log
+
+# Check PyPI once a day for a newer version and show a note in the
+# workspace picker.
+#check_updates = false
+
+[builds]
+# After a build finishes, delete old runs, keeping the newest N of
+# each kind (build_*/test_*). Unset or -1: never delete anything.
+#auto_prune_keep = 10
+
+[ai]
+# The claude CLI used for failure analysis (default: found on PATH).
+#claude_bin = /path/to/claude
+
+[ui]
+# Turn file:line references in failure logs into editor links.
+# Placeholders: {path}, {line}, {line0} (= {line} - 1), and
+# {project} (the workspace directory name). Unset: no links.
+#editor_url = vscode://file{path}:{line}
+# JetBrains IDEs need the open project's name and count lines from
+# zero, hence {project} and {line0}:
+#editor_url = jetbrains://clion/navigate/reference?project={project}&path={path}:{line0}
+"""
+
+
+def write_template(path=None):
+    """Write a fully commented template so the keys are discoverable.
+
+    The CLI calls this when no config file exists. Mode "x" never
+    clobbers a file that appeared meanwhile, and any failure returns
+    None: the template is a convenience, never a requirement.
+    """
+    path = path or config_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "x") as f:
+            f.write(TEMPLATE)
+    except OSError:
+        return None
+    return path
+
+
 class Config:
     """A typed view over the ini file; unset keys resolve to None."""
 

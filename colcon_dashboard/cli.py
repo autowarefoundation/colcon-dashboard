@@ -30,7 +30,7 @@ from http.server import ThreadingHTTPServer
 from urllib.parse import quote
 
 from . import __version__
-from .config import CONFIG
+from .config import CONFIG, write_template
 from .monitor import prune_builds
 from .registry import CACHE_DIR, GLOBAL_PORT, Registry, SERVER_FILE
 from .web import Handler
@@ -167,8 +167,10 @@ def install_service():
     for cmd in (("daemon-reload",), ("enable", "--now", SERVICE)):
         if systemctl(*cmd) != 0:
             raise SystemExit(f"failed: systemctl --user {' '.join(cmd)}")
-    print(f"config file: {CONFIG.path}"
-          f"{'' if CONFIG.exists else ' (create it to set host, port, ...)'}")
+    created = None if CONFIG.exists else write_template(CONFIG.path)
+    note = (" (new template; uncomment keys to set host, port, ...)"
+            if created else "")
+    print(f"config file: {CONFIG.path}{note}")
     info = wait_for_server()
     if info:
         print(f"service running: {server_url(info)}")
@@ -427,6 +429,8 @@ def main():
             print("another server is starting")
             return
 
+    created = None if CONFIG.exists else write_template(CONFIG.path)
+
     ThreadingHTTPServer.daemon_threads = True  # a stop request must not hang
     port = explicit_port if explicit_port else GLOBAL_PORT
     try:
@@ -457,6 +461,8 @@ def main():
     info = {"host": host, "port": port}
     print("Colcon Dashboard")
     print(f"  url: {server_url(info)}")
+    if created:
+        print(f"  config: {created}  (new template)")
     if host in ("0.0.0.0", "::", ""):
         ip = lan_ip()
         if ip:

@@ -4,7 +4,7 @@ import os
 import tempfile
 import unittest
 
-from colcon_dashboard.config import Config
+from colcon_dashboard.config import Config, TEMPLATE, write_template
 
 
 class ConfigFile(unittest.TestCase):
@@ -77,6 +77,47 @@ class ConfigFile(unittest.TestCase):
         self.assertFalse(cfg.exists)
         self.assertIsNone(cfg.host)
         self.assertIsNone(cfg.port)
+
+
+class TemplateFile(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = os.path.join(self.tmp.name, "colcon-dashboard",
+                                 "config.ini")
+
+    def test_template_applies_no_values(self):
+        # the template only documents; a server reading it uses defaults
+        self.assertEqual(write_template(self.path), self.path)
+        cfg = Config(path=self.path)
+        self.assertTrue(cfg.exists)
+        self.assertIsNone(cfg.host)
+        self.assertIsNone(cfg.port)
+        self.assertIsNone(cfg.log_base)
+        self.assertFalse(cfg.check_updates)
+        self.assertIsNone(cfg.auto_prune_keep)
+        self.assertIsNone(cfg.claude_bin)
+        self.assertIsNone(cfg.editor_url)
+
+    def test_template_documents_every_key(self):
+        for key in ("host", "port", "log_base", "check_updates",
+                    "auto_prune_keep", "claude_bin", "editor_url"):
+            self.assertIn(f"#{key} = ", TEMPLATE)
+
+    def test_never_overwrites(self):
+        os.makedirs(os.path.dirname(self.path))
+        with open(self.path, "w") as f:
+            f.write("[server]\nport = 9000\n")
+        self.assertIsNone(write_template(self.path))
+        self.assertEqual(Config(path=self.path).port, 9000)
+
+    def test_unwritable_path_returns_none(self):
+        # a file where the directory should be blocks even root
+        blocker = os.path.join(self.tmp.name, "blocker")
+        with open(blocker, "w") as f:
+            f.write("")
+        self.assertIsNone(write_template(
+            os.path.join(blocker, "sub", "config.ini")))
 
 
 if __name__ == "__main__":
