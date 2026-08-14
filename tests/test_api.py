@@ -16,6 +16,7 @@ import urllib.parse
 import urllib.request
 from http.server import ThreadingHTTPServer
 
+from colcon_dashboard import __version__
 from colcon_dashboard import registry as registry_mod
 from colcon_dashboard.registry import Registry
 from colcon_dashboard.web import Handler
@@ -95,7 +96,39 @@ class ApiTest(unittest.TestCase):
     def test_ping(self):
         st, body, _ = self.get("/api/ping")
         self.assertEqual(st, 200)
-        self.assertEqual(json.loads(body)["app"], "colcon-dashboard")
+        ping = json.loads(body)
+        self.assertEqual(ping["app"], "colcon-dashboard")
+        self.assertEqual(ping["version"], __version__)
+
+    def test_config_endpoint(self):
+        st, body, _ = self.get("/api/config")
+        self.assertEqual(st, 200)
+        d = json.loads(body)
+        self.assertEqual(d["version"], __version__)
+        self.assertFalse(d["config"]["exists"])  # tests isolate the config
+        self.assertIn("auto_prune_keep", d["config"])
+
+    def test_workspaces_has_no_update_note_by_default(self):
+        _, body, _ = self.get("/api/workspaces")
+        self.assertNotIn("update", json.loads(body))
+
+    def test_delete_accepts_test_runs_but_not_live_ones(self):
+        test_dir = os.path.join(self.ws, "log", "test_2026-08-09_11-00-00")
+        os.makedirs(test_dir, exist_ok=True)
+        events = os.path.join(test_dir, "events.log")
+        with open(events, "w") as f:
+            f.write("x")
+        url = ("/api/builds/delete?ws=" + self.wsq()
+               + "&build=test_2026-08-09_11-00-00")
+        st, r = self.post(url)  # a fresh events.log means the run is live
+        self.assertEqual(st, 400)
+        self.assertTrue(os.path.exists(test_dir))
+        old = time.time() - 3600
+        os.utime(events, (old, old))
+        st, r = self.post(url)
+        self.assertEqual(st, 200)
+        self.assertTrue(r["ok"])
+        self.assertFalse(os.path.exists(test_dir))
 
     def test_static_index_and_traversal_guard(self):
         st, body, ctype = self.get("/")

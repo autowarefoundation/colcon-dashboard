@@ -18,6 +18,9 @@ DEP_KEY_RES = (re.compile(rb"'([^']+)': '/"),      # dict repr  {'name': '/path'
                re.compile(rb"\('([^']+)', '/"))    # legacy     [('name', '/path')]
 PCT_RE = re.compile(rb"\[\s*(\d{1,3})%\]")
 
+# the log directories colcon writes per run: build_<stamp>, test_<stamp>
+BUILD_DIR_RE = re.compile(r"(?:build|test)_[\w.-]+")
+
 
 def parse_build_id_time(build_id):
     """build_2026-08-09_09-56-51 -> epoch seconds (local time), or None."""

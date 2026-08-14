@@ -9,8 +9,11 @@ import os
 import re
 import threading
 import time
+import urllib.request
 
-from .events import parse_build_id_time
+from . import __version__
+from .config import CONFIG
+from .events import BUILD_DIR_RE, parse_build_id_time
 from .monitor import BuildMonitor
 
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache",
@@ -99,24 +102,34 @@ class Registry:
         self.stats_cache[ws] = (now, out)
         return out
 
-    def monitor(self, ws, build=None):
+    def monitor(self, ws, build=None, touch=True):
         try:
             ws = os.path.realpath(os.path.expanduser(ws))
         except (OSError, ValueError):
             return None
         if not os.path.isdir(ws):
             return None
-        if build and not re.fullmatch(r"build_[\w.-]+", build):
+        if build and not BUILD_DIR_RE.fullmatch(build):
             return None
         key = (ws, build)
         with self.lock:
             mon = self.monitors.get(key)
             if mon is None:
                 mon = BuildMonitor(ws, self.log_base, pin_build=build)
+                if build is None:
+                    mon.on_prune = (lambda deleted, ws=ws:
+                                    self._auto_pruned(ws, deleted))
                 self.monitors[key] = mon
                 threading.Thread(target=mon.run, daemon=True).start()
-        self.touch(ws)
+        if touch:
+            self.touch(ws)
         return mon
+
+    def _auto_pruned(self, ws, deleted):
+        """After a monitor auto-prunes: mirror the manual-prune cleanup."""
+        for name in deleted:
+            self.drop_pinned(ws, name)
+        self.stats_cache.pop(ws, None)
 
     def drop_pinned(self, ws, build):
         with self.lock:
@@ -150,6 +163,63 @@ class Registry:
         out.sort(key=lambda e: (not e.get("active"), not e["fav"],
                                 -(e.get("last_used") or 0)))
         return {"workspaces": out}
+
+
+PYPI_URL = "https://pypi.org/pypi/colcon-dashboard/json"
+UPDATE_INTERVAL = 86400
+_update_thread = None
+
+
+def _ver_key(version):
+    nums = [int(x) for x in re.findall(r"\d+", version or "")[:3]]
+    return tuple(nums + [0] * (3 - len(nums)))
+
+
+def _read_update():
+    try:
+        with open(os.path.join(CACHE_DIR, "update.json")) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def _check_update_now():
+    data = {"checked_at": time.time()}
+    try:
+        with urllib.request.urlopen(PYPI_URL, timeout=6) as r:
+            data["latest"] = json.load(r)["info"]["version"]
+    except (OSError, ValueError, KeyError):
+        old = _read_update()  # keep a stale answer over none
+        if old and old.get("latest"):
+            data["latest"] = old["latest"]
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(os.path.join(CACHE_DIR, "update.json"), "w") as f:
+            json.dump(data, f)
+    except OSError:
+        pass
+
+
+def update_status():
+    """{'latest', 'current'} when PyPI has a newer release, else None.
+
+    Opt-in through check_updates in config.ini. At most one check a
+    day, always in the background: no request ever waits on PyPI.
+    """
+    global _update_thread
+    if not CONFIG.check_updates:
+        return None
+    data = _read_update()
+    stale = data is None \
+        or time.time() - data.get("checked_at", 0) > UPDATE_INTERVAL
+    if stale and (_update_thread is None or not _update_thread.is_alive()):
+        _update_thread = threading.Thread(target=_check_update_now,
+                                          daemon=True)
+        _update_thread.start()
+    latest = (data or {}).get("latest")
+    if latest and _ver_key(latest) > _ver_key(__version__):
+        return {"latest": latest, "current": __version__}
+    return None
 
 
 SCAN_PRUNE = {"node_modules", "__pycache__", "build", "install", "log",

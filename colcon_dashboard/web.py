@@ -2,15 +2,17 @@
 
 import json
 import os
-import re
-import shutil
 import threading
 import time
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, unquote, urlparse
 
+from . import __version__
 from .ai import CLAUDE_BIN
-from .registry import discover_workspaces
+from .config import CONFIG
+from .events import BUILD_DIR_RE
+from .monitor import prune_builds, remove_build_dir
+from .registry import discover_workspaces, update_status
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
@@ -117,40 +119,31 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 pass
 
-        def remove(build):
-            target = os.path.realpath(os.path.join(log_dir, build))
-            if not target.startswith(log_dir + os.sep):
-                return 0
-            size = 0
-            for dp, _dn, fns in os.walk(target):
-                for fn in fns:
-                    try:
-                        size += os.stat(os.path.join(dp, fn)).st_size
-                    except OSError:
-                        pass
-            shutil.rmtree(target, ignore_errors=True)
-            self.registry.drop_pinned(ws, build)
-            return size
-
         if path == "/api/builds/delete":
             build = q.get("build", [None])[0]
-            if not build or not re.fullmatch(r"build_[\w.-]+", build):
+            if not build or not BUILD_DIR_RE.fullmatch(build):
                 return self._send(400, json.dumps({"error": "bad build id"}))
             if build == active_build:
                 return self._send(400, json.dumps(
                     {"error": "the build runs now"}))
-            freed = remove(build)
+            try:  # a live `colcon test` run has no monitor following it
+                mtime = os.path.getmtime(
+                    os.path.join(log_dir, build, "events.log"))
+                if time.time() - mtime < 15.0:
+                    return self._send(400, json.dumps(
+                        {"error": "the run is still active"}))
+            except OSError:
+                pass
+            freed = remove_build_dir(log_dir, build)
+            self.registry.drop_pinned(ws, build)
             result = {"ok": True, "deleted": 1, "freed": freed}
         else:
             keep = max(1, query_int(q, "keep", 3))
-            try:
-                names = sorted((d for d in os.listdir(log_dir)
-                                if d.startswith("build_")), reverse=True)
-            except OSError:
-                names = []
-            victims = [n for n in names[keep:] if n != active_build]
-            freed = sum(remove(n) for n in victims)
-            result = {"ok": True, "deleted": len(victims), "freed": freed}
+            protect = {active_build} if active_build else set()
+            deleted, freed = prune_builds(log_dir, keep, protect)
+            for name in deleted:
+                self.registry.drop_pinned(ws, name)
+            result = {"ok": True, "deleted": len(deleted), "freed": freed}
         self.registry.stats_cache.pop(ws, None)
         if live is not None:
             live._builds_cache = None
@@ -163,9 +156,31 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/ping":
             return self._send(200, json.dumps(
-                {"app": "colcon-dashboard", "pid": os.getpid()}))
+                {"app": "colcon-dashboard", "pid": os.getpid(),
+                 "version": __version__}))
+        if path == "/api/config":
+            return self._send(200, json.dumps({
+                "version": __version__,
+                "editor_url": CONFIG.editor_url,
+                "log_base": self.registry.log_base,
+                "config": {
+                    "path": CONFIG.path,
+                    "exists": CONFIG.exists,
+                    "host": CONFIG.host,
+                    "port": CONFIG.port,
+                    "log_base": CONFIG.log_base,
+                    "auto_prune_keep": CONFIG.auto_prune_keep,
+                    "check_updates": CONFIG.check_updates,
+                    "claude_bin": CONFIG.claude_bin,
+                    "editor_url": CONFIG.editor_url,
+                },
+            }))
         if path == "/api/workspaces":
-            return self._send(200, json.dumps(self.registry.overview()))
+            overview = self.registry.overview()
+            update = update_status()
+            if update:
+                overview["update"] = update
+            return self._send(200, json.dumps(overview))
         if path == "/api/discover":
             found = [{"path": p, **self.registry.stats(p)}
                      for p in discover_workspaces()]

@@ -6,12 +6,15 @@ dependency graph, samples system pressure, and serves log chunks.
 
 import json
 import os
-import re
+import shutil
 import threading
 import time
 
 from .ai import AIAnalysis, CLAUDE_BIN
-from .events import EventLog, RC_RE, parse_build_id_time
+from .config import CONFIG
+from .events import (
+    BUILD_DIR_RE, EVENT_RE, EventLog, RC_RE, parse_build_id_time,
+)
 from .packages import PackageIndex, parse_namespace
 
 LOG_FILES = {
@@ -21,6 +24,48 @@ LOG_FILES = {
     "command": "command.log",
     "streams": "streams.log",
 }
+
+
+def dir_size(path):
+    total = 0
+    for dirpath, _dirnames, filenames in os.walk(path):
+        for fn in filenames:
+            try:
+                total += os.stat(os.path.join(dirpath, fn)).st_size
+            except OSError:
+                pass
+    return total
+
+
+def remove_build_dir(log_dir, build):
+    """Delete one run's log directory; returns the bytes freed."""
+    log_dir = os.path.realpath(log_dir)
+    target = os.path.realpath(os.path.join(log_dir, build))
+    if not target.startswith(log_dir + os.sep) or not os.path.isdir(target):
+        return 0
+    freed = dir_size(target)
+    shutil.rmtree(target, ignore_errors=True)
+    return freed
+
+
+def prune_builds(log_dir, keep, protect=()):
+    """Keep the newest `keep` runs of each kind (build_, test_) and
+    delete the rest; returns (deleted names, bytes freed)."""
+    keep = max(1, keep)
+    deleted = []
+    freed = 0
+    for prefix in ("build_", "test_"):
+        try:
+            names = sorted((d for d in os.listdir(log_dir)
+                            if d.startswith(prefix)), reverse=True)
+        except OSError:
+            break
+        for name in names[keep:]:
+            if name in protect:
+                continue
+            freed += remove_build_dir(log_dir, name)
+            deleted.append(name)
+    return deleted, freed
 
 
 class BuildMonitor:
@@ -42,6 +87,10 @@ class BuildMonitor:
         self._prev_cpu = {}
         self._builds_cache = None
         self.analyses = {}  # (build_dir, pkg) -> AIAnalysis
+        self.active_flag = False
+        self.prev_info = None  # the previous run's outcome, for comparisons
+        self._pruned_for = None  # the build id auto-prune already ran for
+        self.on_prune = None  # the registry's cleanup after an auto-prune
 
     def sample_system(self):
         """CPU %, per-core %, memory and swap from /proc; None if unavailable."""
@@ -105,25 +154,38 @@ class BuildMonitor:
         return os.path.join(self.log_base, candidates[-1]) if candidates else None
 
     OUTCOME_FILE = ".colcon-dashboard.json"
+    OUTCOME_V = 2  # bump when _compute_outcome grows new fields
 
     def _read_outcome(self, build_dir):
         try:
             with open(os.path.join(build_dir, self.OUTCOME_FILE)) as f:
-                return json.load(f)
+                info = json.load(f)
         except (OSError, ValueError):
             return None
+        if not isinstance(info, dict) or info.get("v") != self.OUTCOME_V:
+            return None  # an older cache format: recompute lazily
+        return info
 
     def _compute_outcome(self, build_dir):
         """One streaming pass over events.log; cached in the build folder."""
         path = os.path.join(build_dir, "events.log")
         total = done = failed = aborted = skipped = 0
         shutdown = False
+        starts = {}     # name bytes -> start t
+        durations = {}  # per-package seconds, successful jobs only
+        last_line = b""
         try:
             mtime = os.stat(path).st_mtime
             with open(path, "rb") as f:
                 for line in f:
+                    last_line = line
                     if b"JobQueued" in line:
                         total += 1
+                    elif b"JobStarted" in line:
+                        # verify the event type: a StdoutLine may echo it
+                        m = EVENT_RE.match(line)
+                        if m and m.group(3) == b"JobStarted":
+                            starts[m.group(2)] = float(m.group(1))
                     elif b"JobEnded" in line:
                         m = RC_RE.search(line)
                         if not m:
@@ -132,6 +194,13 @@ class BuildMonitor:
                             aborted += 1
                         elif int(m.group(2)) == 0:
                             done += 1
+                            em = EVENT_RE.match(line)
+                            if em and em.group(3) == b"JobEnded" \
+                                    and em.group(2) in starts:
+                                name = em.group(2).decode("utf-8", "replace")
+                                durations[name] = round(
+                                    float(em.group(1))
+                                    - starts[em.group(2)], 1)
                         else:
                             failed += 1
                     elif b"JobSkipped" in line:
@@ -153,8 +222,14 @@ class BuildMonitor:
             outcome = "passed"
         else:
             outcome = "empty"
-        info = {"outcome": outcome, "done": done, "total": total,
-                "failed": failed, "aborted": aborted, "skipped": skipped}
+        duration = None
+        m = EVENT_RE.match(last_line)
+        if m:
+            duration = round(float(m.group(1)), 1)
+        info = {"v": self.OUTCOME_V, "outcome": outcome, "done": done,
+                "total": total, "failed": failed, "aborted": aborted,
+                "skipped": skipped, "duration": duration,
+                "pkg_durations": durations}
         try:
             with open(os.path.join(build_dir, self.OUTCOME_FILE), "w") as f:
                 json.dump(info, f)
@@ -165,36 +240,33 @@ class BuildMonitor:
     def list_builds(self):
         try:
             names = sorted(
-                (d for d in os.listdir(self.log_base) if d.startswith("build_")),
+                (d for d in os.listdir(self.log_base)
+                 if d.startswith(("build_", "test_"))),
+                key=lambda n: (parse_build_id_time(n) or 0, n),
                 reverse=True,
             )
         except OSError:
             names = []
         now = time.time()
-        if self._builds_cache and now - self._builds_cache[0] < 30 \
-                and self._builds_cache[1] == names:
-            return self._builds_cache[2]
+        cache = self._builds_cache  # other threads may null it mid-check
+        if cache and now - cache[0] < 30 and cache[1] == names:
+            return cache[2]
         builds = []
         pending = []
         for name in names:
             bdir = os.path.join(self.log_base, name)
-            size = 0
-            for dp, _dn, fns in os.walk(bdir):
-                for fn in fns:
-                    try:
-                        size += os.stat(os.path.join(dp, fn)).st_size
-                    except OSError:
-                        pass
             entry = {"id": name, "time": parse_build_id_time(name),
-                     "size": size}
+                     "size": dir_size(bdir)}
             info = self._read_outcome(bdir)
             if info:
-                entry.update(info)
+                entry.update({k: v for k, v in info.items()
+                              if k not in ("v", "pkg_durations")})
             elif not (name == self.build_id
                       and getattr(self, "active_flag", False)):
                 pending.append(name)
             builds.append(entry)
-        result = {"builds": builds, "latest": self.build_id,
+        result = {"builds": builds,
+                  "latest": None if self.pin_build else self.build_id,
                   "pinned": self.pin_build}
         self._builds_cache = (now, names, result)
         if pending and not getattr(self, "_outcome_busy", False):
@@ -209,6 +281,40 @@ class BuildMonitor:
             threading.Thread(target=work, args=(pending,),
                              daemon=True).start()
         return result
+
+    def _find_prev_outcome(self, build_id):
+        """The nearest earlier run of the same kind, with its outcome."""
+        kind = build_id.split("_", 1)[0] + "_"
+        try:
+            names = sorted((d for d in os.listdir(self.log_base)
+                            if d.startswith(kind) and d < build_id),
+                           reverse=True)
+        except OSError:
+            return None
+        for name in names[:5]:
+            bdir = os.path.join(self.log_base, name)
+            info = self._read_outcome(bdir) or self._compute_outcome(bdir)
+            if info and info.get("outcome") != "empty":
+                info = dict(info)
+                info["id"] = name
+                return info
+        return None
+
+    def _auto_prune(self):
+        """After a build ends: prune old runs, when the config asks for it."""
+        keep = CONFIG.auto_prune_keep
+        if keep is None or keep < 1:
+            return
+        protect = {self.build_id}
+
+        def work():
+            deleted, _freed = prune_builds(self.log_base, keep, protect)
+            if deleted:
+                self._builds_cache = None
+                if self.on_prune:
+                    self.on_prune(deleted)
+
+        threading.Thread(target=work, daemon=True).start()
 
     # -- graph reduction -----------------------------------------------------
 
@@ -254,6 +360,8 @@ class BuildMonitor:
             self.events = EventLog(os.path.join(build_dir, "events.log"))
             self.namespace = None
             self.direct_deps = {}
+            self.active_flag = False
+            self.prev_info = self._find_prev_outcome(build_id)
 
         if self.namespace is None:
             self.namespace = parse_namespace(
@@ -276,6 +384,13 @@ class BuildMonitor:
 
         now = time.time()
         active = (not ev.shutdown) and (now - ev.mtime() < 15.0)
+        # a finished latest build prunes once, even when the monitor first
+        # sees it after the fact (a service restart, a headless build)
+        keep = CONFIG.auto_prune_keep
+        if (keep is not None and keep >= 1 and not active
+                and self.pin_build is None and self._pruned_for != build_id):
+            self._pruned_for = build_id
+            self._auto_prune()
         self.active_flag = bool(active)
         epoch0 = parse_build_id_time(build_id) or (ev.mtime() - ev.last_t)
 
@@ -357,7 +472,12 @@ class BuildMonitor:
                 "path": idx.get(name, {}).get("path", ""),
                 "in_build": name in jobs,
             }
-        graph = {"build_id": build_id, "packages": graph_pkgs}
+        prev = None
+        if self.prev_info:
+            prev = {"id": self.prev_info.get("id"),
+                    "duration": self.prev_info.get("duration"),
+                    "durations": self.prev_info.get("pkg_durations") or {}}
+        graph = {"build_id": build_id, "packages": graph_pkgs, "prev": prev}
 
         self.seq += 1
         with self.lock:
@@ -382,7 +502,7 @@ class BuildMonitor:
         if which not in LOG_FILES or "/" in pkg or ".." in pkg or not pkg:
             return None
         build_dir = self.build_dir
-        if build and re.fullmatch(r"build_[\w.-]+", build):
+        if build and BUILD_DIR_RE.fullmatch(build):
             build_dir = os.path.join(self.log_base, build)
         if not build_dir:
             return None
@@ -425,7 +545,7 @@ class BuildMonitor:
         if not CLAUDE_BIN or "/" in pkg or ".." in pkg or not pkg:
             return None
         build_dir = self.build_dir
-        if build and re.fullmatch(r"build_[\w.-]+", build):
+        if build and BUILD_DIR_RE.fullmatch(build):
             build_dir = os.path.join(self.log_base, build)
         if not build_dir or not os.path.isdir(os.path.join(build_dir, pkg)):
             return None
