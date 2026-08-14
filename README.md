@@ -44,22 +44,53 @@ The command line:
 ```bash
 colcon-dashboard                              # start the server, or print its URL
 colcon-dashboard ~/projects/autoware          # same, and open this workspace
+colcon-dashboard --status                     # print the build status in the terminal
 colcon-dashboard --list                       # the known workspaces and their URLs
+colcon-dashboard --prune --keep 5             # delete all but the newest builds
 colcon-dashboard --stop                       # stop the server
 colcon-dashboard --install-service            # install the systemd user service
+colcon-dashboard --restart-service            # e.g. after a config.ini change
 ```
 
-The server follows `log/latest_build`. If a new build starts in the same workspace, the page switches to it and shows a notice.
+The service commands are `--install-service`, `--uninstall-service`, `--start-service`, `--stop-service`, `--restart-service`, and `--service-status`.
+
+The server follows `log/latest_build`. If a new build starts in the same workspace, the page switches to it and shows a notice. `colcon test` runs appear in the build picker too, with their own pass/fail counts.
+
+## Configuration
+
+The server reads `~/.config/colcon-dashboard/config.ini` at startup. The file is optional, and a command line flag always wins over it. This is how service users set the port or the bind address, because the systemd unit passes no flags. After a change, run `colcon-dashboard --restart-service`.
+
+```ini
+[server]
+host = 127.0.0.1        ; use 0.0.0.0 to reach the page from another machine
+port = 8642
+log_base = log
+check_updates = false   ; true: ask PyPI once a day for a newer release
+
+[builds]
+auto_prune_keep = -1    ; N >= 1: keep the newest N builds and N test
+                        ; runs after each build the server watches
+                        ; -1 (the default): never delete anything
+
+[ai]
+claude_bin =            ; explicit path to the claude CLI
+
+[ui]
+editor_url =            ; e.g. vscode://file{path}:{line} - file:line log
+                        ; lines get a link that opens your editor
+```
 
 ## What the page shows
 
 ### Header
 
-The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The workspace path opens the workspace picker. The build id opens the build picker. The power button stops the server, after a confirmation. When the server stops answering, the whole top panel turns red.
+The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The workspace path opens the workspace picker. The build id opens the build picker. The bell button turns on desktop notifications: the build finished, the build failed, or the first package failed. A second click adds a quiet chime. The ? button (or the `?` key) opens the keyboard and mouse reference. The power button stops the server, after a confirmation. When the server stops answering, the whole top panel turns red.
 
-The workspace picker lists your recent workspaces with their build count, log size, and last build time, and shows live progress for workspaces that build now. The list sorts by the last build time, and a workspace that builds now has the newest build, so it sits on top. A star pins a favorite, and a sort menu reorders the list by favorites, build count, or log size. The picker also opens any path and scans your home directory for colcon workspaces.
+The browser tab mirrors the build even in the background: the title shows `[42%] workspace` while the build runs, then `✓` or `✗`, and the favicon changes color with it.
 
-The build picker lists every build of the workspace with its log size and its outcome: a passed, failed, or aborted chip, with the done, failed, aborted, and skipped package counts. The outcome comes from one pass over the build's `events.log`, cached in a small file inside the build folder. Open a build and the whole dashboard shows it, with the `build` query parameter in the address. The 🗑 buttons delete one build's logs, and a prune action keeps the last three. The server refuses to delete a build that runs now.
+The workspace picker lists your recent workspaces with their build count, log size, and last build time, and shows live progress for workspaces that build now. The list sorts by the last build time, and a workspace that builds now has the newest build, so it sits on top. A star pins a favorite, and a sort menu reorders the list by favorites, build count, or log size. The picker also opens any path and scans your home directory for colcon workspaces. With `check_updates = true` in the config, a dismissible line appears here when PyPI has a newer release; the server makes no other network request, ever.
+
+The build picker lists every build and `colcon test` run of the workspace with its log size and its outcome: a passed, failed, or aborted chip, with the done, failed, aborted, and skipped package counts. Each finished run also shows its total duration, and the delta against the previous run of the same kind: `+3:12` in red for a slower run, `−1:04` in green for a faster one. The outcome comes from one pass over the run's `events.log`, cached in a small file inside its folder. Open a run and the whole dashboard shows it, with the `build` query parameter in the address. The 🗑 buttons delete one run's logs, and a prune action keeps the last three of each kind (build and test). The server refuses to delete a run that is active now. The `auto_prune_keep` config key does the same pruning automatically when a build finishes, for every workspace the server watches.
 
 The right side is the system strip. A colcon build can exhaust the machine, so pressure stays visible at all times:
 
@@ -72,7 +103,7 @@ The right side is the system strip. A colcon build can exhaust the machine, so p
 
 The meter fills as the build advances: green for done, animated blue stripes for building, red for failed, orange for aborted.
 
-The tiles count each state: done out of the total, building, ready, waiting (plus a blocked count after a failure), failed, aborted, and skipped. Elapsed time and the rate in packages per minute sit at the end.
+The tiles count each state: done out of the total, building, ready, waiting (plus a blocked count after a failure), failed, aborted, and skipped. Elapsed time, the rate in packages per minute, and an ETA sit at the end. The ETA is an estimate: the longest remaining dependency chain, or the remaining work spread over the workers, whichever is larger, with each package's duration taken from the previous build.
 
 ### Dependency graph
 
@@ -97,9 +128,10 @@ Edges take color from their endpoints:
 
 Interaction:
 
-- Hover a node to see its state, phase, time, stderr count, and path, and to light its full dependency chain while the rest dims.
+- Hover a node to see its state, phase, time, stderr count, and path, and to light its full dependency chain while the rest dims. When the previous build has a duration for the package, the tooltip compares them, and marks a clear regression.
 - Click a node to open its log pane.
-- The **find package** box highlights matching packages while the rest fades, in every layout and in the timeline. Enter and Shift+Enter jump through the matches.
+- The **find package** box highlights matching packages while the rest fades, in every layout and in the timeline. Enter and Shift+Enter jump through the matches. The `/` key jumps to the box.
+- The **state chips** (failed, building, waiting, done) filter the same way by state instead of by name, and combine with the find box. One click on **failed** shows the whole blast radius of a broken build.
 - Double-click a log tab in the dock to center the view on that package.
 - Drag to pan, scroll to zoom. **Fit** frames the whole graph.
 - **⌖ follow build** keeps the camera on the packages that build now, so the action stays framed as the build moves through the graph. Pan or zoom by hand and the camera is yours again.
@@ -140,8 +172,13 @@ The dock opens with a pinned **build log** tab: the whole build, as a terminal s
 - A selector switches a package pane between the timestamped output, `stdout+stderr`, `stderr`, `stdout`, and the command log.
 - ANSI colors render as in a terminal: the 16 classic colors, 256-color, and truecolor, with palettes tuned per theme. Uncolored lines that match error or warning patterns still get color.
 - When a package fails, its pane opens by itself and a toast points to it. A page opened on an already failed build opens the failed packages' panes too, earliest failure first.
+- A **✗ failures** tab appears with the first failure and aggregates every failed package: the last stderr lines of each, in failure order, with a jump link, an open-log button, and the ask-claude button. When a failed build ends, this pane comes to the front.
+- The **⧉ path** button in a package pane copies the package's absolute source path.
+- With `editor_url` configured, `file:line` positions in the logs get a ↗ link that opens your editor at that line.
 - **✕ close all** at the end of the tab strip closes every tab except the build log.
 - Drag the bar above the dock to resize it.
+
+The address bar mirrors the open pane and the picked view (`#pkg=...&view=...`), so a copied link opens the same package pane for a colleague. The `ws` and `build` query parameters already pin the workspace and the build.
 
 ### AI failure analysis
 
@@ -172,9 +209,18 @@ Per-package logs come from `log/<build>/<package>/`. The server serves them incr
 | `--port` | `8642` | HTTP port. The default falls back to a free port when taken |
 | `--host` | `127.0.0.1` | Bind address. Use `0.0.0.0` to reach the page from another machine |
 | `--log-base` | `log` | Log directory, relative to a workspace |
-| `--stop` | | Stop the server |
+| `--version` | | Print the version |
+| `--status` | | Print the workspace's build status and exit |
 | `--list` | | List the known workspaces and their URLs |
+| `--prune` | | Delete all but the newest runs of each kind (build, test) |
+| `--keep` | `3` | How many runs of each kind `--prune` keeps |
+| `--stop` | | Stop the server |
 | `--install-service` | | Install and start the systemd user service |
+| `--uninstall-service` | | Stop, disable, and remove the service |
+| `--start-service` `--stop-service` `--restart-service` | | Control the service |
+| `--service-status` | | Show the service and server status |
+
+When the server binds `0.0.0.0`, it prints the real LAN URL next to the loopback one. **The server trusts every caller**: it serves logs and deletes them on request. Expose the port only to a network you trust.
 
 ## API
 
@@ -183,6 +229,7 @@ Workspace endpoints take a `ws=<path>` query parameter. Add `build=<build id>` t
 | Endpoint | Returns |
 |---|---|
 | `/api/workspaces` | The recent workspaces, with live build info where known |
+| `/api/config` | The server version and the loaded config values |
 | `/api/discover` | Colcon workspaces found under the home directory |
 | `/api/register?ws=` (POST) | Registers a workspace, like opening it in the page |
 | `/api/favorite?ws=&fav=1` (POST) | Pins or unpins a workspace |
@@ -190,7 +237,7 @@ Workspace endpoints take a `ws=<path>` query parameter. Add `build=<build id>` t
 | `/api/builds/prune?ws=&keep=3` (POST) | Deletes all but the newest builds |
 | `/api/state?ws=` | Job states, counts, timings, build metadata |
 | `/api/graph?ws=` | Direct dependency edges for the graph views |
-| `/api/builds?ws=` | The `build_*` directories under the log base |
+| `/api/builds?ws=` | The `build_*` and `test_*` runs under the log base, plus the latest and pinned ids |
 | `/api/log/<pkg>?ws=&offset=N&file=streams` | A log chunk from byte `N`, plus the new offset |
 | `/api/buildlog?ws=&offset=N` | A chunk of the combined build log, same shape |
 | `/api/analyze/<pkg>?ws=&q=` (POST) | Starts an AI analysis of a failed package, or asks a follow-up |
