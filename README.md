@@ -58,7 +58,7 @@ The server follows `log/latest_build`. If a new build starts in the same workspa
 
 ## Configuration
 
-The server reads `~/.config/colcon-dashboard/config.ini` at startup. The file is optional, and a command line flag always wins over it. This is how service users set the port or the bind address, because the systemd unit passes no flags. After a change, run `colcon-dashboard --restart-service`.
+The server reads `~/.config/colcon-dashboard/config.ini` at startup. The file is optional, and a command line flag always wins over it. This is how service users set the port or the bind address, because the systemd unit passes no flags. When the file does not exist, the server (and `--install-service`) writes a template with every key commented out — open it and uncomment what you need. After a change, run `colcon-dashboard --restart-service`.
 
 ```ini
 [server]
@@ -77,7 +77,11 @@ claude_bin =            ; explicit path to the claude CLI
 
 [ui]
 editor_url =            ; e.g. vscode://file{path}:{line} - file:line log
-                        ; lines get a link that opens your editor
+                        ; lines get a link that opens your editor.
+                        ; JetBrains IDEs need the project name ({project},
+                        ; the workspace directory name) and count lines
+                        ; from zero ({line0}, {line} minus one), e.g.
+                        ; jetbrains://clion/navigate/reference?project={project}&path={path}:{line0}
 ```
 
 ## What the page shows
