@@ -1,3 +1,3 @@
 """Colcon Dashboard: a live web dashboard for colcon builds."""
 
-__version__ = "0.8.3"
+__version__ = "0.9.0"
