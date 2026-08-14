@@ -227,6 +227,7 @@ export function syncGlow() {
 
 export function updateNodes() {
   if (!App.nodeEls.size) return;
+  if (GS.states.size) runGraphSearch();  // states move: refresh the chips
   const { failed, doomed } = computeDoomed();
   const next = computeNext();
   App.doomedSet = doomed;
@@ -386,7 +387,16 @@ export function showNodeTooltip(name, ev) {
     rows.push(`state <b>${st}</b>`);
     const dur = p.t1 ? p.t1 - p.t0
       : p.t0 && App.active ? (Date.now() / 1000 - p.t0) : null;
-    if (dur != null) rows.push(`time <b>${fmtDur(dur)}</b>`);
+    if (dur != null) {
+      let row = `time <b>${fmtDur(dur)}</b>`;
+      const prevDur = App.prev?.durations?.[name];
+      if (prevDur != null) {
+        row += ` · last build ${fmtDur(prevDur)}`;
+        if (dur > prevDur * 1.5 && dur - prevDur > 10)
+          row += ' <span class="treg">slower</span>';
+      }
+      rows.push(row);
+    }
     if (p.err) rows.push(`stderr lines <b>${p.err}</b>`);
   } else {
     rows.push(meta.in_build ? 'state <b>pending</b>' : 'not part of this build');

@@ -37,6 +37,8 @@
       <div class="smbar"><div class="smfill"></div></div>
     </div>
   </div>
+  <button id="bellBtn" title="build notifications"></button>
+  <button id="helpBtn" title="keyboard shortcuts and mouse gestures (?)">?</button>
   <button id="themeBtn" title="theme: system / light / dark">◐</button>
   <button id="stopBtn" title="stop the dashboard server"><svg viewBox="0 0 24 24"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg></button>
   </div>
@@ -86,6 +88,10 @@
       <div class="label"><span class="dot c-none"></span>Rate</div>
       <div class="value" id="t-rate">–<small> pkg/min</small></div>
     </div>
+    <div class="tile">
+      <div class="label"><span class="dot c-none"></span>ETA</div>
+      <div class="value" id="t-eta" title="estimated time left, from the previous build’s package durations">–</div>
+    </div>
   </div>
 </section>
 
@@ -115,6 +121,12 @@
       <button id="scopeBuild" class="on">this build</button>
       <button id="scopeAll">whole workspace</button>
     </span>
+  </span>
+  <span id="stateChips" title="highlight packages by state, in every view">
+    <button data-filter="failed">failed</button>
+    <button data-filter="building">building</button>
+    <button data-filter="waiting">waiting</button>
+    <button data-filter="done">done</button>
   </span>
   <span class="searchwrap">
     <input id="gsearch" type="text" placeholder="find package" spellcheck="false"
@@ -154,7 +166,7 @@
     <div id="blist"></div>
     <div class="wsadd">
       <span class="grow"></span>
-      <button id="bprune" class="danger">Keep the last 3, delete the rest</button>
+      <button id="bprune" class="danger">Keep the last 3 of each kind, delete the rest</button>
     </div>
   </div>
 </div>
@@ -175,6 +187,13 @@
       <button id="wsopen">Open</button>
       <button id="wsscan" title="search your home directory for colcon workspaces">Scan home</button>
     </div>
+  </div>
+</div>
+
+<div id="help" hidden>
+  <div class="cbox wsbox helpbox">
+    <div class="wshead">Keyboard &amp; mouse</div>
+    <table><tbody></tbody></table>
   </div>
 </div>
 

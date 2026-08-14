@@ -12,6 +12,10 @@ export function wsParam(joiner = '?') {
   }
   return s;
 }
+// for strings that reach innerHTML: log content and URLs are not HTML
+export const esc = s => String(s).replace(/[&<>"']/g, c => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 export const SVGNS = 'http://www.w3.org/2000/svg';
 
 export function svgEl(tag, attrs, parent) {
@@ -27,6 +31,24 @@ export function fmtDur(sec) {
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
            : `${m}:${String(s).padStart(2, '0')}`;
+}
+
+export async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {  // http:// pages get no clipboard API: fall back
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e2) { /* denied */ }
+    ta.remove();
+    return ok;
+  }
 }
 
 export function fmtGB(kb) {

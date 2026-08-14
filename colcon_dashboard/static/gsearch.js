@@ -2,28 +2,42 @@ import { zoomToPkg } from './camera.js';
 import { App } from './state.js';
 import { $ } from './util.js';
 
-/* ---- graph search: find packages by name in any view ---- */
+/* ---- graph search: find packages by name or state in any view ---- */
 
-export const GS = { q: '', matches: [], set: null, idx: -1 };
+export const GS = { q: '', matches: [], set: null, idx: -1,
+                    states: new Set() };
+
+// chip -> package states it matches: the failed chip includes the
+// blocked blast radius, the post-mortem gesture the chips exist for
+export const CHIP_STATES = {
+  failed: ['failed', 'blocked'],
+  building: ['building'],
+  waiting: ['waiting', 'ready'],
+  done: ['done'],
+};
 
 export function runGraphSearch() {
   const q = $('#gsearch').value.trim().toLowerCase();
   GS.q = q;
+  const filtering = !!q || GS.states.size > 0;
   GS.matches = [];
   GS.idx = -1;
-  if (q && App.lay) {
-    for (const name of App.lay.nodes.keys())
-      if (name.toLowerCase().includes(q)) GS.matches.push(name);
+  if (filtering && App.lay) {
+    for (const name of App.lay.nodes.keys()) {
+      if (q && !name.toLowerCase().includes(q)) continue;
+      if (GS.states.size && !GS.states.has(App.pkgs[name]?.s)) continue;
+      GS.matches.push(name);
+    }
     GS.matches.sort();
   }
-  GS.set = q ? new Set(GS.matches) : null;
-  $('#graph').classList.toggle('searching', !!q);
-  $('#gantt').classList.toggle('searching', !!q);
+  GS.set = filtering ? new Set(GS.matches) : null;
+  $('#graph').classList.toggle('searching', filtering);
+  $('#gantt').classList.toggle('searching', filtering);
   for (const [name, g] of App.nodeEls)
     g.classList.toggle('smatch', !!GS.set?.has(name));
   for (const bar of $('#gantt').querySelectorAll('.gbar'))
     bar.classList.toggle('smatch', !!GS.set?.has(bar.dataset.name));
-  $('#gscount').textContent = q ? `${GS.matches.length} found` : '';
+  $('#gscount').textContent = filtering ? `${GS.matches.length} found` : '';
 }
 
 export function stepGraphSearch(dir) {
@@ -59,4 +73,12 @@ export function initGraphSearch() {
     sync();
     runGraphSearch();
   };
+  for (const chip of document.querySelectorAll('#stateChips button')) {
+    chip.onclick = () => {
+      const states = CHIP_STATES[chip.dataset.filter] || [];
+      const on = chip.classList.toggle('on');
+      for (const s of states) on ? GS.states.add(s) : GS.states.delete(s);
+      runGraphSearch();
+    };
+  }
 }

@@ -29,6 +29,8 @@ export async function pollState() {
     updateSysMeters(s.sys);
     return;
   }
+  // set before build-changed: its handlers open panes that render paths
+  App.workspace = s.workspace || App.workspace;
   if (s.build_id !== App.buildId) {
     const first = App.buildId === null;
     App.buildId = s.build_id;
@@ -65,6 +67,7 @@ export async function pollState() {
 export async function fetchGraph() {
   const g = await (await fetch(`/api/graph${wsParam()}`)).json();
   App.graph = g.packages;
+  App.prev = g.prev || null;
   App.lastGraphFetch = Date.now();
   App.graphJobCount = Object.values(g.packages).filter(p => p.in_build).length;
   emit('graph');

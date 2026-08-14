@@ -21,7 +21,8 @@ export async function startAnalysis(pkg, question) {
 
 export function updatePaneHeads() {
   for (const [name, p] of App.panes) {
-    if (p.ai) continue;  // its chip updates from /api/analysis responses
+    // ai chips update from /api/analysis; the failure summary from 'state'
+    if (p.ai || p.summary) continue;
     if (p.fixed) {
       const chip = p.el.querySelector('.chip');
       chip.textContent = App.active ? 'live' : 'stopped';
@@ -37,6 +38,8 @@ export function updatePaneHeads() {
     chip.className = 'chip ' + s;
     const ask = p.el.querySelector('.askai');
     if (ask) ask.hidden = !(App.ai && s === 'failed');
+    const cp = p.el.querySelector('.cpath');
+    if (cp) cp.hidden = !App.graph?.[name]?.path;
     p.el.querySelector('.ph').textContent =
       st && st.s === 'building'
         ? (st.ph || '') + (st.pct != null ? ` ${st.pct}%` : '') : '';

@@ -20,8 +20,9 @@ STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 ALLOWED = {
     'ai': ['bus', 'dock', 'state', 'util'],
     'ansi': [],
-    'app': ['ai', 'camera', 'dock', 'g3d', 'gantt', 'gsearch', 'modes',
-            'pickers', 'poller', 'state', 'theme', 'util', 'views'],
+    'app': ['ai', 'bus', 'camera', 'dock', 'g3d', 'gantt', 'gsearch',
+            'header', 'help', 'modes', 'notify', 'pickers', 'poller',
+            'state', 'theme', 'util', 'views'],
     'bus': [],
     # camera/force/graph/g3d/gsearch are one subsystem (the graph views)
     # and may import each other; only hoisted functions cross at load time
@@ -34,8 +35,10 @@ ALLOWED = {
     'gantt': ['bus', 'graph', 'gsearch', 'state', 'util'],
     'graph': ['bus', 'camera', 'gsearch', 'modes', 'state', 'util'],
     'gsearch': ['camera', 'state', 'util'],
-    'header': ['bus', 'util'],
+    'header': ['bus', 'state', 'util'],
+    'help': ['util'],
     'modes': ['state'],
+    'notify': ['bus', 'state', 'util'],
     'pickers': ['graph', 'header', 'state', 'toasts', 'util'],
     'poller': ['bus', 'header', 'modes', 'state', 'toasts', 'util'],
     'state': [],

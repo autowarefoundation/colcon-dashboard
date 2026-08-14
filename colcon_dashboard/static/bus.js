@@ -10,6 +10,7 @@
      open-pkg (name)          request: open this package's log pane
      focus-pkg (name)         request: fly the view to this package
      analyze-pkg (pkg, q?)    request: start or continue an AI analysis
+     pane-changed (name)      another log pane became active (or null)
      theme-changed            the color theme was applied */
 
 const listeners = new Map();

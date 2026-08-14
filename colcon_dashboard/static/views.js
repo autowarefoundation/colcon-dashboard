@@ -9,6 +9,24 @@ import { $ } from './util.js';
 
 /* ---------------- view switching, dock resize ---------------- */
 
+/* Deep links: #pkg=<name>&view=<view> mirrors the open log pane and
+   the picked view, so a pasted address restores both. The ws and
+   build query params already pin the workspace and the build. */
+
+export function syncHash() {
+  const params = new URLSearchParams();
+  const pane = App.panes.get(App.activePane);
+  if (pane && !pane.fixed && !pane.ai && !pane.summary)
+    params.set('pkg', pane.name);
+  // with a pkg the view is always encoded, so a shared link restores
+  // both; without one, only a non-default view earns a hash
+  if (params.has('pkg') || App.view !== 'split')
+    params.set('view', App.view);
+  const h = params.toString();
+  history.replaceState(null, '',
+    location.pathname + location.search + (h ? '#' + h : ''));
+}
+
 export function setView(v) {
   App.view = v;
   localStorage.setItem('cmc-view', v);
@@ -31,6 +49,7 @@ export function setView(v) {
   $('#gfollowBtn').style.display = showGantt ? '' : 'none';
   $('#gsortSel').style.display = showGantt ? '' : 'none';
   updateForceCtl();
+  syncHash();
   dispatchEvent(new Event('resize'));  // both panels take their new sizes
   if (showGantt) drawGantt();
   if (!showGraph) mode().hide?.();
@@ -58,7 +77,14 @@ export function initViews() {
   for (const b of document.querySelectorAll('.vtab')) {
     b.onclick = () => setView(b.dataset.view);
   }
-  setView(localStorage.getItem('cmc-view') || 'split');
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const hashView = hash.get('view');
+  setView(['graph', 'gantt', 'split'].includes(hashView)
+    ? hashView : (localStorage.getItem('cmc-view') || 'split'));
+  const hashPkg = hash.get('pkg');
+  // the hash is untrusted input, so it must look like a package name;
+  // returned so the caller opens it after the build-log pane
+  const deepPkg = hashPkg && /^[\w.+-]+$/.test(hashPkg) ? hashPkg : null;
   $('#fitBtn').onclick = () => {
     breakFollow();
     mode().fit();
@@ -153,9 +179,12 @@ export function initViews() {
     addEventListener('pointermove', move);
     addEventListener('pointerup', up);
   });
+  return deepPkg;
 }
 
 on('state', () => mode().onState?.());
+
+on('pane-changed', syncHash);
 
 on('focus-pkg', name => {
   if (App.view === 'gantt') setView('split');  // bring the graph in

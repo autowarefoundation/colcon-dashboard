@@ -155,7 +155,9 @@ body.offline #sysmeters { display: none; }
   display: block;
   fill: currentColor;
 }
-#themeBtn, #stopBtn, #sysBtn { padding: 4px 8px; }
+#themeBtn, #stopBtn, #sysBtn, #bellBtn { padding: 4px 8px; }
+#helpBtn { padding: 4px 9px; font-weight: 650; }
+#bellBtn.on { color: var(--accent); border-color: var(--accent); }
 
 /* system meters: colcon can eat all the RAM, keep pressure visible */
 #sysmeters { display: flex; gap: 14px; align-items: center; }
@@ -471,6 +473,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 #tooltip .tname { font-family: var(--mono); font-weight: 650; margin-bottom: 3px; }
 #tooltip .trow { color: var(--ink2); }
 #tooltip .trow b { color: var(--ink); font-weight: 600; }
+#tooltip .treg { color: var(--critical); font-weight: 650; }
 
 /* ---- log dock ---- */
 #dockbar {
@@ -597,6 +600,106 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   outline: 1px solid var(--warning);
 }
 
+/* failure summary pane */
+.fsummary { flex: 1; min-height: 0; overflow: auto; padding: 8px 12px; background: var(--surface); }
+.fitem { border: 1px solid var(--grid); border-radius: 8px; margin-bottom: 10px; }
+.fitem .fhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: var(--ink2);
+  border-bottom: 1px solid var(--grid);
+  flex-wrap: wrap;
+}
+.fitem .fjump {
+  border: none;
+  background: none;
+  padding: 0;
+  font-weight: 650;
+  color: var(--critical);
+  cursor: pointer;
+}
+.fitem .fjump:hover { text-decoration: underline; color: var(--critical); }
+.fitem .fmeta { color: var(--muted); }
+.fitem .grow { flex: 1; }
+.fitem .fopen { padding: 1px 7px; font-size: 11px; }
+.fitem .askai { padding: 1px 7px; font-size: 11px; color: var(--accent); border-color: var(--accent); font-weight: 650; }
+.fitem .askai:hover { background: var(--accent); color: #fff; }
+.fitem .ftail {
+  margin: 0;
+  padding: 6px 10px;
+  max-height: 220px;
+  overflow: auto;
+  font: 11px/1.5 var(--mono);
+  color: var(--ink2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* editor links on file:line log lines */
+.pane .elink, .fitem .elink {
+  text-decoration: none;
+  color: var(--accent);
+  padding: 0 3px;
+  font-weight: 650;
+}
+.pane .elink:hover, .fitem .elink:hover { background: var(--accent); color: #fff; border-radius: 3px; }
+.pane .phead .cpath { white-space: nowrap; }
+
+/* build picker: run durations and their deltas */
+.wsrow .wdelta { font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wsrow .wdelta.dplus { color: var(--critical); }
+.wsrow .wdelta.dminus { color: var(--good); }
+
+/* update notice in the workspace picker */
+#updnote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--accent);
+  border-left-width: 4px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+#updnote a { color: var(--accent); }
+#updnote .dismiss {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+#updnote .dismiss:hover { color: var(--critical); }
+
+/* keyboard help overlay */
+#help {
+  position: fixed;
+  inset: 0;
+  z-index: 46;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+#help[hidden] { display: none; }
+.helpbox { width: min(480px, 92vw); }
+.helpbox table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.helpbox td { padding: 5px 8px; border-top: 1px solid var(--grid); color: var(--ink2); }
+.helpbox td:first-child { white-space: nowrap; color: var(--ink); }
+.helpbox .hsep { color: var(--muted); }
+.helpbox kbd {
+  font: 11px var(--mono);
+  background: var(--page);
+  border: 1px solid var(--baseline);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
 /* ambient halos behind building packages */
 #graph .gs0 { stop-color: var(--accent); stop-opacity: 0.30; }
 #graph .gs1 { stop-color: var(--accent); stop-opacity: 0.10; }
@@ -620,6 +723,14 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 }
 #gsearch:focus { outline: none; border-color: var(--accent); }
 #gscount { font-size: 10.5px; color: var(--muted); min-width: 40px; }
+/* state chips: filter by state like search filters by name */
+#stateChips { display: inline-flex; gap: 4px; }
+#stateChips button { font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+#stateChips button[data-filter="failed"].on { color: var(--critical); border-color: var(--critical); }
+#stateChips button[data-filter="building"].on { color: var(--accent); border-color: var(--accent); }
+#stateChips button[data-filter="waiting"].on { color: var(--ink); border-color: var(--baseline); }
+#stateChips button[data-filter="done"].on { color: var(--good); border-color: var(--good); }
+
 .searchwrap { position: relative; display: inline-flex; align-items: center; }
 .searchwrap input { padding-right: 22px; }
 .searchwrap .sclear {

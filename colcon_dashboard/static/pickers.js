@@ -2,7 +2,7 @@ import { label } from './graph.js';
 import { setBadge } from './header.js';
 import { App } from './state.js';
 import { toast } from './toasts.js';
-import { $, fmtAgo, fmtBytes, PINNED_BUILD, WS, wsParam } from './util.js';
+import { $, esc, fmtAgo, fmtBytes, fmtDur, PINNED_BUILD, WS, wsParam } from './util.js';
 
 export const WS_SORTS = {
   // a workspace building now has the newest build, so "last built"
@@ -64,6 +64,25 @@ export function renderWsList(items) {
 
 export let wsItems = [];
 
+export function showUpdateNote(update) {
+  $('#updnote')?.remove();
+  if (!update
+      || localStorage.getItem('cmc-upd-dismissed') === update.latest) return;
+  const note = document.createElement('div');
+  note.id = 'updnote';
+  note.innerHTML =  // the versions come from a remote response: escape
+    `colcon-dashboard <b>${esc(update.latest)}</b> is available ` +
+    `(installed ${esc(update.current)}) — ` +
+    `<a href="https://github.com/autowarefoundation/colcon-dashboard/releases"` +
+    ` target="_blank" rel="noopener">release notes</a>` +
+    `<button class="dismiss" title="hide until the next release">✕</button>`;
+  note.querySelector('.dismiss').onclick = () => {
+    localStorage.setItem('cmc-upd-dismissed', update.latest);
+    note.remove();
+  };
+  $('#wspick .wshead').after(note);
+}
+
 export async function openWsPicker() {
   $('#wspick').hidden = false;
   const list = $('#wslist');
@@ -72,6 +91,7 @@ export async function openWsPicker() {
     const d = await (await fetch('/api/workspaces')).json();
     wsItems = d.workspaces || [];
     renderWsList(wsItems);
+    showUpdateNote(d.update);
   } catch (e) {
     list.innerHTML = '<div class="wsempty">The server does not answer.</div>';
   }
@@ -157,7 +177,10 @@ export async function openBuildPicker(retry) {
   }
   list.innerHTML = '';
   const builds = d.builds || [];
-  const latest = builds.length ? builds[0].id : null;
+  // what the live view follows: the newest entry can be a test run,
+  // and a pinned monitor reports no latest at all
+  const latest = d.latest
+    || builds.find(b => b.id.startsWith('build_'))?.id || null;
   // Outcomes compute in the background on first sight of old builds.
   if (builds.some(b => !b.outcome) && tries < 8) {
     setTimeout(() => {
@@ -170,14 +193,37 @@ export async function openBuildPicker(retry) {
   live.innerHTML = '<span class="wpath">latest</span>' +
                    '<span class="tag">live</span>';
   list.appendChild(live);
-  for (const b of builds) {
+  // total duration, and the delta against the previous run of the
+  // same kind (test runs never compare against builds)
+  const olderDuration = i => {
+    const kind = builds[i].id.split('_')[0];
+    for (let j = i + 1; j < builds.length; j++) {
+      if (builds[j].id.split('_')[0] === kind
+          && builds[j].duration != null) return builds[j].duration;
+    }
+    return null;
+  };
+  builds.forEach((b, i) => {
     const a = document.createElement('a');
     a.className = 'wsrow' + (PINNED_BUILD === b.id ? ' cur' : '');
     a.href = buildHref(b.id);
+    let durHtml = '';
+    if (b.duration != null) {
+      durHtml = `<span class="wmeta">${fmtDur(b.duration)}</span>`;
+      const prev = olderDuration(i);
+      if (prev != null && Math.abs(b.duration - prev) >= 2) {
+        const d = b.duration - prev;
+        durHtml += `<span class="wdelta ${d > 0 ? 'dplus' : 'dminus'}"` +
+          ` title="against the previous run">` +
+          `${d > 0 ? '+' : '−'}${fmtDur(Math.abs(d))}</span>`;
+      }
+    }
     a.innerHTML =
       `<span class="wpath">${b.id}</span>` +
+      (b.id.startsWith('test_') ? '<span class="tag">test</span>' : '') +
       (b.id === latest ? '<span class="tag">latest</span>' : '') +
       outcomeHtml(b) +
+      durHtml +
       `<span class="wmeta">${fmtBytes(b.size)}</span>` +
       `<button class="del" title="delete this build's logs">🗑</button>`;
     const del = a.querySelector('.del');
@@ -201,7 +247,7 @@ export async function openBuildPicker(retry) {
       openBuildPicker();
     };
     list.appendChild(a);
-  }
+  });
 }
 
 export function initBuildPicker() {
@@ -216,15 +262,15 @@ export function initBuildPicker() {
   prune.onclick = async () => {
     if (!prune.classList.contains('sure')) {
       prune.classList.add('sure');
-      prune.textContent = 'Really delete all but the last 3?';
+      prune.textContent = 'Really delete all but the last 3 of each kind?';
       setTimeout(() => {
         prune.classList.remove('sure');
-        prune.textContent = 'Keep the last 3, delete the rest';
+        prune.textContent = 'Keep the last 3 of each kind, delete the rest';
       }, 3000);
       return;
     }
     prune.classList.remove('sure');
-    prune.textContent = 'Keep the last 3, delete the rest';
+    prune.textContent = 'Keep the last 3 of each kind, delete the rest';
     const r = await (await fetch(
       `/api/builds/prune?ws=${encodeURIComponent(WS)}&keep=3`,
       { method: 'POST' })).json();

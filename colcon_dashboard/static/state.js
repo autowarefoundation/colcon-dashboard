@@ -1,11 +1,14 @@
 export const App = {
   buildId: null,
   graph: null,          // /api/graph packages
+  prev: null,           // /api/graph prev: the previous run's durations
   graphJobCount: 0,
   lastGraphFetch: 0,
   pkgs: {},             // /api/state packages
   active: false,
   total: 0,
+  workspace: '',        // absolute path, from /api/state
+  cfg: null,            // /api/config: version, editor_url
   scope: 'build',       // 'build' | 'all'
   view: 'graph',
   ganttFollow: true,

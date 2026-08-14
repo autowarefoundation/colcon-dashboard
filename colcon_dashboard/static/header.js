@@ -1,7 +1,22 @@
 import { on } from './bus.js';
-import { $, fmtGB } from './util.js';
+import { App } from './state.js';
+import { $, fmtDur, fmtGB } from './util.js';
 
 /* ---------------- header + tiles ---------------- */
+
+export async function initHeaderMeta() {
+  // one boot fetch: the server version and the editor-link template
+  try {
+    App.cfg = await (await fetch('/api/config')).json();
+  } catch (e) {
+    return;  // offline: the poller reports it
+  }
+  if (App.cfg.version) {
+    const v = `v${App.cfg.version}`;
+    $('#stopBtn').title = `stop the dashboard server (${v})`;
+    document.querySelector('#topbar .brand').title = `colcon-dashboard ${v}`;
+  }
+}
 
 export function setBadge(cls, text) {
   const b = $('#livebadge');
@@ -62,6 +77,51 @@ export function updateSysMeters(sys) {
   }
 }
 
+export function estimateEta(s) {
+  /* Remaining build time: the longest remaining dependency chain, or
+     the remaining work spread over the workers, whichever is larger.
+     Per-package durations come from the previous run (App.prev), with
+     this run's mean as the fallback. */
+  if (!s.active || !s.total || !App.graph) return null;
+  const pkgs = s.packages;
+  const prev = App.prev?.durations || {};
+  const doneDur = [];
+  for (const p of Object.values(pkgs))
+    if (p.s === 'done' && p.t0 && p.t1) doneDur.push(p.t1 - p.t0);
+  const prevVals = Object.values(prev);
+  const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+  const typical = doneDur.length >= 3 ? mean(doneDur)
+    : prevVals.length ? mean(prevVals) : null;
+  if (typical == null) return null;
+  const remOf = n => {
+    const p = pkgs[n];
+    if (!p || p.s === 'done' || p.s === 'failed' || p.s === 'aborted'
+        || p.s === 'skipped' || p.s === 'blocked') return 0;
+    const d = prev[n] ?? typical;
+    if (p.s === 'building') return Math.max(3, d - (s.now - p.t0));
+    return d;
+  };
+  const memo = new Map();  // longest remaining chain ending at a package
+  const chain = n => {
+    if (memo.has(n)) return memo.get(n);
+    memo.set(n, 0);  // cycle guard
+    let deepest = 0;
+    for (const d of App.graph[n]?.deps || [])
+      if (pkgs[d]) deepest = Math.max(deepest, chain(d));
+    const v = remOf(n) + deepest;
+    memo.set(n, v);
+    return v;
+  };
+  let critical = 0, work = 0;
+  for (const n of Object.keys(pkgs)) {
+    critical = Math.max(critical, chain(n));
+    work += remOf(n);
+  }
+  if (!work) return null;
+  const workers = s.workers || Math.max(1, s.counts?.building || 1);
+  return Math.max(critical, work / workers);
+}
+
 export function applyState(s) {
   const c = s.counts || {};
   const done = c.done || 0, failed = c.failed || 0, aborted = c.aborted || 0;
@@ -87,6 +147,8 @@ export function applyState(s) {
   $('#t-skipped').textContent = skipped;
   const rate = s.elapsed > 30 ? (done / (s.elapsed / 60)) : null;
   $('#t-rate').innerHTML = (rate ? rate.toFixed(1) : '–') + '<small> pkg/min</small>';
+  const eta = estimateEta(s);
+  $('#t-eta').textContent = eta != null ? `~${fmtDur(eta)}` : '–';
 
   const seg = (cls, n) =>
     $(`#meter .seg.${cls}`).style.flexBasis = (s.total ? (100 * n / s.total) : 0) + '%';
