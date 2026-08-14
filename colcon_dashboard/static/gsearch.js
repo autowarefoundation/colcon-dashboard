@@ -16,20 +16,27 @@ export const CHIP_STATES = {
   done: ['done'],
 };
 
-export function runGraphSearch() {
+export function runGraphSearch(refresh = false) {
   const q = $('#gsearch').value.trim().toLowerCase();
   GS.q = q;
   const filtering = !!q || GS.states.size > 0;
-  GS.matches = [];
-  GS.idx = -1;
+  const matches = [];
   if (filtering && App.lay) {
     for (const name of App.lay.nodes.keys()) {
       if (q && !name.toLowerCase().includes(q)) continue;
       if (GS.states.size && !GS.states.has(App.pkgs[name]?.s)) continue;
-      GS.matches.push(name);
+      matches.push(name);
     }
-    GS.matches.sort();
+    matches.sort();
   }
+  // a poll-tick refresh with an unchanged match set must not reset the
+  // Enter-stepping position or overwrite the i/N counter
+  if (refresh && GS.set && matches.length === GS.matches.length
+      && matches.every((m, i) => m === GS.matches[i])) {
+    return;
+  }
+  GS.matches = matches;
+  GS.idx = -1;
   GS.set = filtering ? new Set(GS.matches) : null;
   $('#graph').classList.toggle('searching', filtering);
   $('#gantt').classList.toggle('searching', filtering);

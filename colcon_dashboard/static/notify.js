@@ -126,6 +126,17 @@ export function initNotify() {
     apply();
   };
   apply();
+  // audio needs a user gesture per page load: the first interaction
+  // primes the context, or a reloaded chime setting would stay silent
+  const prime = () => {
+    if (notifyMode !== 'sound') return;
+    try {
+      audioCtx = audioCtx || new AudioContext();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) { /* no audio device */ }
+  };
+  addEventListener('pointerdown', prime, { once: true, capture: true });
+  addEventListener('keydown', prime, { once: true, capture: true });
 }
 
 on('state', s => {
@@ -156,4 +167,11 @@ on('pkg-failed', name => {
 on('build-changed', () => {
   failNotified = false;
   prevActive = null;
+});
+
+on('state-lost', () => {
+  // no build state to mirror: a stale "[42%]" title would lie
+  document.title = BASE_TITLE;
+  setFavicon('#0ca30c');
+  prevActive = null;  // reconnecting must not fire a stale notification
 });

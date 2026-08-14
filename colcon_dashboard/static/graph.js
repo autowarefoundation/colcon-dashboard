@@ -227,7 +227,7 @@ export function syncGlow() {
 
 export function updateNodes() {
   if (!App.nodeEls.size) return;
-  if (GS.states.size) runGraphSearch();  // states move: refresh the chips
+  if (GS.states.size) runGraphSearch(true);  // states move: refresh chips
   const { failed, doomed } = computeDoomed();
   const next = computeNext();
   App.doomedSet = doomed;

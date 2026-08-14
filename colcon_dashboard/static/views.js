@@ -27,9 +27,9 @@ export function syncHash() {
     location.pathname + location.search + (h ? '#' + h : ''));
 }
 
-export function setView(v) {
+export function setView(v, persist = true) {
   App.view = v;
-  localStorage.setItem('cmc-view', v);
+  if (persist) localStorage.setItem('cmc-view', v);
   document.querySelectorAll('.vtab').forEach(x =>
     x.classList.toggle('on', x.dataset.view === v));
   const showGraph = v !== 'gantt';
@@ -79,8 +79,10 @@ export function initViews() {
   }
   const hash = new URLSearchParams(location.hash.slice(1));
   const hashView = hash.get('view');
-  setView(['graph', 'gantt', 'split'].includes(hashView)
-    ? hashView : (localStorage.getItem('cmc-view') || 'split'));
+  const linked = ['graph', 'gantt', 'split'].includes(hashView);
+  // a shared link picks the view but must not overwrite the preference
+  setView(linked ? hashView : (localStorage.getItem('cmc-view') || 'split'),
+          !linked);
   const hashPkg = hash.get('pkg');
   // the hash is untrusted input, so it must look like a package name;
   // returned so the caller opens it after the build-log pane

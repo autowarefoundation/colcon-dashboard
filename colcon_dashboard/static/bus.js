@@ -4,6 +4,7 @@
 
    Events:
      state (s)                a /api/state poll landed, App is updated
+     state-lost               a poll failed or carried no build state
      graph                    a /api/graph fetch landed, App.graph is updated
      build-changed (s, first) the page follows a new build id
      pkg-failed (name)        a package newly turned failed

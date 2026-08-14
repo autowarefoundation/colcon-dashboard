@@ -15,18 +15,21 @@ export async function pollState() {
     setBadge('offline', App.stopped
       ? 'STOPPED — the server was shut down'
       : 'OFFLINE — the server does not answer');
+    emit('state-lost');
     return;
   }
   if (s.nows) {
     setBadge('idle', 'PICK A WORKSPACE');
     $('#ws').textContent = 'pick a workspace';
     $('#buildid').textContent = 'builds';
+    emit('state-lost');
     return;
   }
   if (s.error) {
     setBadge('idle', 'WAITING');
     $('#buildid').textContent = s.error;
     updateSysMeters(s.sys);
+    emit('state-lost');
     return;
   }
   // set before build-changed: its handlers open panes that render paths

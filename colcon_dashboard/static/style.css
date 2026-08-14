@@ -104,8 +104,9 @@ button.on { color: var(--accent); border-color: var(--accent); }
   /* dissolve the meta box: the chips and the badge pack one shared
      wrap flow instead of each block hoarding its own row */
   #topbar .meta { display: contents; }
-  /* the buttons stay pinned to the top right corner */
-  #topbar { position: relative; padding-right: 128px; }
+  /* the buttons stay pinned to the top right corner; the reserve
+     fits all five of them (sys, bell, help, theme, stop) */
+  #topbar { position: relative; padding-right: 230px; }
   #topbar .hbtns { position: absolute; top: 6px; right: 12px; }
 }
 .hbtns { display: flex; align-items: center; gap: 12px; }
@@ -555,7 +556,8 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   row-gap: 4px;
 }
 .pane .phead .pname { font-family: var(--mono); font-weight: 650; color: var(--ink); white-space: nowrap; }
-.pane .phead .chip {
+.pane .phead .chip,
+.fitem .fhead .chip {
   padding: 0 7px;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -563,7 +565,8 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 }
 .pane .phead .chip.done { color: var(--good); border-color: var(--good); }
 .pane .phead .chip.building { color: var(--accent); border-color: var(--accent); }
-.pane .phead .chip.failed { color: var(--critical); border-color: var(--critical); }
+.pane .phead .chip.failed,
+.fitem .fhead .chip.failed { color: var(--critical); border-color: var(--critical); }
 .pane .phead .chip.aborted { color: var(--serious); border-color: var(--serious); }
 .pane .phead .grow { flex: 1; }
 .pane .phead select, .pane .phead button { padding: 1px 7px; font-size: 11px; }
@@ -686,7 +689,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   background: rgba(0, 0, 0, 0.35);
 }
 #help[hidden] { display: none; }
-.helpbox { width: min(480px, 92vw); }
+#help .wsbox.helpbox { width: min(480px, 92vw); }  /* outspecify .wsbox */
 .helpbox table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .helpbox td { padding: 5px 8px; border-top: 1px solid var(--grid); color: var(--ink2); }
 .helpbox td:first-child { white-space: nowrap; color: var(--ink); }
@@ -831,7 +834,8 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 }
 #wspick[hidden] { display: none; }
 #wspick .wsbox,
-#bpick .wsbox {
+#bpick .wsbox,
+#help .wsbox {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -841,7 +845,8 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   color: var(--ink);
 }
 #wspick .wshead,
-#bpick .wshead {
+#bpick .wshead,
+#help .wshead {
   display: flex;
   align-items: center;
   justify-content: space-between;
