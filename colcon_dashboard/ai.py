@@ -6,9 +6,16 @@ import shutil
 import subprocess
 import threading
 
+from .config import CONFIG
+
 
 def _find_claude():
-    """The claude CLI; ~/.local/bin is not on the systemd user PATH."""
+    """The claude CLI: the config file wins, then PATH, then
+    ~/.local/bin, which is not on the systemd user PATH."""
+    if CONFIG.claude_bin:
+        cand = os.path.expanduser(CONFIG.claude_bin)
+        if os.access(cand, os.X_OK):
+            return cand
     found = shutil.which("claude")
     if found:
         return found

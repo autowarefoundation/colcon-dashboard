@@ -2,6 +2,14 @@
 
 import os
 
+from colcon_dashboard.config import CONFIG
+
+# Tests must never see the developer's real config file: re-init the
+# shared CONFIG object against a path that cannot exist. Every module
+# holds this same object, so mutating it in place reaches them all.
+CONFIG.__init__(path=os.path.join(os.sep, "nonexistent",
+                                  "colcon-dashboard-test.ini"))
+
 
 def event_line(t, name, event, payload="{}"):
     """One events.log line in colcon's format."""
