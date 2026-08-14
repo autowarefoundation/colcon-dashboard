@@ -222,7 +222,15 @@ class ListBuildsKinds(unittest.TestCase):
                     SHUTDOWN], mtime=time.time() - 3600)
         mon = BuildMonitor(tmp.name, pin_build=BUILD_ID)
         mon.scan_once()
-        self.assertIsNone(mon.list_builds()["latest"])
+        # wait out the background outcome worker: its cache write must
+        # not race the tempdir cleanup (it lost that race on Launchpad)
+        deadline = time.time() + 8
+        while time.time() < deadline:
+            result = mon.list_builds()
+            if all(b.get("outcome") for b in result["builds"]):
+                break
+            time.sleep(0.05)
+        self.assertIsNone(result["latest"])
 
 
 class AutoPrune(unittest.TestCase):
@@ -274,13 +282,13 @@ class AutoPrune(unittest.TestCase):
         mon.on_prune = pruned.extend
         mon.scan_once()
         log_dir = os.path.join(tmp.name, "log")
-        deadline = time.time() + 5
-        while time.time() < deadline:
-            if "build_2026-08-09_08-00-00" not in os.listdir(log_dir):
-                break
+        # the callback fires last, so waiting on it (not on listdir)
+        # means the whole worker is done before the assertions run
+        deadline = time.time() + 8
+        while time.time() < deadline and not pruned:
             time.sleep(0.05)
-        self.assertEqual(os.listdir(log_dir), [BUILD_ID])
         self.assertEqual(pruned, ["build_2026-08-09_08-00-00"])
+        self.assertEqual(os.listdir(log_dir), [BUILD_ID])
 
 
 class ScanOnce(unittest.TestCase):
