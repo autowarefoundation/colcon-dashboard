@@ -643,12 +643,14 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 
 /* editor links on file:line log lines */
 .pane .elink, .fitem .elink {
-  text-decoration: none;
-  color: var(--accent);
-  padding: 0 3px;
-  font-weight: 650;
+  color: inherit;
+  text-decoration: underline dotted var(--accent);
+  text-underline-offset: 2px;
 }
-.pane .elink:hover, .fitem .elink:hover { background: var(--accent); color: #fff; border-radius: 3px; }
+.pane .elink:hover, .fitem .elink:hover {
+  color: var(--accent);
+  text-decoration-style: solid;
+}
 .pane .phead .cpath { white-space: nowrap; }
 
 /* build picker: run durations and their deltas */
