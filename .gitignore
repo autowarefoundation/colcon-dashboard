@@ -11,3 +11,6 @@ debian/python3-colcon-dashboard.*.debhelper
 debian/files
 debian/*.substvars
 debian/debhelper-build-stamp
+site/
+.cache/
+.venv/

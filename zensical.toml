@@ -1,0 +1,134 @@
+[project]
+site_name = "Colcon Dashboard"
+site_url = "https://autowarefoundation.github.io/colcon-dashboard/"
+site_description = "Live web dashboard for colcon builds: dependency graph, timeline, per-package logs, system pressure"
+site_author = "Mete Fatih Cırıt"
+
+copyright = "Copyright &copy; 2026 Autoware Foundation"
+
+repo_url = "https://github.com/autowarefoundation/colcon-dashboard"
+repo_name = "autowarefoundation/colcon-dashboard"
+edit_uri = "edit/main/docs/"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = [
+    { "Install" = "install.md" },
+    { "Quick start" = "quick-start.md" },
+    { "Configuration" = "configuration.md" },
+  ] },
+  { "The dashboard" = [
+    "guide/index.md",
+    { "Dependency graph" = "guide/graph.md" },
+    { "Timeline" = "guide/timeline.md" },
+    { "Log panes" = "guide/logs.md" },
+    { "AI failure analysis" = "guide/ai.md" },
+  ] },
+  { "Reference" = [
+    { "Command line" = "reference/cli.md" },
+    { "HTTP API" = "reference/api.md" },
+    { "How it works" = "reference/how-it-works.md" },
+  ] },
+]
+
+[project.theme]
+language = "en"
+features = [
+  "announce.dismiss",
+  "content.action.edit",
+  "content.action.view",
+  "content.code.annotate",
+  "content.code.copy",
+  "content.code.select",
+  "content.footnote.tooltips",
+  "content.tabs.link",
+  "content.tooltips",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.instant.prefetch",
+  "navigation.path",
+  "navigation.sections",
+  "navigation.tabs",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+  "toc.follow",
+]
+
+[project.theme.icon]
+logo = "lucide/layout-dashboard"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "blue"
+accent = "blue"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "blue"
+accent = "blue"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/autowarefoundation/colcon-dashboard"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/python"
+link = "https://pypi.org/project/colcon-dashboard/"
+
+[project.markdown_extensions]
+abbr = {}
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+toc = {
+  permalink = true
+}
+pymdownx.betterem = {}
+pymdownx.caret = {}
+pymdownx.details = {}
+pymdownx.emoji = {
+  emoji_generator = "zensical.extensions.emoji.to_svg",
+  emoji_index = "zensical.extensions.emoji.twemoji",
+}
+pymdownx.highlight = {
+  anchor_linenums = true,
+  line_spans = "__span",
+  pygments_lang_class = true,
+}
+pymdownx.inlinehilite = {}
+pymdownx.keys = {}
+pymdownx.magiclink = {}
+pymdownx.mark = {}
+pymdownx.smartsymbols = {}
+pymdownx.superfences = {
+  custom_fences = [
+    {
+      name = "mermaid",
+      class = "mermaid",
+      format = "pymdownx.superfences.fence_code_format",
+    },
+  ],
+}
+pymdownx.tabbed = {
+  alternate_style = true,
+  combine_header_slug = true
+}
+pymdownx.tasklist = {
+  custom_checkbox = true
+}
+pymdownx.tilde = {}
