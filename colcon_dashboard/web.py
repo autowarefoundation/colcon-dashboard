@@ -110,12 +110,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, json.dumps({"error": "no log directory"}))
         live = self.registry.monitor(ws)
         active_build = None
+        monitored = None
         if live is not None:
             try:
                 with live.lock:
                     st = json.loads(live.state_json)
+                monitored = st.get("build_id")
                 if st.get("active"):
-                    active_build = st.get("build_id")
+                    active_build = monitored
             except ValueError:
                 pass
 
@@ -126,14 +128,17 @@ class Handler(BaseHTTPRequestHandler):
             if build == active_build:
                 return self._send(400, json.dumps(
                     {"error": "the build runs now"}))
-            try:  # a live `colcon test` run has no monitor following it
-                mtime = os.path.getmtime(
-                    os.path.join(log_dir, build, "events.log"))
-                if time.time() - mtime < 15.0:
-                    return self._send(400, json.dumps(
-                        {"error": "the run is still active"}))
-            except OSError:
-                pass
+            if build != monitored:
+                # a live `colcon test` run has no monitor following it;
+                # the monitored build already passed the real active check
+                try:
+                    mtime = os.path.getmtime(
+                        os.path.join(log_dir, build, "events.log"))
+                    if time.time() - mtime < 15.0:
+                        return self._send(400, json.dumps(
+                            {"error": "the run is still active"}))
+                except OSError:
+                    pass
             freed = remove_build_dir(log_dir, build)
             self.registry.drop_pinned(ws, build)
             result = {"ok": True, "deleted": 1, "freed": freed}

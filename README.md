@@ -46,7 +46,7 @@ colcon-dashboard                              # start the server, or print its U
 colcon-dashboard ~/projects/autoware          # same, and open this workspace
 colcon-dashboard --status                     # print the build status in the terminal
 colcon-dashboard --list                       # the known workspaces and their URLs
-colcon-dashboard --prune --keep 5             # delete all but the newest builds
+colcon-dashboard --prune --keep 5             # keep 5 builds and 5 test runs
 colcon-dashboard --stop                       # stop the server
 colcon-dashboard --install-service            # install the systemd user service
 colcon-dashboard --restart-service            # e.g. after a config.ini change
@@ -90,7 +90,7 @@ The browser tab mirrors the build even in the background: the title shows `[42%]
 
 The workspace picker lists your recent workspaces with their build count, log size, and last build time, and shows live progress for workspaces that build now. The list sorts by the last build time, and a workspace that builds now has the newest build, so it sits on top. A star pins a favorite, and a sort menu reorders the list by favorites, build count, or log size. The picker also opens any path and scans your home directory for colcon workspaces. With `check_updates = true` in the config, a dismissible line appears here when PyPI has a newer release; the server makes no other network request, ever.
 
-The build picker lists every build and `colcon test` run of the workspace with its log size and its outcome: a passed, failed, or aborted chip, with the done, failed, aborted, and skipped package counts. Each finished run also shows its total duration, and the delta against the previous run of the same kind: `+3:12` in red for a slower run, `−1:04` in green for a faster one. The outcome comes from one pass over the run's `events.log`, cached in a small file inside its folder. Open a run and the whole dashboard shows it, with the `build` query parameter in the address. The 🗑 buttons delete one run's logs, and a prune action keeps the last three of each kind (build and test). The server refuses to delete a run that is active now. The `auto_prune_keep` config key does the same pruning automatically when a build finishes, for every workspace the server watches.
+The build picker lists every build and `colcon test` run of the workspace with its log size and its outcome: a passed, failed, or aborted chip, with the done, failed, aborted, and skipped package counts. Each finished run also shows its total duration, and the delta against the previous run of the same kind: `+3:12` in red for a slower run, `−1:04` in green for a faster one. The outcome comes from one pass over the run's `events.log`, cached in a small file inside its folder. Open a run and the whole dashboard shows it, with the `build` query parameter in the address. The 🗑 buttons delete one run's logs, and a prune action keeps the last three of each kind (build and test). The server refuses to delete a run that is still writing its logs. The `auto_prune_keep` config key does the same pruning automatically whenever it sees a finished build, for every workspace the server watches.
 
 The right side is the system strip. A colcon build can exhaust the machine, so pressure stays visible at all times:
 
@@ -234,7 +234,7 @@ Workspace endpoints take a `ws=<path>` query parameter. Add `build=<build id>` t
 | `/api/register?ws=` (POST) | Registers a workspace, like opening it in the page |
 | `/api/favorite?ws=&fav=1` (POST) | Pins or unpins a workspace |
 | `/api/builds/delete?ws=&build=` (POST) | Deletes one build's logs |
-| `/api/builds/prune?ws=&keep=3` (POST) | Deletes all but the newest builds |
+| `/api/builds/prune?ws=&keep=3` (POST) | Deletes all but the newest runs of each kind |
 | `/api/state?ws=` | Job states, counts, timings, build metadata |
 | `/api/graph?ws=` | Direct dependency edges for the graph views |
 | `/api/builds?ws=` | The `build_*` and `test_*` runs under the log base, plus the latest and pinned ids |

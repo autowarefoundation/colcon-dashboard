@@ -167,6 +167,10 @@ class PrevRunInfo(unittest.TestCase):
                    [queued(0.1, "a"), started(0.2, "a")], mtime=time.time())
         mon = BuildMonitor(tmp.name)
         mon.scan_once()
+        deadline = time.time() + 5  # the prev outcome loads off-thread
+        while mon.prev_info is None and time.time() < deadline:
+            time.sleep(0.05)
+        mon.scan_once()  # the next scan publishes the loaded info
         graph = json.loads(mon.graph_json)
         self.assertEqual(graph["prev"]["id"], self.OLD_ID)
         self.assertEqual(graph["prev"]["durations"], {"a": 0.8})

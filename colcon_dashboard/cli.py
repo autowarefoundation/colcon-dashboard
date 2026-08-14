@@ -272,15 +272,17 @@ def show_status(info, workspace):
 def prune_cmd(info, alive, workspace, keep, log_base):
     keep = max(1, keep)
     if alive:
-        # a server watching a different log dir cannot prune this one:
-        # fall back to the local prune, which is safe there
+        # use the API only when the server confirms it watches the same
+        # log dir; a mismatch, an older server (no /api/config), or an
+        # error all prune locally, which is safe: the newest run of each
+        # kind always survives, and that is where a live build writes
         try:
             with urllib.request.urlopen(api_url(info, "/api/config"),
                                         timeout=2) as r:
                 server_base = json.load(r).get("log_base")
         except (OSError, ValueError):
             server_base = None
-        if server_base is not None and server_base != log_base:
+        if server_base != log_base:
             alive = False
     if alive:
         url = api_url(info, "/api/builds/prune?ws="
@@ -329,7 +331,8 @@ def main():
     act.add_argument("--status", action="store_true",
                      help="print the workspace's build status and exit")
     act.add_argument("--prune", action="store_true",
-                     help="delete all but the newest builds (see --keep)")
+                     help="delete all but the newest runs of each kind"
+                          " (see --keep)")
     act.add_argument("--install-service", action="store_true",
                      help="install and start the systemd user service")
     act.add_argument("--uninstall-service", action="store_true",

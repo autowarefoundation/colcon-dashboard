@@ -91,6 +91,7 @@ class BuildMonitor:
         self.prev_info = None  # the previous run's outcome, for comparisons
         self._pruned_for = None  # the build id auto-prune already ran for
         self.on_prune = None  # the registry's cleanup after an auto-prune
+        self.stopped = False  # a dropped monitor's thread must end
 
     def sample_system(self):
         """CPU %, per-core %, memory and swap from /proc; None if unavailable."""
@@ -282,6 +283,13 @@ class BuildMonitor:
                              daemon=True).start()
         return result
 
+    def _load_prev_outcome(self, build_id):
+        """Off the scan thread: computing an old run's outcome reads its
+        whole events.log, which can be huge."""
+        info = self._find_prev_outcome(build_id)
+        if self.build_id == build_id:  # not raced by another build change
+            self.prev_info = info
+
     def _find_prev_outcome(self, build_id):
         """The nearest earlier run of the same kind, with its outcome."""
         kind = build_id.split("_", 1)[0] + "_"
@@ -361,7 +369,9 @@ class BuildMonitor:
             self.namespace = None
             self.direct_deps = {}
             self.active_flag = False
-            self.prev_info = self._find_prev_outcome(build_id)
+            self.prev_info = None
+            threading.Thread(target=self._load_prev_outcome,
+                             args=(build_id,), daemon=True).start()
 
         if self.namespace is None:
             self.namespace = parse_namespace(
@@ -371,7 +381,10 @@ class BuildMonitor:
             self.index.scan(base_paths)
 
         ev = self.events
-        ev.poll()
+        offset = -1
+        while ev.offset != offset:  # drain a cold replay before publishing
+            offset = ev.offset
+            ev.poll()
         if ev.graph_dirty:
             self.reduce_graph()
 
@@ -485,7 +498,7 @@ class BuildMonitor:
             self.graph_json = json.dumps(graph, separators=(",", ":"))
 
     def run(self):
-        while True:
+        while not self.stopped:
             try:
                 self.scan_once()
             except Exception as exc:  # keep the monitor alive, report the error

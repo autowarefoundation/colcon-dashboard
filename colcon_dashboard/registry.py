@@ -134,6 +134,8 @@ class Registry:
     def drop_pinned(self, ws, build):
         with self.lock:
             mon = self.monitors.pop((ws, build), None)
+        if mon is not None:
+            mon.stopped = True  # its scan thread ends on the next tick
         return mon is not None
 
     def overview(self):
