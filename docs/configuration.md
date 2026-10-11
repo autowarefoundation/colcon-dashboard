@@ -29,7 +29,22 @@ claude_bin =            ; explicit path to the claude CLI
 [ui]
 editor_url =            ; e.g. vscode://file{path}:{line} - file:line log
                         ; lines get a link that opens your editor.
+
+[discover]
+extra_roots =           ; e.g. /mnt/data, ~/ros - more directories for
+                        ; the workspace scan, next to your home directory.
 ```
+
+## Extra scan roots
+
+The Scan button in the workspace picker searches your home directory for colcon workspaces. If your workspaces are on another drive, add their parent directories to `extra_roots`. Separate the directories with commas or newlines:
+
+```ini
+[discover]
+extra_roots = /mnt/data, ~/ros
+```
+
+The scan goes four directory levels down from each root. It skips hidden directories and symbolic links.
 
 ## Editor links
 

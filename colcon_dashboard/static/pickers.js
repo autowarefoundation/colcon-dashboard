@@ -32,7 +32,7 @@ export function renderWsList(items) {
   items = sortWs(items);
   if (!items.length) {
     list.innerHTML =
-      '<div class="wsempty">No workspaces yet. Open a path below, or scan your home directory.</div>';
+      '<div class="wsempty">No workspaces yet. Open a path below, or scan for workspaces.</div>';
     return;
   }
   for (const w of items) {
@@ -132,7 +132,7 @@ export function initWsPicker() {
       }
       renderWsList(wsItems);
     } catch (e) { /* server gone */ }
-    $('#wsscan').textContent = 'Scan home';
+    $('#wsscan').textContent = 'Scan';
     $('#wsscan').disabled = false;
   };
   if (!WS) openWsPicker();

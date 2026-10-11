@@ -107,6 +107,7 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(d["version"], __version__)
         self.assertFalse(d["config"]["exists"])  # tests isolate the config
         self.assertIn("auto_prune_keep", d["config"])
+        self.assertEqual(d["config"]["extra_roots"], [])
 
     def test_workspaces_has_no_update_note_by_default(self):
         _, body, _ = self.get("/api/workspaces")
@@ -185,6 +186,17 @@ class ApiTest(unittest.TestCase):
     def test_unknown_api_is_404(self):
         st, _, _ = self.get("/api/nonsense?ws=" + self.wsq())
         self.assertEqual(st, 404)
+
+
+class DiscoverAll(unittest.TestCase):
+    def test_extra_roots_are_scanned_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = os.path.join(tmp, "group", "ws")
+            make_build(ws, BUILD_ID, [queued(0.1, "a")])
+            # the same root twice must not list the workspace twice
+            found = registry_mod.discover_all([tmp, tmp])
+            self.assertEqual(found.count(ws), 1)
+            self.assertIn(ws, registry_mod.discover_workspaces(tmp))
 
 
 if __name__ == "__main__":

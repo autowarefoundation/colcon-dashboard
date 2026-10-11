@@ -25,6 +25,7 @@ class ConfigFile(unittest.TestCase):
         self.assertIsNone(cfg.auto_prune_keep)
         self.assertIsNone(cfg.claude_bin)
         self.assertIsNone(cfg.editor_url)
+        self.assertEqual(cfg.extra_roots, [])
         self.assertFalse(cfg.check_updates)
 
     def test_values_and_inline_comments(self):
@@ -60,6 +61,13 @@ class ConfigFile(unittest.TestCase):
         self.assertIsNone(cfg.port)
         self.assertFalse(cfg.check_updates)
         self.assertEqual(cfg.auto_prune_keep, -1)  # -1 means disabled
+
+    def test_extra_roots_split_and_expand(self):
+        cfg = self.load("[discover]\n"
+                        "extra_roots = /mnt/data, ~/ros,\n"
+                        "  /srv/ws\n")
+        self.assertEqual(cfg.extra_roots, [
+            "/mnt/data", os.path.expanduser("~/ros"), "/srv/ws"])
 
     def test_empty_value_is_none(self):
         cfg = self.load("[server]\nhost =\n")
@@ -98,10 +106,12 @@ class TemplateFile(unittest.TestCase):
         self.assertIsNone(cfg.auto_prune_keep)
         self.assertIsNone(cfg.claude_bin)
         self.assertIsNone(cfg.editor_url)
+        self.assertEqual(cfg.extra_roots, [])
 
     def test_template_documents_every_key(self):
         for key in ("host", "port", "log_base", "check_updates",
-                    "auto_prune_keep", "claude_bin", "editor_url"):
+                    "auto_prune_keep", "claude_bin", "editor_url",
+                    "extra_roots"):
             self.assertIn(f"#{key} = ", TEMPLATE)
 
     def test_never_overwrites(self):

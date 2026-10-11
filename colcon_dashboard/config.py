@@ -19,12 +19,16 @@ optional, and the command line always wins:
     [ui]
     editor_url = vscode://file{path}:{line}
 
+    [discover]
+    extra_roots = /mnt/data, ~/ros
+
 A missing file, a broken file, or a bad value must never stop the
 server: unreadable values resolve to None, like missing ones.
 """
 
 import configparser
 import os
+import re
 
 
 def config_path():
@@ -70,6 +74,11 @@ TEMPLATE = """\
 # JetBrains IDEs need the open project's name and count lines from
 # zero, hence {project} and {line0}:
 #editor_url = jetbrains://clion/navigate/reference?project={project}&path={path}:{line0}
+
+[discover]
+# More directories for the workspace scan, next to your home directory.
+# Separate them with commas or newlines. ~ expands to your home.
+#extra_roots = /mnt/data, ~/ros
 """
 
 
@@ -111,6 +120,7 @@ class Config:
         self.auto_prune_keep = self._get_int(cp, "builds", "auto_prune_keep")
         self.claude_bin = self._get(cp, "ai", "claude_bin")
         self.editor_url = self._get(cp, "ui", "editor_url")
+        self.extra_roots = self._get_list(cp, "discover", "extra_roots")
 
     @staticmethod
     def _get(cp, section, key):
@@ -129,6 +139,15 @@ class Config:
             return int(value)
         except ValueError:
             return None
+
+    @classmethod
+    def _get_list(cls, cp, section, key):
+        """Comma- or newline-separated paths, ~-expanded; unset: []."""
+        value = cls._get(cp, section, key)
+        if value is None:
+            return []
+        return [os.path.expanduser(v.strip())
+                for v in re.split(r"[,\n]", value) if v.strip()]
 
     @classmethod
     def _get_bool(cls, cp, section, key):

@@ -12,7 +12,7 @@ from .ai import CLAUDE_BIN
 from .config import CONFIG
 from .events import BUILD_DIR_RE
 from .monitor import prune_builds, remove_build_dir
-from .registry import discover_workspaces, update_status
+from .registry import discover_all, update_status
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
@@ -178,6 +178,7 @@ class Handler(BaseHTTPRequestHandler):
                     "check_updates": CONFIG.check_updates,
                     "claude_bin": CONFIG.claude_bin,
                     "editor_url": CONFIG.editor_url,
+                    "extra_roots": CONFIG.extra_roots,
                 },
             }))
         if path == "/api/workspaces":
@@ -188,7 +189,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps(overview))
         if path == "/api/discover":
             found = [{"path": p, **self.registry.stats(p)}
-                     for p in discover_workspaces()]
+                     for p in discover_all(CONFIG.extra_roots)]
             found.sort(key=lambda w: -(w.get("builds") or 0))  # by use
             return self._send(200, json.dumps({"workspaces": found}))
 
