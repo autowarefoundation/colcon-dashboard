@@ -13,7 +13,7 @@ on:
 jobs:
   build:
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -34,7 +34,7 @@ jobs:
 
   publish:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: pypi
       url: https://pypi.org/p/colcon-dashboard
@@ -51,7 +51,7 @@ jobs:
     needs: build
     # run on manual dispatch too, where build is skipped
     if: always() && (github.event_name == 'workflow_dispatch' || needs.build.result == 'success')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # the ppa environment holds the uploader key and pauses for approval
     environment:
       name: ppa
