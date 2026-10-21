@@ -7,16 +7,32 @@ import { $, fmtDur, wsParam } from './util.js';
 
 /* ---------------- polling ---------------- */
 
+// One poll at a time: the next one starts after the last one ends, so
+// slow answers cannot pile up or land out of order.
+export function startStatePolling() {
+  const loop = async () => {
+    let ok = false;
+    try { ok = await pollState(); } catch (e) { /* keep polling */ }
+    setTimeout(loop, ok === false ? 2000 : 1000);  // slower while offline
+  };
+  loop();
+}
+
 export async function pollState() {
   let s;
   try {
     s = await (await fetch(`/api/state${wsParam()}`)).json();
   } catch (e) {
+    // the build may still run, but nobody can tell: stop the clock
+    if (App.active) {
+      App.elapsedBase += (Date.now() - App.elapsedAt) / 1000;
+      App.active = false;
+    }
     setBadge('offline', App.stopped
       ? 'STOPPED - the server was shut down'
       : 'OFFLINE - the server does not answer');
     emit('state-lost');
-    return;
+    return false;
   }
   if (s.nows) {
     setBadge('idle', 'PICK A WORKSPACE');

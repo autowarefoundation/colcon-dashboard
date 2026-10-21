@@ -10,7 +10,7 @@ import { initHelp } from './help.js';
 import { mode } from './modes.js';
 import { initNotify } from './notify.js';
 import { initBuildPicker, initStop, initWsPicker } from './pickers.js';
-import { pollState, tickElapsed } from './poller.js';
+import { startStatePolling, tickElapsed } from './poller.js';
 import { App } from './state.js';
 import { initTheme } from './theme.js';
 import { $ } from './util.js';
@@ -34,8 +34,7 @@ $('#sysBtn').onclick = () => document.body.classList.toggle('showsys');
 await initHeaderMeta();  // App.cfg must land before the first log render
 openPane(BUILD_PANE);  // the pinned whole-build terminal view
 if (deepPkg) emit('open-pkg', deepPkg);
-pollState();
-setInterval(pollState, 1000);
+startStatePolling();
 setInterval(pollAllPanes, 1200);
 setInterval(tickElapsed, 1000);
 addEventListener('resize', () => {
