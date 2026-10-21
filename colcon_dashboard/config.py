@@ -22,6 +22,9 @@ optional, and the command line always wins:
     [discover]
     extra_roots = /mnt/data, ~/ros
 
+    [notify]
+    command = notify-send "colcon {outcome}" "{name}: {summary}"
+
 A missing file, a broken file, or a bad value must never stop the
 server: unreadable values resolve to None, like missing ones.
 """
@@ -79,6 +82,16 @@ TEMPLATE = """\
 # More directories for the workspace scan, next to your home directory.
 # Separate them with commas or newlines. ~ expands to your home.
 #extra_roots = /mnt/data, ~/ros
+
+[notify]
+# A command to run when a build ends, also with no dashboard page open.
+# It runs for the workspaces that the server watches. The server does not
+# use a shell: it splits the line into arguments, then fills them in.
+# Placeholders: {workspace}, {name} (the workspace directory name),
+# {build}, {outcome} (passed, failed, or aborted), {summary}, {failed}.
+#command = notify-send "colcon {outcome}" "{name}: {summary}"
+# A webhook works through curl:
+#command = curl -s -X POST -d "{name}: {summary}" https://example.com/hook
 """
 
 
@@ -171,6 +184,7 @@ class Config:
         self.claude_bin = self._get(cp, "ai", "claude_bin")
         self.editor_url = self._get(cp, "ui", "editor_url")
         self.extra_roots = self._get_list(cp, "discover", "extra_roots")
+        self.notify_command = self._get(cp, "notify", "command")
 
     @staticmethod
     def _get(cp, section, key):

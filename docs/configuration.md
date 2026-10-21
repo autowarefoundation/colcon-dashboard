@@ -33,6 +33,9 @@ editor_url =            ; e.g. vscode://file{path}:{line} - file:line log
 [discover]
 extra_roots =           ; e.g. /mnt/data, ~/ros - more directories for
                         ; the workspace scan, next to your home directory.
+
+[notify]
+command =               ; a command to run when a build ends
 ```
 
 ## Extra scan roots
@@ -65,6 +68,35 @@ JetBrains IDEs need the project name (`{project}`, the workspace directory name)
 [ui]
 editor_url = jetbrains://clion/navigate/reference?project={project}&path={path}:{line0}
 ```
+
+## Build notifications
+
+The bell in the page notifies you only while a dashboard page is open. To get a notification without a page, set a command in `[notify]`. The server runs it once when a build ends:
+
+```ini
+[notify]
+command = notify-send "colcon {outcome}" "{name}: {summary}"
+```
+
+The command can use these placeholders:
+
+| Placeholder | Value |
+|---|---|
+| `{outcome}` | `passed`, `failed`, or `aborted` |
+| `{summary}` | For example `498 of 502 packages in 44m 12s, 4 failed` |
+| `{failed}` | The number of failed packages |
+| `{name}` | The workspace directory name |
+| `{workspace}` | The full workspace path |
+| `{build}` | The build id, for example `build_2026-10-20_16-50-56` |
+
+The server does not use a shell. It splits the line into arguments first, and then it fills in the placeholders. So a package or a path name can never act as shell syntax. A webhook works through `curl`:
+
+```ini
+[notify]
+command = curl -s -X POST -d "{name}: {summary}" https://example.com/hook
+```
+
+The command runs for the workspaces that the server watches: each workspace that a page opened, or that `colcon-dashboard .` registered, since the server started.
 
 ## Network exposure
 

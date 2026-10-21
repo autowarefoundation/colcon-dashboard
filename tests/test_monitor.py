@@ -445,6 +445,32 @@ class ScanOnce(unittest.TestCase):
         self.assertEqual(state["build_id"], "test_2026-08-09_11-00-00")
         self.assertEqual(state["packages"]["a"]["tr"]["f"], 1)
 
+    def test_notify_command_runs_once_when_the_build_ends(self):
+        import sys
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        ws = self.tmp.name
+        out = os.path.join(ws, "notified.txt")
+        events = [queued(0.1, "a"), started(0.2, "a"), ended(1.0, "a", rc=2)]
+        bdir = make_build(ws, BUILD_ID, events, mtime=time.time())
+        old = CONFIG.notify_command
+        self.addCleanup(setattr, CONFIG, "notify_command", old)
+        CONFIG.notify_command = (f"{sys.executable} -c \"import sys; open(sys.argv[1], 'a')"
+                                 f".write(' | '.join(sys.argv[2:]) + chr(10))\" {out} {{outcome}} {{summary}}")
+        mon = BuildMonitor(ws)
+        mon.scan_once()  # the build runs
+        with open(os.path.join(bdir, "events.log"), "ab") as f:
+            f.write(SHUTDOWN)
+        mon.scan_once()  # it ended: notify
+        mon.scan_once()  # and only once
+        for _ in range(100):
+            if os.path.exists(out):
+                break
+            time.sleep(0.05)
+        time.sleep(0.2)
+        with open(out) as f:
+            self.assertEqual(f.read(), "failed | 0 of 1 packages in 1m 39s, 1 failed\n")
+
     def test_dead_build_states(self):
         mon, state, _ = self.scan(mtime=time.time() - 600)
         self.assertFalse(state["active"])

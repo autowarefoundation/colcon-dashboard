@@ -6,7 +6,9 @@ dependency graph, samples system pressure, and serves log chunks.
 
 import json
 import os
+import shlex
 import shutil
+import subprocess
 import threading
 import time
 
@@ -97,6 +99,8 @@ class BuildMonitor:
         self._outcome_mem = {}  # build_dir -> (events.log mtime, outcome)
         self._pkg_key = self._graph_key = None  # the inputs of the cached tables
         self._test_cache = {}  # package -> (job end time, JUnit results)
+        self._was_active = False   # for the [notify] command at the end
+        self._build_ended = False
         self._pkg_cached = None
         self.analyses = {}  # (build_dir, pkg) -> AIAnalysis
         self.active_flag = False
@@ -277,6 +281,35 @@ class BuildMonitor:
             # or every listing reads the whole events.log again
             self._outcome_mem[build_dir] = (mtime, info)
         return info
+
+    def _notify_end(self, build_id, counts, total, elapsed):
+        """Run the [notify] command of config.ini once a build ends."""
+        template = CONFIG.notify_command
+        if not template:
+            return
+        failed = counts.get("failed", 0)
+        done = counts.get("done", 0)
+        outcome = "failed" if failed else "passed" if done == total else "aborted"
+        mins, secs = divmod(int(round(elapsed)), 60)
+        summary = f"{done} of {total} packages in " + (f"{mins}m {secs}s" if mins else f"{secs}s")
+        if failed:
+            summary += f", {failed} failed"
+        values = {"workspace": self.workspace, "name": os.path.basename(self.workspace),
+                  "build": build_id, "outcome": outcome, "summary": summary,
+                  "failed": str(failed)}
+        try:
+            # no shell: split first, then fill each argument, so that a
+            # package or path name can never become shell syntax
+            args = [a.format_map(values) for a in shlex.split(template)]
+        except (ValueError, KeyError, IndexError):
+            return
+        def run():
+            try:
+                subprocess.run(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, timeout=60, check=False)
+            except (OSError, subprocess.SubprocessError):
+                pass
+        threading.Thread(target=run, daemon=True).start()
 
     def _test_results(self, name, ended):
         """A package's JUnit results, read once when its test job ends."""
@@ -489,6 +522,9 @@ class BuildMonitor:
                 and self.pin_build is None and self._pruned_for != build_id):
             self._pruned_for = build_id
             self._auto_prune()
+        if self._was_active and not active and self.pin_build is None:
+            self._build_ended = True  # notify once the counts are known
+        self._was_active = bool(active)
         self.active_flag = bool(active)
         epoch0 = parse_build_id_time(build_id) or (ev.mtime() - ev.last_t)
 
@@ -582,6 +618,10 @@ class BuildMonitor:
             "ai": bool(CLAUDE_BIN),
             "seq": self.seq,
         }
+
+        if self._build_ended:
+            self._build_ended = False
+            self._notify_end(build_id, counts, len(packages), ev.last_t)
 
         graph_key = (build_id, ev.offset, self.index.scanned_at,
                      id(self.prev_info))
