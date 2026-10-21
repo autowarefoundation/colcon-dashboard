@@ -13,7 +13,11 @@ export const App = {
   view: 'graph',
   ganttFollow: true,
   layoutMode: localStorage.getItem('cmc-layout') || 'layered',
-  prefix: '',
+  prefixes: [],         // label prefixes to hide (graph.js computePrefix)
+  prefixMode: 'auto',
+  prefixAuto: '',
+  prefixCands: [],
+  prefixTotal: 0,
   lay: null,
   nodeEls: new Map(),
   edgeList: [],

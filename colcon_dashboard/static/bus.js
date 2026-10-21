@@ -12,7 +12,8 @@
      focus-pkg (name)         request: fly the view to this package
      analyze-pkg (pkg, q?)    request: start or continue an AI analysis
      pane-changed (name)      another log pane became active (or null)
-     theme-changed            the color theme was applied */
+     theme-changed            the color theme was applied
+     labels-changed           the hidden label prefixes changed */
 
 const listeners = new Map();
 

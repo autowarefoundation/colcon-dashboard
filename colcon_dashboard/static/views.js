@@ -2,7 +2,7 @@ import { on } from './bus.js';
 import { breakFollow, zoomToPkg } from './camera.js';
 import { applySpread } from './force.js';
 import { drawGantt } from './gantt.js';
-import { buildGraphView } from './graph.js';
+import { buildGraphView, initPrefixMenu } from './graph.js';
 import { mode } from './modes.js';
 import { App } from './state.js';
 import { $ } from './util.js';
@@ -98,6 +98,7 @@ export function initViews() {
     applySpread(parseFloat(slider.value));
   };
   updateForceCtl();
+  initPrefixMenu();
   $('#layoutSelect').onchange = ev => setLayoutMode(ev.target.value);
   App.ganttSort = localStorage.getItem('cmc-gsort') || 'start';
   const gsort = $('#gsortSelect');

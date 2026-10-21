@@ -136,3 +136,5 @@ export function initGanttPan() {
 on('state', () => {
   if (App.view !== 'graph' && (App.pollTick++ % 2 === 0)) drawGantt();
 });
+
+on('labels-changed', () => { if (App.view !== 'graph') drawGantt(); });

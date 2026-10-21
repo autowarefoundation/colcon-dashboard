@@ -299,7 +299,25 @@ body.offline #sysmeters { display: none; }
   border-radius: 0;
 }
 #viewbar .vtab.on { color: var(--ink); border-bottom-color: var(--accent); }
-.panehead .hint { color: var(--muted); font-size: 11px; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.prefixwrap { position: relative; margin-left: auto; font-size: 11px; }
+#prefixBtn { color: var(--muted); font-size: 11px; }
+#prefixBtn::after { content: " ▾"; }
+#prefixBtn:empty { display: none; }
+#prefixPop {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 40;
+  width: 300px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18); color: var(--ink2); font-size: 12px;
+}
+#prefixPop[hidden] { display: none; }
+#prefixPop .pphead { font-weight: 600; color: var(--ink); }
+#prefixPop label { display: flex; align-items: baseline; gap: 6px; cursor: pointer; }
+#prefixPop .ppmuted { color: var(--muted); }
+#prefixPop #prefixInput { font: 12px var(--mono); padding: 4px 7px; margin-left: 20px; }
+#prefixPop .ppsug { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 20px; }
+#prefixPop .ppsug button { font: 11px var(--mono); padding: 1px 7px; border-radius: 999px; }
+#prefixPop .ppsug small { color: var(--muted); }
+#prefixPop .ppnote { color: var(--muted); font-size: 11px; }
 #viewbar .vsep { width: 1px; align-self: stretch; margin: 4px 3px; background: var(--border); }
 #followBuildBtn.on {
   color: var(--accent);

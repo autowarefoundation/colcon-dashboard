@@ -1,11 +1,26 @@
-import { on } from './bus.js';
+import { emit, on } from './bus.js';
 import { fitGraph, setViewBox } from './camera.js';
 import { GS, runGraphSearch } from './gsearch.js';
 import { mode } from './modes.js';
 import { App } from './state.js';
-import { $, fmtDur, svgEl } from './util.js';
+import { $, esc, fmtDur, svgEl, WS } from './util.js';
 
 /* ---------------- graph ---------------- */
+
+/* Label prefixes: a prefix that most packages share, such as autoware_,
+   hides in the labels. The choice is per workspace and per browser:
+   {mode: 'auto'} (the most common first word, when more than half of
+   the packages share it), {mode: 'off'}, or {mode: 'custom', list}. */
+const PREFIX_KEY = 'cmc-prefix:' + (WS || '');
+
+function loadPrefixPref() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFIX_KEY));
+    if (p && (p.mode === 'off' || (p.mode === 'custom' && Array.isArray(p.list))))
+      return p;
+  } catch (e) { /* a bad value falls back to auto */ }
+  return { mode: 'auto' };
+}
 
 export function computePrefix() {
   const names = Object.keys(App.graph).filter(n => App.graph[n].in_build);
@@ -14,17 +29,101 @@ export function computePrefix() {
     const i = n.indexOf('_');
     if (i > 0) { const t = n.slice(0, i + 1); freq[t] = (freq[t] || 0) + 1; }
   }
-  const best = Object.entries(freq).sort((a, b) => b[1] - a[1])[0];
-  App.prefix = (best && best[1] > names.length * 0.5) ? best[0] : '';
-  $('#prefixHint').textContent = App.prefix
-    ? `“${App.prefix}” prefix hidden in labels` : '';
+  // the suggestions in the prefix menu: first words that 3+ packages share
+  App.prefixCands = Object.entries(freq).filter(([, c]) => c >= 3)
+    .sort((a, b) => b[1] - a[1]).slice(0, 6);
+  App.prefixTotal = names.length;
+  const best = App.prefixCands[0];
+  App.prefixAuto = best && best[1] > names.length * 0.5 ? best[0] : '';
+  const pref = loadPrefixPref();
+  App.prefixMode = pref.mode;
+  App.prefixes = (pref.mode === 'custom' ? pref.list
+    : pref.mode === 'off' ? [] : App.prefixAuto ? [App.prefixAuto] : [])
+    .slice().sort((a, b) => b.length - a.length);  // the longest match wins
+  renderPrefixBtn();
+}
+
+function renderPrefixBtn() {
+  const n = App.prefixes.length;
+  $('#prefixBtn').textContent = !n ? 'full names'
+    : n === 1 ? `“${App.prefixes[0]}” hidden` : `${n} prefixes hidden`;
+}
+
+function setPrefixPref(pref) {
+  try { localStorage.setItem(PREFIX_KEY, JSON.stringify(pref)); } catch (e) { /* private mode */ }
+  computePrefix();
+  emit('labels-changed');
+}
+
+function parsePrefixList(text) {
+  return [...new Set(text.split(/[\s,]+/).filter(Boolean))];
+}
+
+function renderPrefixPop() {
+  const pop = $('#prefixPop');
+  const auto = App.prefixAuto
+    ? `<span class="ppmuted">now “${esc(App.prefixAuto)}”, ${App.prefixCands[0][1]} of ${App.prefixTotal}</span>`
+    : '<span class="ppmuted">no common prefix found</span>';
+  const custom = App.prefixMode === 'custom' ? App.prefixes : [];
+  pop.innerHTML = `
+    <div class="pphead">Hide a name prefix in the labels</div>
+    <label><input type="radio" name="pfx" value="auto"> Detect it ${auto}</label>
+    <label><input type="radio" name="pfx" value="off"> Show the full names</label>
+    <label><input type="radio" name="pfx" value="custom"> Hide these prefixes:</label>
+    <input id="prefixInput" type="text" spellcheck="false" autocomplete="off"
+           placeholder="autoware_, tier4_" value="${esc(custom.join(', '))}">
+    ${App.prefixCands.length ? `<div class="ppsug">${App.prefixCands.map(([p, c]) =>
+      `<button data-p="${esc(p)}" class="${custom.includes(p) ? 'on' : ''}">${esc(p)} <small>${c}</small></button>`
+    ).join('')}</div>` : ''}
+    <div class="ppnote">The graph, the timeline, and the log tabs use the short names. Tooltips show the full names.</div>`;
+  pop.querySelector(`input[value="${App.prefixMode}"]`).checked = true;
+  const input = pop.querySelector('#prefixInput');
+  const applyCustom = () => setPrefixPref({ mode: 'custom', list: parsePrefixList(input.value) });
+  pop.querySelectorAll('input[name="pfx"]').forEach(r => r.onchange = () => {
+    if (r.value === 'custom') {
+      // start the list from what the labels hide now
+      if (!input.value.trim()) input.value = App.prefixes.join(', ');
+      applyCustom();
+    } else setPrefixPref({ mode: r.value });
+    renderPrefixPop();
+    if (r.value === 'custom') $('#prefixInput').focus();
+  });
+  input.oninput = () => {
+    pop.querySelector('input[value="custom"]').checked = true;
+    applyCustom();
+    pop.querySelectorAll('.ppsug button').forEach(b =>
+      b.classList.toggle('on', App.prefixes.includes(b.dataset.p)));
+  };
+  pop.querySelectorAll('.ppsug button').forEach(b => b.onclick = () => {
+    const list = parsePrefixList(input.value);
+    const i = list.indexOf(b.dataset.p);
+    if (i >= 0) list.splice(i, 1); else list.push(b.dataset.p);
+    input.value = list.join(', ');
+    input.oninput();
+  });
+}
+
+export function initPrefixMenu() {
+  const btn = $('#prefixBtn'), pop = $('#prefixPop');
+  btn.onclick = () => {
+    pop.hidden = !pop.hidden;
+    if (!pop.hidden) renderPrefixPop();
+  };
+  document.addEventListener('pointerdown', ev => {
+    if (!pop.hidden && !ev.target.closest('.prefixwrap')) pop.hidden = true;
+  });
+  pop.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' || ev.key === 'Enter') { pop.hidden = true; btn.focus(); }
+  });
 }
 
 export const measureCtx = document.createElement('canvas').getContext('2d');
 measureCtx.font = '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
 export function label(name) {
-  return App.prefix && name.startsWith(App.prefix) ? name.slice(App.prefix.length) : name;
+  for (const p of App.prefixes)
+    if (name.length > p.length && name.startsWith(p)) return name.slice(p.length);
+  return name;
 }
 
 export function buildGraphView() {
@@ -418,3 +517,5 @@ on('graph', () => {
 });
 
 on('state', () => updateNodes());
+
+on('labels-changed', () => buildGraphView());

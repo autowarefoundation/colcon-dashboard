@@ -83,7 +83,7 @@ export function createPane(name) {
   tab.className = 'ltab';
   tab.innerHTML =
     `<span class="dot ${fixed ? 'c-building' : 'c-waiting'}"></span>` +
-    `<span>${fixed ? 'build log' : (ai ? '✦ ' : '') + esc(label(pkg))}</span>` +
+    `<span class="tlabel">${fixed ? 'build log' : (ai ? '✦ ' : '') + esc(label(pkg))}</span>` +
     (fixed ? '' : `<button class="x" title="close">✕</button>`);
   tab.onclick = ev => {
     if (ev.target.classList.contains('x')) closePane(name);
@@ -630,6 +630,13 @@ on('state', () => {
 });
 
 on('open-pkg', openPane);
+
+on('labels-changed', () => {
+  for (const p of App.panes.values()) {
+    if (p.fixed) continue;
+    p.tabEl.querySelector('.tlabel').textContent = (p.ai ? '✦ ' : '') + label(p.pkg);
+  }
+});
 
 on('build-changed', (s, first) => {
   if (first && App.failedSeen.size) {

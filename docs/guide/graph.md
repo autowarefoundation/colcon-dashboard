@@ -43,7 +43,7 @@ Edges take color from their endpoints:
 - When you zoom far out, the labels hide and each node becomes a plain colored box. A graph of hundreds of packages then stays readable at Fit.
 - **⌖ follow build** keeps the camera on the packages that build now, so the action stays framed as the build moves. If you pan or zoom by hand, the camera is yours again.
 - The **show** switch picks what the graph draws: only the packages of this build, or the whole workspace.
-- When most package names share a prefix such as `autoware_`, the labels hide it. Tooltips keep the full name.
+- When most package names share a prefix such as `autoware_`, the labels hide it. Tooltips keep the full name. To pick other prefixes, or to show the full names, click the prefix menu at the right end of the view bar. The menu suggests the common prefixes of the workspace, and you can hide more than one. The page saves the choice per workspace in this browser.
 
 ## Layout modes
 

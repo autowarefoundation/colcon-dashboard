@@ -113,6 +113,10 @@
     <button id="gsclear" class="sclear" hidden title="clear the search">✕</button>
   </span>
   <span id="gscount"></span>
+  <span class="prefixwrap">
+    <button id="prefixBtn" class="linkbtn" title="hide a package name prefix in the labels"></button>
+    <div id="prefixPop" hidden></div>
+  </span>
 </nav>
 
 <main id="viz">
@@ -132,7 +136,6 @@
           <button id="scopeAll">whole workspace</button>
         </span>
       </span>
-      <span class="hint" id="prefixHint"></span>
     </div>
     <div id="graphwrap"><svg id="graph"></svg><canvas id="graph3d"></canvas></div>
   </section>
