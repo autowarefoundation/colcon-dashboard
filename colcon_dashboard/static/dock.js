@@ -129,7 +129,8 @@ export function createPane(name) {
       <span class="ph"></span>
       <span class="errn"></span>
       ${fixed || ai ? '' : `<button class="askai" hidden title="explain this failure with the claude CLI">✦ ask claude</button>
-      <button class="cpath" hidden title="copy the package source path">⧉ path</button>`}
+      <button class="cpath" hidden title="copy the package source path">⧉ path</button>
+      <button class="locate" title="find this package in the graph or the timeline">⌖ locate</button>`}
       <span class="grow"></span>
       <span class="searchwrap"><input class="search" type="text" placeholder="search" spellcheck="false"><button class="sclear" hidden title="clear the search">✕</button></span>
       <span class="scount"></span>
@@ -186,6 +187,7 @@ export function createPane(name) {
   initSearch(p);
   pane.querySelector('.askai')?.addEventListener('click',
     () => emit('analyze-pkg', name));
+  pane.querySelector('.locate')?.addEventListener('click', () => zoomToPkg(pkg));
   pane.querySelector('.cpath')?.addEventListener('click', async () => {
     const abs = pkgAbsPath(name);
     if (!abs) return;
@@ -570,11 +572,14 @@ export function createFailPane() {
       <span class="pname">failed packages</span>
       <span class="chip failed">…</span>
       <span class="grow"></span>
+      <button class="fcopyall" title="copy every failure as text, for an issue or a chat">⧉ copy all</button>
       <button class="close" title="close pane">✕</button>
     </div>
     <div class="fsummary"></div>`;
   $('#panes').appendChild(pane);
   pane.querySelector('.close').onclick = () => closePane(FAIL_PANE);
+  pane.querySelector('.fcopyall').onclick = () => copyFailures(
+    [...pane.querySelectorAll('.fsummary .fitem')], 'every failure');
   const p = { name: FAIL_PANE, el: pane, tabEl: tab, pre: null, fixed: false,
               ai: false, summary: true, pkg: null, offset: -1,
               fetching: false, items: new Map() };
@@ -592,10 +597,13 @@ export function buildFailItem(name, st) {
       <span class="chip failed">${esc(failNote(st))}</span>
       ${dur ? `<span class="fmeta">failed after ${dur}</span>` : ''}
       <span class="grow"></span>
+      <button class="fcopy" title="copy the name, the reason, and the log tail as text">⧉ copy</button>
       <button class="askai" ${App.ai ? '' : 'hidden'} title="explain this failure with the claude CLI">✦ ask claude</button>
       <button class="fopen" title="open the full log pane">open log</button>
     </div>
     <pre class="ftail">loading…</pre>`;
+  el.dataset.head = `${name}: ${failNote(st)}` + (dur ? `, failed after ${dur}` : '');
+  el.querySelector('.fcopy').onclick = () => copyFailures([el], name);
   el.querySelector('.fjump').onclick = () => {
     emit('open-pkg', name);
     emit('focus-pkg', name);
@@ -603,6 +611,15 @@ export function buildFailItem(name, st) {
   el.querySelector('.fopen').onclick = () => openPane(name);
   el.querySelector('.askai').onclick = () => emit('analyze-pkg', name);
   return el;
+}
+
+// Failures as plain text, for an issue or a chat: one block per package,
+// the name and the reason, then the log tail.
+async function copyFailures(items, what) {
+  const text = items.map(el =>
+    `${el.dataset.head}\n${el.querySelector('.ftail').textContent.trimEnd()}`).join('\n\n');
+  const ok = await copyText(text);
+  toast(ok ? `Copied ${esc(what)}` : 'The browser refused the clipboard.', 'info');
 }
 
 export async function fillFailTail(item, name) {
