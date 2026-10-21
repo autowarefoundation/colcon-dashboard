@@ -1,0 +1,19 @@
+/* The colors of the logo, after Windows 7: the blue of the Harmony
+   wallpaper, and its deep navy for the dark scheme. */
+:root, [data-md-color-scheme="default"] {
+  --md-primary-fg-color: #1e7fd9;
+  --md-primary-fg-color--light: #4a9ae3;
+  --md-primary-fg-color--dark: #155fa6;
+  --md-accent-fg-color: #1e7fd9;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0c1a2d;
+  --md-primary-fg-color--light: #17283f;
+  --md-primary-fg-color--dark: #06101e;
+  --md-accent-fg-color: #3a95ea;
+  --md-default-bg-color: #06101e;
+}
+/* The logo has a light version (navy tube) and a dark version (white tube). */
+[data-md-color-scheme="slate"] .md-logo img {
+  content: url("../assets/logo-dark.svg");
+}

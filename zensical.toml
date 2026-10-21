@@ -6,6 +6,8 @@ site_author = "Mete Fatih Cırıt"
 
 copyright = "Copyright &copy; 2026 Autoware Foundation"
 
+extra_css = ["stylesheets/extra.css"]
+
 repo_url = "https://github.com/autowarefoundation/colcon-dashboard"
 repo_name = "autowarefoundation/colcon-dashboard"
 edit_uri = "edit/main/docs/"
@@ -33,6 +35,8 @@ nav = [
 
 [project.theme]
 language = "en"
+logo = "assets/logo.svg"
+favicon = "assets/logo.svg"
 features = [
   "announce.dismiss",
   "content.action.edit",
@@ -56,8 +60,6 @@ features = [
   "toc.follow",
 ]
 
-[project.theme.icon]
-logo = "lucide/layout-dashboard"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme)"
@@ -67,16 +69,16 @@ toggle.name = "Switch to light mode"
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"
-primary = "blue"
-accent = "blue"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/sun"
 toggle.name = "Switch to dark mode"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"
 scheme = "slate"
-primary = "blue"
-accent = "blue"
+primary = "custom"
+accent = "custom"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
 
