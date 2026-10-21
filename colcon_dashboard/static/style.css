@@ -332,6 +332,7 @@ body.offline #sysmeters { display: none; }
 #ganttwrap.panning { cursor: grabbing; }
 #ganttwrap.panning svg * { pointer-events: none; }  /* no hover flicker mid-drag */
 #ganttwrap svg { display: block; }
+#gaxis { position: sticky; top: 0; z-index: 1; background: var(--page); }
 #gantt .gbar { cursor: pointer; }
 
 /* side-by-side: timeline left, graph right, over a drag bar */

@@ -8,6 +8,7 @@ import { $, fmtDur, svgEl } from './util.js';
 
 export function drawGantt() {
   const svg = $('#gantt');
+  const axis = $('#gaxis');  // the time labels stay on top while rows scroll
   const wrap = $('#ganttwrap');
   const nowS0 = Date.now() / 1000;
   const endOf = p => p.t1 || (App.active ? nowS0 : p.t0);
@@ -23,6 +24,7 @@ export function drawGantt() {
     .filter(([, p]) => p.t0)
     .sort(cmp);
   svg.innerHTML = '';
+  axis.innerHTML = '';
   if (!rows.length || !App.buildStarted) return;
 
   const nowS = Date.now() / 1000;
@@ -31,7 +33,7 @@ export function drawGantt() {
   for (const [, p] of rows) tMax = Math.max(tMax, p.t1 || (App.active ? nowS : p.t0));
   const span = Math.max(30, tMax - t0);
 
-  const ROW = 16, TOP = 26;
+  const ROW = 16, AXIS = 22, TOP = 4;
   const W = Math.max(640, wrap.clientWidth - 16);
   // the name gutter fits the longest name, up to a third of the width;
   // a longer name ends in "…" (the tooltip still shows all of it)
@@ -46,15 +48,19 @@ export function drawGantt() {
   const H = TOP + rows.length * ROW + 10;
   svg.setAttribute('width', W);
   svg.setAttribute('height', H);
+  axis.setAttribute('width', W);
+  axis.setAttribute('height', AXIS);
   const k = (W - GUT - 20) / span;
 
   const steps = [10, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200];
   const step = steps.find(s => span / s <= 10) || 14400;
   const gT = svgEl('g', { class: 'gtick' }, svg);
+  const aT = svgEl('g', { class: 'gtick' }, axis);
   for (let t = 0; t <= span; t += step) {
     const x = GUT + t * k;
-    svgEl('line', { x1: x, y1: TOP - 6, x2: x, y2: H }, gT);
-    const lbl = svgEl('text', { x: x + 3, y: TOP - 10 }, gT);
+    svgEl('line', { x1: x, y1: 0, x2: x, y2: H }, gT);
+    svgEl('line', { x1: x, y1: AXIS - 6, x2: x, y2: AXIS }, aT);
+    const lbl = svgEl('text', { x: x + 3, y: AXIS - 8 }, aT);
     lbl.textContent = fmtDur(t);
   }
 
@@ -79,7 +85,7 @@ export function drawGantt() {
 
   if (App.active) {
     const x = GUT + (nowS - t0) * k;
-    svgEl('line', { class: 'gnow', x1: x, y1: TOP - 4, x2: x, y2: H }, svg);
+    svgEl('line', { class: 'gnow', x1: x, y1: 0, x2: x, y2: H }, svg);
   }
   if (App.ganttFollow) wrap.scrollTop = wrap.scrollHeight;
 
