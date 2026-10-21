@@ -35,6 +35,7 @@ Edges take color from their endpoints:
 ## Interaction
 
 - Hover a node to see its state, phase, time, stderr count, and path. The hover also lights its full dependency chain while the rest dims. When the previous build has a duration for the package, the tooltip compares them, and marks a clear regression.
+- Click a node to select it, and to open its log. A selection keeps the dependency chain in focus after the mouse leaves. Ctrl+click or Shift+click adds a node to the selection, or takes it out again, and the focus then shows all the selected chains. To clear the selection, click empty space or press Esc.
 - Click a node to open its log pane.
 - The **find package** box highlights matching packages while the rest fades, in every layout and in the timeline. ++enter++ and ++shift+enter++ jump through the matches. The ++slash++ key jumps to the box.
 - The **state chips** (failed, building, waiting, done) filter the same way by state instead of by name, and combine with the find box. One click on **failed** shows the whole blast radius of a broken build.

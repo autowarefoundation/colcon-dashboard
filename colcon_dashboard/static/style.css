@@ -513,6 +513,11 @@ svg.efocus .edge.hl { stroke: var(--accent); stroke-width: 1.6; stroke-opacity: 
 .node.building, .node.ready { --glow: var(--accent); }
 .node.failed, .node.blocked { --glow: var(--critical); }
 .node.aborted { --glow: var(--serious); }
+/* a selected package keeps its glow, with an accent ring */
+#graph .node.sel rect.box {
+  filter: drop-shadow(0 0 4px var(--glow));
+  stroke: var(--accent); stroke-width: 2.6;
+}
 #graph .node:hover rect.box, #graph .node.hot rect.box {
   filter: drop-shadow(0 0 3px var(--glow)) brightness(1.06);
   stroke-width: 2.2;

@@ -1,7 +1,7 @@
 import { emit } from './bus.js';
 import { Force, forceTick, stopForce } from './force.js';
-import { buildGraphView, clearFocus, cullEdges, hideTooltip, hoverFocus, showNodeTooltip,
-         uncullEdges } from './graph.js';
+import { buildGraphView, clearFocus, clearSelection, cullEdges, hideTooltip, hoverFocus,
+         selectPkg, showNodeTooltip, uncullEdges } from './graph.js';
 import { mode, registerMode } from './modes.js';
 import { App } from './state.js';
 import { $ } from './util.js';
@@ -100,8 +100,12 @@ export function initPanZoom() {
   const svg = $('#graph');
   let moved = 0;
   let downNode = null;  // pointer capture retargets `click`, so remember the node
-  svg.addEventListener('click', () => {
-    if (moved <= 4 && downNode) emit('open-pkg', downNode);
+  svg.addEventListener('click', ev => {
+    if (moved > 4) return;  // the end of a drag, not a click
+    if (!downNode) return clearSelection();  // a click on empty space
+    if (ev.ctrlKey || ev.metaKey || ev.shiftKey) return selectPkg(downNode, true);
+    selectPkg(downNode);
+    emit('open-pkg', downNode);
   });
   svg.addEventListener('pointerleave', () => { hideTooltip(); clearFocus(); });
   // Pan and zoom do not change the view box on each step: that redraws

@@ -294,6 +294,10 @@ export function renderGraph() {
 
   updateNodes();
   if (GS.q) runGraphSearch();  // recompute matches for the new node set
+  // the new elements carry no focus yet: show the selection on them again
+  edgeFocus = nodeFocus = null;
+  markSelected();
+  focusSelection();
   if (App.vb) setViewBox(App.vb);
   else fitGraph();
   mode().onLayout?.();
@@ -372,6 +376,7 @@ export function updateNodes() {
     if (next.has(name)) cls += ' next';
     if (g.classList.contains('hl')) cls += ' hl';  // keep the hover highlight
     if (g.classList.contains('hot')) cls += ' hot';  // keep the grabbed node lit
+    if (App.selected.has(name)) cls += ' sel';      // keep the selection
     if (GS.set?.has(name)) cls += ' smatch';       // keep the search highlight
     if (g.getAttribute('class') !== cls) g.setAttribute('class', cls);
     const inner = g.firstChild;
@@ -462,18 +467,39 @@ export function chainSetFor(name) {
   return chainCache.set;
 }
 
-export function hoverFocus(name) {
-  if (edgeFocus !== name) {  // edges: instant
-    edgeFocus = name;
-    const chain = chainSetFor(name);
-    $('#graph').classList.add('efocus');
-    for (const e of App.edgeList) {
-      const on = chain.has(e.a) && chain.has(e.b);
-      e.el.classList.toggle('hl', on);
-      if (e.flow) e.flow.classList.toggle('hl', on);
-    }
+// The focus shows a dependency chain: its edges at once, its nodes after a
+// rest, with the rest of the graph faded. A hover shows the chain of one
+// package. A selection (click, Ctrl+click) keeps the chains of the selected
+// packages in focus until it is cleared; a hover over another package
+// previews that one meanwhile.
+function chainOfAll(names) {
+  if (names.length === 1) return chainSetFor(names[0]);
+  const all = new Set();
+  for (const n of names) for (const m of chainSetFor(n)) all.add(m);
+  return all;
+}
+
+function focusEdges(key, chain) {
+  if (edgeFocus === key) return;
+  edgeFocus = key;
+  $('#graph').classList.add('efocus');
+  for (const e of App.edgeList) {
+    const on = chain.has(e.a) && chain.has(e.b);
+    e.el.classList.toggle('hl', on);
+    if (e.flow) e.flow.classList.toggle('hl', on);
   }
-  if (nodeFocus === name) {  // nodes: rest delay, then eased dim
+}
+
+function focusNodes(key, chain) {
+  nodeFocus = key;
+  $('#graph').classList.add('nfocus');
+  for (const [n, g] of App.nodeEls) g.classList.toggle('hl', chain.has(n));
+}
+
+export function hoverFocus(name) {
+  const key = 'h:' + name;
+  focusEdges(key, chainSetFor(name));  // edges: instant
+  if (nodeFocus === key) {  // nodes: rest delay, then eased dim
     clearTimeout(nodeFocusPending);
     nodeFocusPending = null;
     return;
@@ -481,16 +507,25 @@ export function hoverFocus(name) {
   clearTimeout(nodeFocusPending);
   nodeFocusPending = setTimeout(() => {
     nodeFocusPending = null;
-    nodeFocus = name;
-    const chain = chainSetFor(name);
-    $('#graph').classList.add('nfocus');
-    for (const [n, g] of App.nodeEls) g.classList.toggle('hl', chain.has(n));
+    focusNodes(key, chainSetFor(name));
   }, 280);
+}
+
+// the selection's focus, at once: a click is a deliberate choice
+function focusSelection() {
+  const names = [...App.selected].filter(n => App.nodeEls.has(n));
+  if (!names.length) return false;
+  const key = 's:' + names.sort().join(',');
+  const chain = chainOfAll(names);
+  focusEdges(key, chain);
+  focusNodes(key, chain);
+  return true;
 }
 
 export function clearFocus() {
   clearTimeout(nodeFocusPending);
   nodeFocusPending = null;
+  if (focusSelection()) return;  // back to the selection, not to nothing
   if (edgeFocus !== null) {
     edgeFocus = null;
     $('#graph').classList.remove('efocus');
@@ -505,6 +540,30 @@ export function clearFocus() {
     for (const [, g] of App.nodeEls) g.classList.remove('hl');
   }
 }
+
+function markSelected() {
+  for (const [n, g] of App.nodeEls) g.classList.toggle('sel', App.selected.has(n));
+}
+
+// click: select only this package; additive (Ctrl/Cmd/Shift+click): add
+// it to the selection, or take it out again
+export function selectPkg(name, additive = false) {
+  if (!additive) App.selected = new Set([name]);
+  else if (App.selected.has(name)) App.selected.delete(name);
+  else App.selected.add(name);
+  markSelected();
+  clearFocus();  // shows the selection, or clears the focus when it is empty
+  emit('selection-changed');
+}
+
+export function clearSelection() {
+  if (!App.selected.size) return;
+  App.selected = new Set();
+  markSelected();
+  clearFocus();
+  emit('selection-changed');
+}
+
 
 /* tooltip */
 export function showNodeTooltip(name, ev) {
@@ -564,3 +623,12 @@ on('graph', () => {
 on('state', () => updateNodes());
 
 on('labels-changed', () => buildGraphView());
+
+// Esc clears the selection, unless an overlay or a text box takes it
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape' || !App.selected.size) return;
+  if (ev.target.closest?.('input, textarea, select')) return;
+  if (document.querySelector('#bpick:not([hidden]), #confirm:not([hidden]), #help:not([hidden])')) return;
+  clearSelection();
+});
+

@@ -1,7 +1,8 @@
 import { emit, on } from './bus.js';
 import { breakFollow } from './camera.js';
 import { Force, forcePhysics, startForce, stopForce, update3dPlanes } from './force.js';
-import { chainOf, FLOW_SPACING, FLOW_SPEED, hideTooltip, label, showNodeTooltip } from './graph.js';
+import { chainOf, clearSelection, FLOW_SPACING, FLOW_SPEED, hideTooltip, label, selectPkg,
+         showNodeTooltip } from './graph.js';
 import { GS } from './gsearch.js';
 import { registerMode } from './modes.js';
 import { App } from './state.js';
@@ -182,10 +183,22 @@ export function loop3d(now) {
   draw3d(now);
   // redraw only while something moves: the 3D view must not take CPU
   // from colcon on the same machine when it just sits there
-  const easing = Math.abs((G3.hovered ? 1 : 0) - (G3.dimEase || 0)) > 0.01;
+  const easing = Math.abs((G3.hovered || App.selected.size ? 1 : 0) - (G3.dimEase || 0)) > 0.01;
   if (G3.auto || G3.drag || Force.alpha > 0.004 || App.active || easing) {
     G3.raf = requestAnimationFrame(loop3d);
   }
+}
+
+let selChain = { key: null, set: null };
+function selectionChain3d() {
+  if (!App.selected.size) return null;
+  const key = [...App.selected].sort().join(',');
+  if (selChain.key !== key) {
+    const all = new Set();
+    for (const n of App.selected) for (const m of chainOf(n)) all.add(m);
+    selChain = { key, set: all };
+  }
+  return selChain.set;
 }
 
 export function draw3d(now) {
@@ -193,7 +206,8 @@ export function draw3d(now) {
   G3.refS = G3.F / G3.dist;  // apparent scale at the camera target
   ctx.setTransform(G3.dpr, 0, 0, G3.dpr, 0, 0);
   ctx.clearRect(0, 0, G3.cw, G3.ch);
-  const chainNow = G3.hovered ? chainOf(G3.hovered) : null;
+  // a hover previews one chain; otherwise the selection's chains stay
+  const chainNow = G3.hovered ? chainOf(G3.hovered) : selectionChain3d();
   if (chainNow) G3.lastChain = chainNow;
   G3.dimEase = (G3.dimEase || 0) + ((chainNow ? 1 : 0) - (G3.dimEase || 0)) * 0.12;
   if (!chainNow && G3.dimEase < 0.02) G3.lastChain = null;
@@ -313,7 +327,8 @@ export function draw3d(now) {
     if (sset && !sset.has(name)) alpha *= 0.12;
     if (stKey === 'excluded') alpha *= 0.35;
 
-    const hot = name === G3.hovered;  // the package under the pointer lights up
+    // the package under the pointer, and the selected ones, light up
+    const hot = name === G3.hovered || App.selected.has(name);
     ctx.globalAlpha = hot ? Math.max(alpha, 1) : alpha;
     ctx.fillStyle = doomed ? mix3d(c.surface, c.critical, 0.08) : pal.fill;
     if (hot) ctx.fillStyle = mix3d(ctx.fillStyle, '#ffffff', 0.28);
@@ -435,8 +450,12 @@ export function bind3d() {
     G3.hovered = null;
     hideTooltip();
   });
-  cv.addEventListener('click', () => {
-    if (G3.moved <= 4 && G3.downNode) emit('open-pkg', G3.downNode);
+  cv.addEventListener('click', ev => {  // the same rules as the SVG graph
+    if (G3.moved > 4) return;
+    if (!G3.downNode) return clearSelection();
+    if (ev.ctrlKey || ev.metaKey || ev.shiftKey) return selectPkg(G3.downNode, true);
+    selectPkg(G3.downNode);
+    emit('open-pkg', G3.downNode);
   });
   cv.addEventListener('wheel', ev => {
     ev.preventDefault();
@@ -467,6 +486,10 @@ registerMode('3d', {
     wake3d();
   },
 });
+
+// a selection made in the other view, or Esc, must show here at once
+on('selection-changed', () => wake3d());
+on('graph', () => { selChain = { key: null, set: null }; });
 
 on('theme-changed', () => {
   if (G3.colors) tokens3d();  // refresh the 3D canvas palette
