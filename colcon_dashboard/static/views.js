@@ -103,20 +103,34 @@ export function initViews() {
   App.ganttSort = localStorage.getItem('cmc-gsort') || 'start';
   const gsort = $('#gsortSelect');
   gsort.value = App.ganttSort;
+  const gf = $('#gfollowBtn');
+  const gwrap = $('#ganttwrap');
+  // the newest packages sit at the bottom only in the start and end orders
+  const syncFollow = () => {
+    const ok = App.ganttSort === 'start' || App.ganttSort === 'end';
+    gf.disabled = !ok;
+    gf.title = ok ? 'keep the newest packages in view'
+                  : 'follow works with the start time and end time orders';
+    if (!ok && App.ganttFollow) {
+      App.ganttFollow = false;
+      gf.classList.remove('on');
+    }
+  };
+  syncFollow();
   gsort.onchange = () => {
     App.ganttSort = gsort.value;
     localStorage.setItem('cmc-gsort', gsort.value);
+    syncFollow();
     drawGantt();
   };
-  const gf = $('#gfollowBtn');
-  const gwrap = $('#ganttwrap');
   gf.onclick = () => {
     App.ganttFollow = !App.ganttFollow;
     gf.classList.toggle('on', App.ganttFollow);
     if (App.ganttFollow) gwrap.scrollTop = gwrap.scrollHeight;
   };
   gwrap.addEventListener('scroll', () => {
-    const atEnd = gwrap.scrollTop + gwrap.clientHeight >= gwrap.scrollHeight - 30;
+    const atEnd = !gf.disabled
+      && gwrap.scrollTop + gwrap.clientHeight >= gwrap.scrollHeight - 30;
     if (App.ganttFollow !== atEnd) {
       App.ganttFollow = atEnd;
       gf.classList.toggle('on', atEnd);

@@ -6,6 +6,18 @@ import { $, fmtDur, svgEl } from './util.js';
 
 /* ---------------- gantt ---------------- */
 
+// The live chart redraws every other poll. Its row elements are kept by
+// package name, and a redraw only moves and resizes them: rebuilding
+// three elements per package each time cost real work on big builds.
+const G = { rows: new Map(), gT: null, aT: null, now: null, charW: 0 };
+
+function clearGantt(svg, axis) {
+  svg.innerHTML = '';
+  axis.innerHTML = '';
+  G.rows.clear();
+  G.gT = G.aT = G.now = null;
+}
+
 export function drawGantt() {
   const svg = $('#gantt');
   const axis = $('#gaxis');  // the time labels stay on top while rows scroll
@@ -23,9 +35,11 @@ export function drawGantt() {
   const rows = Object.entries(App.pkgs)
     .filter(([, p]) => p.t0)
     .sort(cmp);
-  svg.innerHTML = '';
-  axis.innerHTML = '';
-  if (!rows.length || !App.buildStarted) return;
+  if (!rows.length || !App.buildStarted) {
+    clearGantt(svg, axis);
+    return;
+  }
+  if (G.gT && !G.gT.isConnected) clearGantt(svg, axis);  // someone emptied the svg
 
   const nowS = Date.now() / 1000;
   const t0 = App.buildStarted;
@@ -37,10 +51,13 @@ export function drawGantt() {
   const W = Math.max(640, wrap.clientWidth - 16);
   // the name gutter fits the longest name, up to a third of the width;
   // a longer name ends in "…" (the tooltip still shows all of it)
-  const probe = svgEl('text', { class: 'gname' }, svg);
-  probe.textContent = 'M'.repeat(20);
-  const cw = probe.getComputedTextLength() / 20 || 6.3;  // 0 while hidden
-  probe.remove();
+  if (!G.charW) {  // measure once: it forces a layout
+    const probe = svgEl('text', { class: 'gname' }, svg);
+    probe.textContent = 'M'.repeat(20);
+    G.charW = probe.getComputedTextLength() / 20;  // 0 while hidden
+    probe.remove();
+  }
+  const cw = G.charW || 6.3;
   const longest = Math.max(...rows.map(([name]) => label(name).length));
   const GUT = Math.round(Math.min(Math.max(160, W / 3),
                                   Math.max(90, longest * cw + 16)));
@@ -52,40 +69,66 @@ export function drawGantt() {
   axis.setAttribute('height', AXIS);
   const k = (W - GUT - 20) / span;
 
+  // the grid lines and the axis are few: draw them fresh
+  if (!G.gT) {
+    G.gT = svgEl('g', { class: 'gtick' }, svg);
+    G.aT = svgEl('g', { class: 'gtick' }, axis);
+  }
+  svg.prepend(G.gT);  // behind the bars
+  G.gT.innerHTML = '';
+  G.aT.innerHTML = '';
   const steps = [10, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200];
   const step = steps.find(s => span / s <= 10) || 14400;
-  const gT = svgEl('g', { class: 'gtick' }, svg);
-  const aT = svgEl('g', { class: 'gtick' }, axis);
   for (let t = 0; t <= span; t += step) {
     const x = GUT + t * k;
-    svgEl('line', { x1: x, y1: 0, x2: x, y2: H }, gT);
-    svgEl('line', { x1: x, y1: AXIS - 6, x2: x, y2: AXIS }, aT);
-    const lbl = svgEl('text', { x: x + 3, y: AXIS - 8 }, aT);
+    svgEl('line', { x1: x, y1: 0, x2: x, y2: H }, G.gT);
+    svgEl('line', { x1: x, y1: AXIS - 6, x2: x, y2: AXIS }, G.aT);
+    const lbl = svgEl('text', { x: x + 3, y: AXIS - 8 }, G.aT);
     lbl.textContent = fmtDur(t);
   }
 
+  const seen = new Set();
   rows.forEach(([name, p], i) => {
+    seen.add(name);
+    let r = G.rows.get(name);
+    if (!r) {
+      const tn = svgEl('text', { class: 'gname', 'text-anchor': 'end' }, svg);
+      const bar = svgEl('rect', { class: 'gbar', rx: 3 }, svg);
+      tn.dataset.name = bar.dataset.name = name;
+      r = { tn, bar, s: null, text: null };
+      G.rows.set(name, r);
+    }
     const y = TOP + i * ROW;
-    const tn = svgEl('text', {
-      class: 'gname' + (p.s === 'failed' ? ' failed' : ''),
-      x: GUT - 8, y: y + 11, 'text-anchor': 'end',
-    }, svg);
     const text = label(name);
-    tn.textContent = text.length > fit ? text.slice(0, fit - 1) + '…' : text;
-    tn.dataset.name = name;
+    const shown = text.length > fit ? text.slice(0, fit - 1) + '…' : text;
+    if (shown !== r.text) { r.tn.textContent = shown; r.text = shown; }
+    r.tn.setAttribute('x', GUT - 8);
+    r.tn.setAttribute('y', y + 11);
+    r.tn.classList.toggle('failed', p.s === 'failed');
+    if (p.s !== r.s) {  // classList, so that a running .flash survives
+      if (r.s) r.bar.classList.remove(r.s);
+      r.bar.classList.add(p.s);
+      r.s = p.s;
+    }
     const end = p.t1 || (App.active ? nowS : p.t0 + 1);
-    const bar = svgEl('rect', {
-      class: 'gbar ' + p.s,
-      x: GUT + (p.t0 - t0) * k, y: y + 2,
-      width: Math.max(2, (end - p.t0) * k), height: ROW - 5, rx: 3,
-    }, svg);
-    bar.dataset.name = name;
-    if (GS.set?.has(name)) bar.classList.add('smatch');
+    r.bar.setAttribute('x', GUT + (p.t0 - t0) * k);
+    r.bar.setAttribute('y', y + 2);
+    r.bar.setAttribute('width', Math.max(2, (end - p.t0) * k));
+    r.bar.setAttribute('height', ROW - 5);
+    r.bar.classList.toggle('smatch', !!GS.set?.has(name));
   });
+  for (const [name, r] of G.rows) {
+    if (!seen.has(name)) { r.tn.remove(); r.bar.remove(); G.rows.delete(name); }
+  }
 
   if (App.active) {
     const x = GUT + (nowS - t0) * k;
-    svgEl('line', { class: 'gnow', x1: x, y1: 0, x2: x, y2: H }, svg);
+    if (!G.now) G.now = svgEl('line', { class: 'gnow' }, svg);
+    svg.appendChild(G.now);  // on top
+    for (const [a, v] of [['x1', x], ['y1', 0], ['x2', x], ['y2', H]]) G.now.setAttribute(a, v);
+  } else if (G.now) {
+    G.now.remove();
+    G.now = null;
   }
   if (App.ganttFollow) wrap.scrollTop = wrap.scrollHeight;
 
