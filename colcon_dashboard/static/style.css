@@ -130,7 +130,7 @@ img.logo.dark { display: none; }
 :root[data-theme="dark"] img.logo.dark { display: inline-block; }
 #topbar .meta {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
   min-width: 0;
   color: var(--ink2);
@@ -139,7 +139,7 @@ img.logo.dark { display: none; }
   row-gap: 4px;
 }
 #topbar .meta .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#ws { max-width: 34vw; }
+#ws { max-width: 30vw; }
 @media (max-width: 900px) {
   #topbar { gap: 10px; }
   #topbar .brand { display: none; }  /* the chips need the room more */
@@ -148,9 +148,15 @@ img.logo.dark { display: none; }
      wrap flow instead of each block hoarding its own row */
   #topbar .meta { display: contents; }
   /* the buttons stay pinned to the top right corner; the reserve
-     fits all five of them (sys, bell, help, theme, stop) */
+     fits all five of them (sys, bell, help, theme, settings) */
   #topbar { position: relative; padding-right: 230px; }
   #topbar .hbtns { position: absolute; top: 6px; right: 12px; }
+}
+@media (max-width: 560px) {
+  /* a phone: the reserve would leave the switchers no room; the
+     buttons take a row of their own on top instead */
+  #topbar { padding-right: 12px; }
+  #topbar .hbtns { position: static; order: -1; flex-basis: 100%; justify-content: flex-end; }
 }
 .hbtns { display: flex; align-items: center; gap: 12px; }
 .badge {
@@ -894,6 +900,9 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 .setbox label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
 .setbox .snote { font-size: 12px; color: var(--muted); margin: 2px 0 6px 122px; }
 .setbox section:last-child .snote { margin-left: 0; margin-top: 8px; }
+.setbox .snote.sintro { margin: 0 0 8px; }
+.setbox .roots .rootnote { margin-top: 6px; }
+.setbox .rootlist .wsrow { padding-top: 4px; padding-bottom: 4px; }
 .setbox dl { display: grid; grid-template-columns: 130px 1fr; gap: 5px 12px; margin: 0; font-size: 12px; }
 .setbox dt { color: var(--ink2); }
 .setbox dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
@@ -1127,9 +1136,10 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 .wsrow .wmeta .live { color: var(--accent); font-weight: 650; }
 .wsempty { color: var(--muted); padding: 10px; }
 #wspick .wsadd,
-#bpick .wsadd { display: flex; gap: 8px; margin-top: 12px; }
+#bpick .wsadd,
+.roots .wsadd { display: flex; gap: 8px; margin-top: 12px; }
 #wspick #wsinput,
-#wspick #rootinput {
+.roots .rootinput {
   flex: 1;
   font: 12px var(--mono);
   color: var(--ink);
@@ -1237,9 +1247,9 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 #wslist .wsgroup .wcount { flex: 1; font-size: 11px; color: var(--muted); white-space: nowrap; }
 #wslist[hidden], #wspick #wsinput[hidden], .wshead .wssort[hidden] { display: none; }
 #wsroots .wssec { padding-top: 4px; }
-#rootlist { display: flex; flex-direction: column; gap: 4px; }
-#rootlist .wsrow:hover { border-color: var(--grid); background: none; }
-#rootlist .rootedit {
+.rootlist { display: flex; flex-direction: column; gap: 4px; }
+.rootlist .wsrow:hover { border-color: var(--grid); background: none; }
+.rootlist .rootedit {
   flex: 1;
   font: 12px var(--mono);
   color: var(--ink);
@@ -1250,9 +1260,9 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
   padding: 1px 4px;
   margin: -2px -5px;
 }
-#rootlist .rootedit:hover { border-color: var(--border); }
-#rootlist .rootedit:focus { border-color: var(--accent); outline: none; background: var(--page); }
-#rootnote { font-size: 11px; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
+.rootlist .rootedit:hover { border-color: var(--border); }
+.rootlist .rootedit:focus { border-color: var(--accent); outline: none; background: var(--page); }
+.rootnote { font-size: 11px; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
 .wsrow .rootdel {
   background: none;
   box-shadow: none;
@@ -1262,19 +1272,26 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
   cursor: pointer;
 }
 .wsrow .rootdel:hover { color: var(--critical); }
-/* the workspace and build switchers look like the menus they are */
-#ws, #buildid {
-  border: 1px solid var(--border);
-  background: var(--page);
-  border-radius: 6px;
-  padding: 2px 9px;
-  cursor: pointer;
+/* the workspace and build switchers: a caption over the value, an icon,
+   and the up-down chevron of a select, so a first look says "switch" */
+#topbar .switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 7px 3px 8px;
+  text-align: left;
+  line-height: 1.2;
 }
-#ws::after, #buildid::after { content: " ▾"; color: var(--muted); }
-#ws:hover, #buildid:hover { border-color: var(--accent); color: var(--accent); }
-#ws:hover::after, #buildid:hover::after { color: var(--accent); }
-#buildid.pinned { color: var(--accent); border-color: var(--accent); font-weight: 650; }
-body.offline #ws, body.offline #buildid { border-color: rgba(255, 255, 255, 0.45); }
+#topbar .switcher .sw-ic { width: 16px; height: 16px; flex: none; fill: var(--accent); }
+#topbar .switcher .sw-chev { width: 16px; height: 16px; flex: none; fill: var(--muted); }
+#topbar .switcher:hover .sw-chev { fill: var(--accent); }
+.switcher .sw-txt { display: flex; flex-direction: column; min-width: 0; }
+.switcher .sw-cap { font-size: 9.5px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.switcher .sw-val { font-size: 13px; font-weight: 650; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#buildid.pinned .sw-cap { color: var(--accent); }
+body.offline .switcher .sw-cap, body.offline .switcher .sw-val { color: #fff; }
+body.offline #topbar .switcher svg { fill: #fff; }
 
 #bpick {
   position: fixed;

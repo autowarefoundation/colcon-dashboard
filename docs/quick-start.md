@@ -31,7 +31,7 @@ The dashboard needs nothing from colcon. It reads the log files that colcon alre
 
 One server runs per machine, on port 8642, and serves every workspace. If another program uses port 8642, the server takes a free port and prints it. To find the address of a running server, run `colcon-dashboard --list`. The `ws` query parameter picks the workspace, so each browser tab can show a different one. A file lock refuses duplicate servers. The server keeps running after the build, so the pages stay available for the next build and for post-mortems.
 
-To open the workspace picker, click the workspace path in the header. The picker shows your starred and recent workspaces, and the workspaces that it finds in your home directory. Type in the box at the top to filter the list, or paste a path and press Enter. To search other directories too, click "Scan roots…" in the picker.
+To open the workspace picker, click the Workspace switcher at the left of the header. The picker shows your starred and recent workspaces, and the workspaces that it finds in your home directory. Type in the box at the top to filter the list, or paste a path and press Enter. To search other directories too, click "Scan roots…" in the picker, or edit the scan roots in the settings.
 
 ## The command line
 

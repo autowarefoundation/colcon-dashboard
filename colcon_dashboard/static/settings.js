@@ -1,12 +1,13 @@
 import { getNotifyMode, notifyBlocked, setNotifyMode, testNotify } from './notify.js';
+import { loadScanRoots, mountScanRoots } from './pickers.js';
 import { App } from './state.js';
 import { savedTheme, setTheme } from './theme.js';
 import { $, copyText, esc } from './util.js';
 
 /* ---------------- settings dialog ----------------
    One place for the choices this browser keeps (theme, notifications,
-   log panes, layout) and a read-only view of the server configuration,
-   which lives in config.ini. The header buttons stay as shortcuts; the
+   log panes, layout), the scan roots (saved in config.ini at once), and
+   a read-only view of the rest of the server configuration. The header buttons stay as shortcuts; the
    dialog reads their state each time it opens. */
 
 // the keys of the page layout; "reset" forgets them
@@ -27,6 +28,7 @@ function render() {
   $('#setNotifyTest').disabled = mode === 'off';
   $('#setTs').checked = localStorage.getItem('cmc-ts') !== '0';
   $('#setWrap').checked = localStorage.getItem('cmc-wrap') === '1';
+  loadScanRoots();
   renderServer();
 }
 
@@ -48,14 +50,13 @@ function renderServer() {
     ['editor links', cfg.editor_url ? `<code>${esc(cfg.editor_url)}</code>` : unset('off')],
     ['claude CLI', cfg.claude_bin ? `<code>${esc(cfg.claude_bin)}</code>` : unset('found on PATH')],
     ['update check', cfg.check_updates ? 'once a day' : unset('off')],
-    ['extra scan folders', (cfg.extra_roots || []).length
-      ? cfg.extra_roots.map(r => `<code>${esc(r)}</code>`).join(' ') : unset('none')],
   ];
   $('#setServer').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
 }
 
 export function initSettings() {
   const overlay = $('#settings');
+  mountScanRoots($('#setRoots'));
   const close = () => { overlay.hidden = true; };
   $('#settingsBtn').onclick = () => {
     if (overlay.hidden) render();

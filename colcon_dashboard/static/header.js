@@ -1,6 +1,6 @@
 import { emit, on } from './bus.js';
 import { App } from './state.js';
-import { $, esc, fmtDur, fmtDurLong, fmtGB } from './util.js';
+import { $, esc, fmtDur, fmtDurLong, fmtGB, PINNED_BUILD } from './util.js';
 
 /* ---------------- header + tiles ---------------- */
 
@@ -171,14 +171,31 @@ function summaryLine(s, c) {
   return `<span class="lead" title="${tip.join('\n')}">${lead}</span>${parts.join('')}`;
 }
 
+// The workspace by its folder name, the build by its start time: the
+// full path and the build id stay in the tooltips.
+function setSwitchers(s) {
+  const ws = s.workspace || '';
+  $('#ws .sw-val').textContent = ws.replace(/\/+$/, '').split('/').pop() || ws || '…';
+  $('#ws').title = `${ws}\nClick to switch the workspace`;
+  const id = s.build_id || '';
+  const test = id.startsWith('test_');
+  $('#buildid .sw-cap').textContent = `${test ? 'Test run' : 'Build'} · ${PINNED_BUILD ? 'pinned' : 'latest'}`;
+  $('#buildid .sw-val').textContent = s.build_started
+    ? new Date(s.build_started * 1000).toLocaleString([], {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : (id || 'no builds yet');
+  $('#buildid').title = (id ? `${id}\n` : '') + (PINNED_BUILD
+    ? 'This page shows this build. Click to switch the build, or to follow the latest one.'
+    : 'This page follows the latest build. Click to open an earlier one.');
+}
+
 export function applyState(s) {
   const c = s.counts || {};
   const done = c.done || 0, failed = c.failed || 0, aborted = c.aborted || 0;
   const building = c.building || 0, ready = c.ready || 0, waiting = c.waiting || 0;
   const skipped = c.skipped || 0, blocked = c.blocked || 0;
 
-  $('#ws').textContent = s.workspace;
-  $('#buildid').textContent = s.build_id;
+  setSwitchers(s);
   updateSysMeters(s.sys);
   $('#workers').textContent = s.workers ? `${s.workers} workers` : '';
   // the options that make this build differ from a plain colcon build

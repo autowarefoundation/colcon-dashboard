@@ -237,48 +237,78 @@ export async function openWsPicker() {
 
 // the extra_roots list as the server last reported it
 let scanRoots = [];
+// Scan root editors: the workspace picker holds one, the settings dialog
+// another. A save renders every one of them.
+const rootBoxes = new Set();
 
-export function renderScanRoots(d) {
-  scanRoots = d.roots || [];
-  const list = $('#rootlist');
-  list.innerHTML = '';
-  const home = document.createElement('div');
-  home.className = 'wsrow';
-  home.innerHTML = `<span class="wpath">${esc(d.home)}</span>` +
-    '<span class="tag">home</span>';
-  list.appendChild(home);
-  scanRoots.forEach((root, i) => {
-    const div = document.createElement('div');
-    div.className = 'wsrow';
-    div.innerHTML =
-      '<input class="rootedit" type="text" spellcheck="false" title="edit, then press Enter">' +
-      '<button class="rootdel" title="remove this scan root">✕</button>';
-    const input = div.querySelector('.rootedit');
-    input.value = root;
-    const commit = () => {
-      const p = input.value.trim();
-      if (p === root) return;
-      const next = [...scanRoots];
-      if (p) next[i] = p; else next.splice(i, 1);
-      saveScanRoots(next).then(ok => { if (!ok) input.value = root; });
-    };
-    input.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter') input.blur();
-      if (ev.key === 'Escape') { input.value = root; input.blur(); }
-    });
-    input.addEventListener('change', commit);
-    div.querySelector('.rootdel').onclick =
-      () => saveScanRoots(scanRoots.filter((_, j) => j !== i));
-    list.appendChild(div);
+export function mountScanRoots(box) {
+  box.classList.add('roots');
+  box.innerHTML = `<div class="rootlist"></div>
+    <div class="wsadd">
+      <input class="rootinput" type="text" placeholder="/mnt/data" spellcheck="false">
+      <button class="rootadd">Add</button>
+    </div>
+    <div class="rootnote"></div>`;
+  const input = box.querySelector('.rootinput');
+  const add = async () => {
+    const p = input.value.trim();
+    if (p && await saveScanRoots([...scanRoots, p])) input.value = '';
+  };
+  box.querySelector('.rootadd').onclick = add;
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') add();
   });
-  $('#rootnote').textContent = `Saved as extra_roots in ${d.config_path}`;
+  rootBoxes.add(box);
+}
+
+function rootRow(root, i) {
+  const div = document.createElement('div');
+  div.className = 'wsrow';
+  div.innerHTML =
+    '<input class="rootedit" type="text" spellcheck="false" title="edit, then press Enter">' +
+    '<button class="rootdel" title="remove this scan root">✕</button>';
+  const input = div.querySelector('.rootedit');
+  input.value = root;
+  const commit = () => {
+    const p = input.value.trim();
+    if (p === root) return;
+    const next = [...scanRoots];
+    if (p) next[i] = p; else next.splice(i, 1);
+    saveScanRoots(next).then(ok => { if (!ok) input.value = root; });
+  };
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') input.blur();
+    if (ev.key === 'Escape') { input.value = root; input.blur(); }
+  });
+  input.addEventListener('change', commit);
+  div.querySelector('.rootdel').onclick =
+    () => saveScanRoots(scanRoots.filter((_, j) => j !== i));
+  return div;
+}
+
+function renderScanRoots(d) {
+  scanRoots = d.roots || [];
+  for (const box of rootBoxes) {
+    const list = box.querySelector('.rootlist');
+    list.innerHTML = '';
+    const home = document.createElement('div');
+    home.className = 'wsrow';
+    home.innerHTML = `<span class="wpath">${esc(d.home)}</span>` +
+      '<span class="tag">home</span>';
+    list.appendChild(home);
+    scanRoots.forEach((root, i) => list.appendChild(rootRow(root, i)));
+    box.querySelector('.rootnote').textContent =
+      `Saved as extra_roots in ${d.config_path}. A change applies at once.`;
+  }
 }
 
 export async function loadScanRoots() {
   try {
     renderScanRoots(await (await fetch('/api/scan-roots')).json());
   } catch (e) {
-    $('#rootlist').innerHTML = '<div class="wsempty">The server does not answer.</div>';
+    for (const box of rootBoxes)
+      box.querySelector('.rootlist').innerHTML =
+        '<div class="wsempty">The server does not answer.</div>';
   }
 }
 
@@ -319,7 +349,6 @@ function moveWsHighlight(step) {
 }
 
 export function initWsPicker() {
-  $('#ws').title = 'switch workspace';
   $('#ws').onclick = openWsPicker;
   const sortSel = $('#wssort');
   const savedSort = localStorage.getItem('cmc-wssort');
@@ -357,14 +386,7 @@ export function initWsPicker() {
     }
   });
   $('#rootsbtn').onclick = () => showScanRoots($('#wsroots').hidden);
-  const addRoot = async () => {
-    const p = $('#rootinput').value.trim();
-    if (p && await saveScanRoots([...scanRoots, p])) $('#rootinput').value = '';
-  };
-  $('#rootadd').onclick = addRoot;
-  $('#rootinput').addEventListener('keydown', ev => {
-    if (ev.key === 'Enter') addRoot();
-  });
+  mountScanRoots($('#wsrootbox'));
   if (!WS) {
     document.body.classList.add('nows');  // the start page (style.css)
     openWsPicker();
@@ -514,7 +536,6 @@ async function postJson(url) {
 
 export function initBuildPicker() {
   $('#buildid').onclick = openBuildPicker;
-  $('#buildid').title = 'browse this workspace’s builds';
   if (PINNED_BUILD) $('#buildid').classList.add('pinned');
   const overlay = $('#bpick');
   overlay.addEventListener('click', ev => {

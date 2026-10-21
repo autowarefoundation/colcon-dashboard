@@ -43,7 +43,7 @@ ALLOWED = {
     'notify': ['bus', 'logo', 'state', 'util'],
     'pickers': ['graph', 'header', 'state', 'toasts', 'util'],
     'poller': ['bus', 'header', 'modes', 'state', 'toasts', 'util'],
-    'settings': ['notify', 'state', 'theme', 'util'],
+    'settings': ['notify', 'pickers', 'state', 'theme', 'util'],
     'state': [],
     'theme': ['bus', 'util'],
     'toasts': ['util'],
