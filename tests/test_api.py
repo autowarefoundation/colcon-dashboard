@@ -159,6 +159,10 @@ class ApiTest(unittest.TestCase):
         self.assertIn("hello api", json.loads(body)["data"])
         _, body, _ = self.get("/api/log/a?ws=" + self.wsq())
         self.assertIn("pkg log line", json.loads(body)["data"])
+        self.assertNotIn("missing", json.loads(body))
+        # a file the build never wrote: the page shows a note, not a blank pane
+        _, body, _ = self.get("/api/log/a?file=streams&ws=" + self.wsq())
+        self.assertTrue(json.loads(body)["missing"])
 
     def test_builds_listing(self):
         self.state()

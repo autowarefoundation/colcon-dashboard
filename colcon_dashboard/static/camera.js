@@ -61,6 +61,7 @@ export function breakFollow() {
 /* double-click a dock tab: fly the selected view to that package */
 export function zoomToPkg(name) {
   breakFollow();
+  Force.autoFit = false;  // stay on the package while the layout settles
   if (App.view === 'gantt') {
     const wrap = $('#ganttwrap');
     const bar = $('#gantt').querySelector(
@@ -99,6 +100,7 @@ export function initPanZoom() {
     ev.preventDefault();
     if (!App.vb) return;
     breakFollow();
+    Force.autoFit = false;
     const [wx, wy] = clientToWorld(ev.clientX, ev.clientY);
     const vb = App.vb;
     const f = Math.min(Math.max((ev.deltaY > 0 ? 1.18 : 1 / 1.18),
@@ -116,6 +118,7 @@ export function initPanZoom() {
     if (!App.vb) return;
     downNode = ev.target.closest('.node')?.dataset.name || null;
     moved = 0;
+    Force.autoFit = false;
     if (App.layoutMode === 'force' && downNode) {
       const n = App.lay?.nodes.get(downNode);
       if (n) {

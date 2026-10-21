@@ -522,9 +522,9 @@ class BuildMonitor:
         path = os.path.join(build_dir, pkg, LOG_FILES[which])
         try:
             size = os.path.getsize(path)
-        except OSError:
+        except OSError:  # the page tells "not written" from "empty"
             return {"size": 0, "start": 0, "offset": 0, "data": "",
-                    "reset": False}
+                    "reset": False, "missing": True}
         reset = False
         if offset < 0:  # initial request: tail the last 128 KiB
             offset = max(0, size - 128 * 1024)

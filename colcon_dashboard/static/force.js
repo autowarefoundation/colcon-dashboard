@@ -5,6 +5,9 @@ import { App } from './state.js';
 
 export const Force = {
   nodes: [], links: [], alpha: 0, raf: null, dragging: null,
+  // the camera keeps framing the graph while the simulation spreads it,
+  // until a pan, zoom, or drag takes the camera over
+  autoFit: false,
   REPULSE: 1600, LINK_DIST: 200, LINK_S: 0.5, AX: 0.035, AY: 0.0035,
   FRICTION: 0.6, DECAY: 0.972, MAXD2: 1300 * 1300, THETA2: 0.72,
   BASE: { REPULSE: 1600, LINK_DIST: 200, MAXD: 1300 },
@@ -244,16 +247,22 @@ export function forceTick() {
     if (na && nb) e.el.setAttribute('d', edgePathD(na, nb));
   }
   syncGlow();  // halos ride along with the moving nodes
+  if (Force.autoFit) (App.followBuild ? frontierView : fitGraph)();
   Force.alpha *= Force.DECAY;
   if (Force.alpha < 0.004 && !Force.dragging) { stopForce(); return; }
   Force.raf = requestAnimationFrame(forceTick);
 }
 
+export function fitForce() {
+  Force.autoFit = true;
+  fitGraph();
+}
+
 registerMode('force', {
-  activate: () => startForce(),
+  activate: () => { startForce(); fitForce(); },
   onLayout: () => startForce(),
   show: () => { if (!Force.raf) startForce(0.15); },
   hide: stopForce,
-  fit: fitGraph,
+  fit: fitForce,
   followFrontier: frontierView,
 });

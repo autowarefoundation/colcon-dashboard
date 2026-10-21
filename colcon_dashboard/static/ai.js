@@ -24,11 +24,17 @@ export function updatePaneHeads() {
     // ai chips update from /api/analysis; the failure summary from 'state'
     if (p.ai || p.summary) continue;
     if (p.fixed) {
+      // the same verdict as the header badge: a finished build is no alarm
+      const all = Object.values(App.pkgs);
+      const done = all.filter(x => x.s === 'done').length;
+      const [label, cls, dot] = App.active ? ['live', 'building', 'c-building']
+        : all.some(x => x.s === 'failed') ? ['failed', 'failed', 'c-failed']
+        : App.total > 0 && done === App.total ? ['finished', 'done', 'c-done']
+        : ['stopped', 'aborted', 'c-skipped'];
       const chip = p.el.querySelector('.chip');
-      chip.textContent = App.active ? 'live' : 'stopped';
-      chip.className = 'chip ' + (App.active ? 'building' : 'aborted');
-      p.tabEl.querySelector('.dot').className =
-        'dot ' + (App.active ? 'c-building' : 'c-skipped');
+      chip.textContent = label;
+      chip.className = 'chip ' + cls;
+      p.tabEl.querySelector('.dot').className = 'dot ' + dot;
       continue;
     }
     const st = App.pkgs[name];

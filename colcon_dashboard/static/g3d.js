@@ -11,7 +11,9 @@ import { $ } from './util.js';
 
 export const G3 = {
   yaw: -0.6, pitch: 0.28, dist: 2600, tx: 0, ty: 0, tz: 0, F: 560,
-  raf: null, auto: true, hovered: null, downNode: null, drag: null, moved: 0,
+  // auto: the camera orbits by itself. fitting: it keeps framing the
+  // cloud while the simulation spreads it. A grab ends both.
+  raf: null, auto: true, fitting: false, hovered: null, downNode: null, drag: null, moved: 0,
   colors: null, pal: null, particles: new Map(), lastT: 0, bound: false,
 };
 
@@ -82,6 +84,12 @@ export function exit3d() {
 }
 
 export function fit3d() {
+  frameAll3d();
+  G3.auto = true;
+  G3.fitting = true;
+}
+
+function frameAll3d() {
   const ns = Force.nodes;
   if (!ns.length) return;
   let sx = 0, sy = 0, sz = 0;
@@ -93,7 +101,6 @@ export function fit3d() {
   // fit the long axis to the viewport width, but keep the whole cloud
   // in front of the camera so nothing clips while it orbits
   G3.dist = Math.max(600, r * 1.15, r * G3.F / ((G3.w2 || 400) * 0.8));
-  G3.auto = true;
 }
 
 export function frontier3d() {
@@ -151,6 +158,7 @@ export function loop3d(now) {
   if (Force.alpha > 0.004) {
     forcePhysics();
     Force.alpha *= Force.DECAY;
+    if (G3.fitting && !G3.drag) (App.followBuild ? frontier3d : frameAll3d)();
   }
   if (G3.auto && !G3.drag) G3.yaw += dt * 0.1;
   stepParticles3d(dt);
@@ -352,6 +360,7 @@ export function bind3d() {
   cv.addEventListener('pointerdown', ev => {
     if (ev.button === 1) ev.preventDefault();  // no middle-click autoscroll
     G3.auto = false;
+    G3.fitting = false;
     G3.downNode = pick3d(...cvCoords(ev));
     G3.drag = {
       x: ev.clientX, y: ev.clientY, yaw: G3.yaw, pitch: G3.pitch,
@@ -408,6 +417,7 @@ export function bind3d() {
   cv.addEventListener('wheel', ev => {
     ev.preventDefault();
     breakFollow();
+    G3.fitting = false;
     G3.dist = Math.max(300, Math.min(30000,
       G3.dist * (ev.deltaY > 0 ? 1.15 : 1 / 1.15)));
   }, { passive: false });
@@ -427,6 +437,7 @@ registerMode('3d', {
     const n = Force.nodes.find(f => f.name === name);
     if (!n) return;
     G3.auto = false;  // keep the camera where we point it
+    G3.fitting = false;
     G3.tx = n.cx; G3.ty = n.cy; G3.tz = n.cz;
     G3.dist = 500;
   },

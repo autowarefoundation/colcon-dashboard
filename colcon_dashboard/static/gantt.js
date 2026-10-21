@@ -31,8 +31,18 @@ export function drawGantt() {
   for (const [, p] of rows) tMax = Math.max(tMax, p.t1 || (App.active ? nowS : p.t0));
   const span = Math.max(30, tMax - t0);
 
-  const GUT = 250, ROW = 16, TOP = 26;
+  const ROW = 16, TOP = 26;
   const W = Math.max(640, wrap.clientWidth - 16);
+  // the name gutter fits the longest name, up to a third of the width;
+  // a longer name ends in "…" (the tooltip still shows all of it)
+  const probe = svgEl('text', { class: 'gname' }, svg);
+  probe.textContent = 'M'.repeat(20);
+  const cw = probe.getComputedTextLength() / 20 || 6.3;  // 0 while hidden
+  probe.remove();
+  const longest = Math.max(...rows.map(([name]) => label(name).length));
+  const GUT = Math.round(Math.min(Math.max(160, W / 3),
+                                  Math.max(90, longest * cw + 16)));
+  const fit = Math.floor((GUT - 16) / cw);
   const H = TOP + rows.length * ROW + 10;
   svg.setAttribute('width', W);
   svg.setAttribute('height', H);
@@ -54,7 +64,8 @@ export function drawGantt() {
       class: 'gname' + (p.s === 'failed' ? ' failed' : ''),
       x: GUT - 8, y: y + 11, 'text-anchor': 'end',
     }, svg);
-    tn.textContent = label(name);
+    const text = label(name);
+    tn.textContent = text.length > fit ? text.slice(0, fit - 1) + '…' : text;
     tn.dataset.name = name;
     const end = p.t1 || (App.active ? nowS : p.t0 + 1);
     const bar = svgEl('rect', {

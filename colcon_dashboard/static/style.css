@@ -563,6 +563,12 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   border: 1px solid var(--border);
   font-size: 10.5px;
 }
+.pane .lognote {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--grid);
+}
 .pane .phead .chip.done { color: var(--good); border-color: var(--good); }
 .pane .phead .chip.building { color: var(--accent); border-color: var(--accent); }
 .pane .phead .chip.failed,
