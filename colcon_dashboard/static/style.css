@@ -299,7 +299,7 @@ body.offline #sysmeters { display: none; }
   border-radius: 0;
 }
 #viewbar .vtab.on { color: var(--ink); border-bottom-color: var(--accent); }
-#viewbar .hint { color: var(--muted); font-size: 11px; margin-left: auto; }
+.panehead .hint { color: var(--muted); font-size: 11px; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 #viewbar .vsep { width: 1px; align-self: stretch; margin: 4px 3px; background: var(--border); }
 #followBuildBtn.on {
   color: var(--accent);
@@ -321,7 +321,27 @@ body.offline #sysmeters { display: none; }
 
 /* ---- viz area ---- */
 #viz { flex: 1; position: relative; overflow: hidden; background: var(--page); user-select: none; -webkit-user-select: none; }
-#graphwrap, #ganttwrap { position: absolute; inset: 0; }
+/* each view pane: a small header with its own controls over the view */
+.vpane { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.vpane[hidden] { display: none; }
+.panehead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  min-height: 24px;
+  font-size: 11px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--grid);
+  background: var(--page);
+  flex-wrap: wrap;
+}
+.panehead > * { white-space: nowrap; }
+.panehead button, .panehead select { font-size: 11px; padding: 1px 7px; }
+.panehead .ptitle { display: none; color: var(--ink2); font-weight: 600; margin-right: 6px; }
+#viz.split .panehead .ptitle { display: inline; }
+#graphwrap, #ganttwrap { position: relative; flex: 1; min-height: 0; }
 #graphwrap svg { width: 100%; height: 100%; display: block; cursor: grab; }
 #graphwrap svg.panning { cursor: grabbing; }
 #graph3d { position: absolute; inset: 0; width: 100%; height: 100%; display: none; cursor: grab; touch-action: none; }
@@ -337,10 +357,10 @@ body.offline #sysmeters { display: none; }
 
 /* side-by-side: timeline left, graph right, over a drag bar */
 #viz.split { display: flex; }
-#viz.split #graphwrap, #viz.split #ganttwrap { position: relative; inset: auto; min-width: 0; }
-#viz.split #ganttwrap { order: 0; flex: 0 0 var(--split-w, 42%); }
+#viz.split .vpane { position: relative; inset: auto; min-width: 0; }
+#viz.split #ganttpane { order: 0; flex: 0 0 var(--split-w, 42%); }
 #viz.split #vsplit { order: 1; }
-#viz.split #graphwrap { order: 2; flex: 1; }
+#viz.split #graphpane { order: 2; flex: 1; }
 #vsplit { flex: none; width: 6px; cursor: col-resize; background: var(--border); }
 #vsplit:hover { background: var(--accent); }
 #vsplit[hidden] { display: none; }

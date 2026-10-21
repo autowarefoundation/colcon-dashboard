@@ -34,20 +34,11 @@ export function setView(v, persist = true) {
     x.classList.toggle('on', x.dataset.view === v));
   const showGraph = v !== 'gantt';
   const showGantt = v !== 'graph';
-  $('#graphwrap').hidden = !showGraph;
-  $('#ganttwrap').hidden = !showGantt;
+  // each pane carries its own controls in its header
+  $('#graphpane').hidden = !showGraph;
+  $('#ganttpane').hidden = !showGantt;
   $('#vsplit').hidden = v !== 'split';
   $('#viz').classList.toggle('split', v === 'split');
-  $('#fitBtn').style.display = showGraph ? '' : 'none';
-  $('#followBuildBtn').style.display = showGraph ? '' : 'none';
-  $('#scopeCtl').style.display = showGraph ? '' : 'none';
-  $('#layoutSel').style.display = showGraph ? '' : 'none';
-  document.querySelectorAll('.vsep.gonly')
-    .forEach(x => x.style.display = showGraph ? '' : 'none');
-  document.querySelectorAll('.vsep.bothonly')  // between the two control groups
-    .forEach(x => x.style.display = v === 'split' ? '' : 'none');
-  $('#gfollowBtn').style.display = showGantt ? '' : 'none';
-  $('#gsortSel').style.display = showGantt ? '' : 'none';
   updateForceCtl();
   syncHash();
   dispatchEvent(new Event('resize'));  // both panels take their new sizes

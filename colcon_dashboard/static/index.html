@@ -101,28 +101,6 @@
   <button class="vtab" data-view="gantt">Timeline</button>
   <button class="vtab" data-view="split">Side by side</button>
   <span class="vsep"></span>
-  <label id="gsortSel" style="display:none" title="timeline row order">order <select id="gsortSelect">
-    <option value="start">start time</option>
-    <option value="duration">duration</option>
-    <option value="end">end time</option>
-    <option value="status">status</option>
-  </select></label>
-  <button id="gfollowBtn" class="on" style="display:none" title="auto-scroll to the newest packages as they start">⤓ follow new</button>
-  <span class="vsep bothonly"></span>
-  <button id="fitBtn" title="frame the whole graph">Fit</button>
-  <button id="followBuildBtn" title="keep the camera on the packages that build now; pan or zoom to release">⌖ follow build</button>
-  <label id="layoutSel" title="graph layout">layout <select id="layoutSelect">
-    <option value="layered">layered</option>
-    <option value="force">force</option>
-    <option value="3d">3D</option>
-  </select></label>
-  <span class="vsep gonly"></span>
-  <span id="scopeCtl" title="which packages the graph shows">show
-    <span class="seg">
-      <button id="scopeBuild" class="on">this build</button>
-      <button id="scopeAll">whole workspace</button>
-    </span>
-  </span>
   <span id="stateChips" title="highlight packages by state, in every view">
     <button data-filter="failed">failed</button>
     <button data-filter="building">building</button>
@@ -135,13 +113,43 @@
     <button id="gsclear" class="sclear" hidden title="clear the search">✕</button>
   </span>
   <span id="gscount"></span>
-  <span class="hint" id="prefixHint"></span>
 </nav>
 
 <main id="viz">
-  <div id="graphwrap"><svg id="graph"></svg><canvas id="graph3d"></canvas></div>
+  <section id="graphpane" class="vpane">
+    <div class="panehead">
+      <span class="ptitle">Dependency graph</span>
+      <button id="fitBtn" title="frame the whole graph">Fit</button>
+      <button id="followBuildBtn" title="keep the camera on the packages that build now; pan or zoom to release">⌖ follow build</button>
+      <label id="layoutSel" title="graph layout">layout <select id="layoutSelect">
+        <option value="layered">layered</option>
+        <option value="force">force</option>
+        <option value="3d">3D</option>
+      </select></label>
+      <span id="scopeCtl" title="which packages the graph shows">show
+        <span class="seg">
+          <button id="scopeBuild" class="on">this build</button>
+          <button id="scopeAll">whole workspace</button>
+        </span>
+      </span>
+      <span class="hint" id="prefixHint"></span>
+    </div>
+    <div id="graphwrap"><svg id="graph"></svg><canvas id="graph3d"></canvas></div>
+  </section>
   <div id="vsplit" hidden title="drag to resize"></div>
-  <div id="ganttwrap" hidden><svg id="gaxis"></svg><svg id="gantt"></svg></div>
+  <section id="ganttpane" class="vpane" hidden>
+    <div class="panehead">
+      <span class="ptitle">Timeline</span>
+      <label id="gsortSel" title="timeline row order">order <select id="gsortSelect">
+        <option value="start">start time</option>
+        <option value="duration">duration</option>
+        <option value="end">end time</option>
+        <option value="status">status</option>
+      </select></label>
+      <button id="gfollowBtn" class="on" title="auto-scroll to the newest packages as they start">⤓ follow new</button>
+    </div>
+    <div id="ganttwrap"><svg id="gaxis"></svg><svg id="gantt"></svg></div>
+  </section>
   <div id="tooltip" hidden></div>
   <div id="forceCtl" hidden title="how far the simulation spreads the nodes">
     <label for="spreadSlider">spread</label>
