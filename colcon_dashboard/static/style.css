@@ -532,7 +532,7 @@ svg.nfocus .node:not(.hl) { opacity: 0.14; }
 .node.waiting text { fill: var(--muted); }
 .node.failed rect.box { fill: color-mix(in srgb, var(--critical) 18%, var(--surface)); stroke: var(--critical); stroke-width: 1.5; }
 .node.failed text { fill: var(--ink); font-weight: 600; }
-.node.aborted rect.box { fill: color-mix(in srgb, var(--serious) 14%, var(--surface)); stroke: var(--serious); }
+.node.aborted rect.box { fill: color-mix(in srgb, var(--serious) 14%, var(--surface)); stroke: var(--serious); stroke-dasharray: 5 2; }
 .node.blocked rect.box { stroke: var(--critical); stroke-dasharray: 3 3; }
 .node.blocked text { fill: var(--muted); }
 .node.skipped rect.box { stroke: var(--grid); }
@@ -561,6 +561,10 @@ svg.nfocus .node:not(.hl) { opacity: 0.14; }
 #graph.far .node text { display: none; }
 #graph.far .edge.edone { stroke-opacity: 0.1; }
 #graph.far .node.done rect.box { fill: color-mix(in srgb, var(--good) 45%, var(--surface)); stroke: none; }
+/* zoomed out, the labels hide: the outline tells failed and aborted apart
+   from done without relying on color */
+#graph.far .node.failed rect.box { stroke-width: 4; }
+#graph.far .node.aborted rect.box { stroke-width: 3; stroke-dasharray: 6 3; }
 #graph.far .node.waiting rect.box, #graph.far .node.skipped rect.box { fill: var(--grid); }
 @keyframes edgebreathe { 50% { stroke-opacity: 0.25; } }
 .pkt { fill: var(--accent); opacity: 0.85; }
@@ -584,8 +588,13 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 .gbar { rx: 3; cursor: pointer; }
 .gbar.done { fill: var(--good); }
 .gbar.building { fill: var(--accent); animation: pulse-f 1.5s ease-in-out infinite; }
-.gbar.failed { fill: var(--critical); }
-.gbar.aborted { fill: var(--serious); }
+.gbar.failed { fill: url(#gHatch); }
+.gh-bg { fill: var(--critical); }
+.gh-line { stroke: rgba(255, 255, 255, 0.55); stroke-width: 2.5; }
+.gbar.aborted {
+  fill: color-mix(in srgb, var(--serious) 35%, var(--surface));
+  stroke: var(--serious); stroke-width: 1.2; stroke-dasharray: 3 2;
+}
 .gnow { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 2 3; }
 @keyframes pulse-f { 50% { fill-opacity: 0.55; } }
 

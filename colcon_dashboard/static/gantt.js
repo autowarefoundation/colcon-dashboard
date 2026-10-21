@@ -71,6 +71,12 @@ export function drawGantt() {
 
   // the grid lines and the axis are few: draw them fresh
   if (!G.gT) {
+    // failed bars are striped, not only red: a red-green color blind user
+    // must tell them from the green done bars
+    const defs = svgEl('defs', {}, svg);
+    defs.innerHTML = '<pattern id="gHatch" patternUnits="userSpaceOnUse" width="6" height="6"'
+      + ' patternTransform="rotate(45)"><rect class="gh-bg" width="6" height="6"/>'
+      + '<line class="gh-line" x1="0" y1="0" x2="0" y2="6"/></pattern>';
     G.gT = svgEl('g', { class: 'gtick' }, svg);
     G.aT = svgEl('g', { class: 'gtick' }, axis);
   }
@@ -99,7 +105,9 @@ export function drawGantt() {
       G.rows.set(name, r);
     }
     const y = TOP + i * ROW;
-    const text = label(name);
+    // a mark that does not rely on color: ✗ failed, ◌ aborted
+    const mark = p.s === 'failed' ? '✗ ' : p.s === 'aborted' ? '◌ ' : '';
+    const text = mark + label(name);
     const shown = text.length > fit ? text.slice(0, fit - 1) + '…' : text;
     if (shown !== r.text) { r.tn.textContent = shown; r.text = shown; }
     r.tn.setAttribute('x', GUT - 8);
