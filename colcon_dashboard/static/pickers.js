@@ -443,8 +443,9 @@ export async function openBuildPicker(retry) {
           `${d > 0 ? '+' : '−'}${fmtDur(Math.abs(d))}</span>`;
       }
     }
+    a.title = b.id;
     a.innerHTML =
-      `<span class="wpath">${b.id}</span>` +
+      `<span class="wpath">${buildWhen(b)}</span>` +
       (b.id.startsWith('test_') ? '<span class="tag">test</span>' : '') +
       (b.id === latest ? '<span class="tag">latest</span>' : '') +
       outcomeHtml(b) +
@@ -464,15 +465,33 @@ export async function openBuildPicker(retry) {
         }, 2500);
         return;
       }
-      const r = await (await fetch(
+      const r = await postJson(
         `/api/builds/delete?ws=${encodeURIComponent(WS)}` +
-        `&build=${encodeURIComponent(b.id)}`, { method: 'POST' })).json();
+        `&build=${encodeURIComponent(b.id)}`);
       toast(r.ok ? `Deleted <b>${b.id}</b>, freed ${fmtBytes(r.freed)}.`
                  : `Not deleted: ${r.error}`, r.ok ? 'info' : '');
       openBuildPicker();
     };
     list.appendChild(a);
   });
+}
+
+// "Oct 20, 16:50 · 2 d ago": the build id is a timestamp, but a long one
+// that wraps in the middle; the row's tooltip keeps the id itself
+function buildWhen(b) {
+  if (!b.time) return esc(b.id);
+  const when = new Date(b.time * 1000).toLocaleString([], {
+    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return `<span class="bwhen">${esc(when)}</span> <span class="bago">${fmtAgo(b.time)}</span>`;
+}
+
+// a POST that answers { ok: false, error } when the server does not answer
+async function postJson(url) {
+  try {
+    return await (await fetch(url, { method: 'POST' })).json();
+  } catch (e) {
+    return { ok: false, error: 'the server does not answer' };
+  }
 }
 
 export function initBuildPicker() {
@@ -500,9 +519,8 @@ export function initBuildPicker() {
     }
     prune.classList.remove('sure');
     prune.textContent = 'Keep the last 3 of each kind, delete the rest';
-    const r = await (await fetch(
-      `/api/builds/prune?ws=${encodeURIComponent(WS)}&keep=3`,
-      { method: 'POST' })).json();
+    const r = await postJson(
+      `/api/builds/prune?ws=${encodeURIComponent(WS)}&keep=3`);
     const stuck = r.failed?.length
       ? ` ${r.failed.length} could not be deleted: another user owns some of their files.` : '';
     toast(r.ok ? `Deleted ${r.deleted} builds, freed ${fmtBytes(r.freed)}.${stuck}`

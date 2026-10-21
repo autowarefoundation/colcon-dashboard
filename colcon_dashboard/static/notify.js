@@ -124,13 +124,23 @@ export function initNotify() {
       : notifyMode === 'on'
         ? 'notifications on - click to also play a chime'
         : 'notifications + chime - click to switch off';
+    btn.setAttribute('aria-pressed', notifyMode !== 'off' ? 'true' : 'false');
+    // the bell must not claim notifications that the browser refuses
+    const blocked = notifyMode === 'off' ? null
+      : !('Notification' in window) ? 'this browser has no desktop notifications'
+        : !window.isSecureContext ? 'browsers allow them only on localhost or https; '
+                                    + 'open the dashboard through localhost or an SSH tunnel'
+          : Notification.permission === 'denied' ? 'the browser blocks them for this site'
+            : null;
+    btn.classList.toggle('blocked', !!blocked);
+    if (blocked) btn.title += `\n\nDesktop notifications do not work: ${blocked}.`;
   };
   btn.onclick = () => {
     notifyMode = MODES[(MODES.indexOf(notifyMode) + 1) % MODES.length];
     localStorage.setItem('cmc-notify', notifyMode);
     if (notifyMode !== 'off' && 'Notification' in window
         && Notification.permission === 'default') {
-      Notification.requestPermission();
+      Notification.requestPermission().then(apply, apply);
     }
     if (notifyMode === 'sound') ding();  // the click is the audio gesture
     apply();

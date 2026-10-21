@@ -230,6 +230,7 @@ body.offline #sysmeters { display: none; }
 #themeBtn, #stopBtn, #sysBtn, #bellBtn { padding: 4px 8px; }
 #helpBtn { padding: 4px 9px; font-weight: 650; }
 #bellBtn.on { color: var(--accent); border-color: var(--accent); }
+#bellBtn.blocked { color: var(--warning); border-color: var(--warning); }
 
 /* system meters: colcon can eat all the RAM, keep pressure visible */
 #sysmeters { display: flex; gap: 14px; align-items: center; }
@@ -415,6 +416,18 @@ body.offline #sysmeters { display: none; }
 
 /* ---- viz area ---- */
 #viz { flex: 1; position: relative; overflow: hidden; background: var(--page); user-select: none; -webkit-user-select: none; }
+/* a workspace without build logs: say so in the middle, not only in a chip */
+#vizEmpty {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; padding: 24px; text-align: center; color: var(--ink2);
+  background: var(--page); user-select: text; -webkit-user-select: text;
+}
+#vizEmpty[hidden] { display: none; }
+#vizEmpty b { font-size: 16px; color: var(--ink); }
+#vizEmpty p { margin: 2px 0; max-width: 520px; }
+#vizEmpty .why { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+#vizEmpty code { font-family: var(--mono); background: var(--grid); padding: 0 4px; border-radius: 4px; }
 /* each view pane: a small header with its own controls over the view */
 .vpane { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .vpane[hidden] { display: none; }
@@ -1061,6 +1074,8 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 #wspick #wsinput,
 #wspick #rootinput {
   flex: 1;
+.wsrow .wpath .bwhen, .wsrow .wpath .bago { white-space: nowrap; }
+.wsrow .wpath .bago { color: var(--muted); margin-left: 6px; font-family: var(--sans); font-size: 11px; }
   font: 12px var(--mono);
   color: var(--ink);
   background: var(--page);

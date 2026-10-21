@@ -121,6 +121,11 @@
 </nav>
 
 <main id="viz">
+  <div id="vizEmpty" hidden role="status">
+    <b>No build yet</b>
+    <p class="why"></p>
+    <p>Run <code>colcon build</code> in this workspace. The dashboard shows it as soon as colcon writes its first log.</p>
+  </div>
   <section id="graphpane" class="vpane">
     <div class="panehead">
       <span class="ptitle">Dependency graph</span>

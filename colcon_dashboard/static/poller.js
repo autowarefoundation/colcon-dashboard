@@ -34,6 +34,8 @@ export async function pollState() {
     emit('state-lost');
     return false;
   }
+  // only "there is no build" errors: "scanning..." comes first on every load
+  $('#vizEmpty').hidden = s.nows || !/^no (colcon build logs|events\.log)/.test(s.error || '');
   if (s.nows) {
     setBadge('idle', 'PICK A WORKSPACE');
     $('#ws').textContent = 'pick a workspace';
@@ -42,6 +44,7 @@ export async function pollState() {
     return;
   }
   if (s.error) {
+    $('#vizEmpty .why').textContent = s.error;
     setBadge('idle', 'WAITING');
     $('#buildid').textContent = s.error;
     updateSysMeters(s.sys);
