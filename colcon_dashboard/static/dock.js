@@ -110,8 +110,8 @@ export function createPane(name) {
       <span class="grow"></span>
       <span class="searchwrap"><input class="search" type="text" placeholder="search" spellcheck="false"><button class="sclear" hidden title="clear the search">✕</button></span>
       <span class="scount"></span>
-      <button class="sprev" title="previous match">↑</button>
-      <button class="snext" title="next match">↓</button>
+      <button class="sprev" title="previous match" disabled>↑</button>
+      <button class="snext" title="next match" disabled>↓</button>
       ${fixed || ai ? '' : `<label>file <select class="fsel">
         <option value="streams">output (timestamped)</option>
         <option value="combined">stdout+stderr</option>
@@ -300,7 +300,10 @@ export function stepHit(p, dir) {
     p.hits = p.hits.filter(h => h.isConnected);  // drop trimmed lines
     if (p.hitIdx >= p.hits.length) p.hitIdx = p.hits.length - 1;
   }
-  if (!p.hits?.length) return;
+  if (!p.hits?.length) {
+    updateSearchCount(p);  // the last matches scrolled out of the log
+    return;
+  }
   p.hitIdx = (p.hitIdx + dir + p.hits.length) % p.hits.length;
   focusHit(p);
   updateSearchCount(p);
@@ -309,6 +312,10 @@ export function stepHit(p, dir) {
 export function updateSearchCount(p) {
   p.el.querySelector('.scount').textContent =
     p.query ? `${p.hits.length ? p.hitIdx + 1 : 0}/${p.hits.length}` : '';
+  // the arrows step through matches, so without one they do nothing
+  const none = !p.hits?.length;
+  p.el.querySelector('.sprev').disabled = none;
+  p.el.querySelector('.snext').disabled = none;
 }
 
 export async function loadEarlier(p) {
