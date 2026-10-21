@@ -32,15 +32,15 @@
 // clip paths, or masks. The dots are holes, like the Rivorbit center.
 
 export const DEFAULTS = {
-  r: 32,          // radius of the tube center line
-  tube: 17,       // tube width
+  r: 30,          // radius of the tube center line
+  tube: 22,       // tube width
   gap: 80,        // opening of the C, in degrees
   dots: 5,        // evenly spaced dots, end to end
   inset: 0,       // pulls the first and the last dot in from the ends, in degrees
   blueFromEnd: 1, // which dot is blue, counted back from the upper end
   dot: 0.45,      // dot radius, as a share of half the tube width
   blue: 1.08,     // blue knob radius, as a share of half the tube width (above 1, it is wider than the tube)
-  knobGap: 2.4,
+  knobGap: 3.5,
   paleTrack: false, // false: the empty tube is the ink (navy, or white on dark). true: pale blue.   // the cut through the tube around the knob, in view box units (flat and rich)
   // Rich version only, after the Rivorbit logo:
   gradient: 1,    // strength of the gradients
