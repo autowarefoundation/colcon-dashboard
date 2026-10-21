@@ -223,15 +223,22 @@ class Handler(BaseHTTPRequestHandler):
                 except OSError:
                     pass
             freed = remove_build_dir(log_dir, build)
-            self.registry.drop_pinned(ws, build)
-            result = {"ok": True, "deleted": 1, "freed": freed}
+            if os.path.isdir(os.path.join(log_dir, build)):
+                result = {"ok": False, "freed": freed, "error":
+                          "some files could not be deleted (owned by another "
+                          "user, for example after a sudo or Docker build)"}
+            else:
+                self.registry.drop_pinned(ws, build)
+                result = {"ok": True, "deleted": 1, "freed": freed}
         else:
             keep = max(1, query_int(q, "keep", 3))
             protect = {active_build} if active_build else set()
-            deleted, freed = prune_builds(log_dir, keep, protect)
+            failed = []
+            deleted, freed = prune_builds(log_dir, keep, protect, failed)
             for name in deleted:
                 self.registry.drop_pinned(ws, name)
-            result = {"ok": True, "deleted": len(deleted), "freed": freed}
+            result = {"ok": True, "deleted": len(deleted), "freed": freed,
+                      "failed": failed}
         self.registry.stats_cache.pop(ws, None)
         if live is not None:
             live._builds_cache = None

@@ -112,6 +112,16 @@ class ComputeOutcome(unittest.TestCase):
         self.assertEqual(info["pkg_durations"], {"a": 0.8, "b": 1.9})
         self.assertEqual(info["duration"], 99.0)  # the shutdown timestamp
 
+    @unittest.skipIf(os.geteuid() == 0, "root can write anywhere")
+    def test_read_only_build_dir_keeps_its_outcome_in_memory(self):
+        bdir = make_build(self.ws, BUILD_ID, [
+            queued(0.1, "a"), started(0.2, "a"), ended(1.0, "a"), SHUTDOWN])
+        os.chmod(bdir, 0o500)
+        self.addCleanup(os.chmod, bdir, 0o700)
+        info = self.mon._compute_outcome(bdir)
+        self.assertFalse(os.path.exists(os.path.join(bdir, self.mon.OUTCOME_FILE)))
+        self.assertEqual(self.mon._read_outcome(bdir), info)
+
     def test_old_cache_format_is_recomputed(self):
         bdir = make_build(self.ws, BUILD_ID,
                           [queued(0.1, "a"), started(0.2, "a"),
@@ -159,6 +169,20 @@ class PruneHelpers(unittest.TestCase):
         self.assertIn("build_2026-08-01_10-00-00", self.names())
         self.assertNotIn("build_2026-08-02_10-00-00", self.names())
         self.assertNotIn("build_2026-08-01_10-00-00", deleted)
+
+    @unittest.skipIf(os.geteuid() == 0, "root can delete anything")
+    def test_undeletable_run_is_not_reported_deleted(self):
+        locked = os.path.join(self.log_dir, "build_2026-01-01_00-00-00")
+        os.makedirs(os.path.join(locked, "pkg"), exist_ok=True)
+        with open(os.path.join(locked, "pkg", "big.log"), "w") as f:
+            f.write("x" * 1000)
+        os.chmod(os.path.join(locked, "pkg"), 0o500)  # its files cannot go
+        self.addCleanup(os.chmod, os.path.join(locked, "pkg"), 0o700)
+        failed = []
+        deleted, freed = prune_builds(self.log_dir, 1, failed=failed)
+        self.assertNotIn("build_2026-01-01_00-00-00", deleted)
+        self.assertIn("build_2026-01-01_00-00-00", failed)
+        self.assertTrue(os.path.isdir(locked))
 
     def test_remove_guards_traversal(self):
         outside = os.path.join(self.tmp.name, "precious")

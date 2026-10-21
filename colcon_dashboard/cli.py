@@ -302,8 +302,11 @@ def prune_cmd(info, alive, workspace, keep, log_base):
         log_dir = os.path.join(workspace, log_base)
         if not os.path.isdir(log_dir):
             raise SystemExit(f"no log directory: {log_dir}")
-        names, freed = prune_builds(log_dir, keep)
+        failed = []
+        names, freed = prune_builds(log_dir, keep, failed=failed)
         deleted = len(names)
+        for name in failed:
+            print(f"could not delete all of {name}: another user owns some files")
     print(f"deleted {deleted} runs, freed {fmt_bytes(freed)}")
 
 

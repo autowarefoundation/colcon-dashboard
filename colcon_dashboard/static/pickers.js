@@ -499,8 +499,10 @@ export function initBuildPicker() {
     const r = await (await fetch(
       `/api/builds/prune?ws=${encodeURIComponent(WS)}&keep=3`,
       { method: 'POST' })).json();
-    toast(r.ok ? `Deleted ${r.deleted} builds, freed ${fmtBytes(r.freed)}.`
-               : `Not deleted: ${r.error}`, r.ok ? 'info' : '');
+    const stuck = r.failed?.length
+      ? ` ${r.failed.length} could not be deleted: another user owns some of their files.` : '';
+    toast(r.ok ? `Deleted ${r.deleted} builds, freed ${fmtBytes(r.freed)}.${stuck}`
+               : `Not deleted: ${r.error}`, r.ok && !stuck ? 'info' : '');
     openBuildPicker();
   };
 }

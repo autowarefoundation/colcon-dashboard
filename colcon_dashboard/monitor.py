@@ -38,19 +38,23 @@ def dir_size(path):
 
 
 def remove_build_dir(log_dir, build):
-    """Delete one run's log directory; returns the bytes freed."""
+    """Delete one run's log directory; returns the bytes freed. Files that
+    this user cannot delete (a sudo or Docker build) stay, and do not count
+    as freed: the caller can see the directory still exists."""
     log_dir = os.path.realpath(log_dir)
     target = os.path.realpath(os.path.join(log_dir, build))
     if not target.startswith(log_dir + os.sep) or not os.path.isdir(target):
         return 0
-    freed = dir_size(target)
+    before = dir_size(target)
     shutil.rmtree(target, ignore_errors=True)
-    return freed
+    return before - (dir_size(target) if os.path.isdir(target) else 0)
 
 
-def prune_builds(log_dir, keep, protect=()):
+def prune_builds(log_dir, keep, protect=(), failed=None):
     """Keep the newest `keep` runs of each kind (build_, test_) and
-    delete the rest; returns (deleted names, bytes freed)."""
+    delete the rest; returns (deleted names, bytes freed). A run that
+    could not be removed fully is not in the deleted names; it goes into
+    the `failed` list, when the caller passes one."""
     keep = max(1, keep)
     deleted = []
     freed = 0
@@ -64,7 +68,11 @@ def prune_builds(log_dir, keep, protect=()):
             if name in protect:
                 continue
             freed += remove_build_dir(log_dir, name)
-            deleted.append(name)
+            if os.path.isdir(os.path.join(log_dir, name)):
+                if failed is not None:
+                    failed.append(name)
+            else:
+                deleted.append(name)
     return deleted, freed
 
 
@@ -86,6 +94,7 @@ class BuildMonitor:
         self.last_request = time.time()
         self._prev_cpu = {}
         self._builds_cache = None
+        self._outcome_mem = {}  # build_dir -> (events.log mtime, outcome)
         self.analyses = {}  # (build_dir, pkg) -> AIAnalysis
         self.active_flag = False
         self.prev_info = None  # the previous run's outcome, for comparisons
@@ -162,7 +171,7 @@ class BuildMonitor:
             with open(os.path.join(build_dir, self.OUTCOME_FILE)) as f:
                 info = json.load(f)
         except (OSError, ValueError):
-            return None
+            return self._outcome_from_memory(build_dir)
         if not isinstance(info, dict) or info.get("v") != self.OUTCOME_V:
             return None  # an older cache format: recompute lazily
         return info
@@ -241,8 +250,22 @@ class BuildMonitor:
             with open(os.path.join(build_dir, self.OUTCOME_FILE), "w") as f:
                 json.dump(info, f)
         except OSError:
-            pass
+            # a read-only log dir (a sudo or Docker build): keep it in memory,
+            # or every listing reads the whole events.log again
+            self._outcome_mem[build_dir] = (mtime, info)
         return info
+
+    def _outcome_from_memory(self, build_dir):
+        hit = self._outcome_mem.get(build_dir)
+        if not hit:
+            return None
+        try:
+            if os.stat(os.path.join(build_dir, "events.log")).st_mtime == hit[0]:
+                return hit[1]
+        except OSError:
+            pass
+        self._outcome_mem.pop(build_dir, None)
+        return None
 
     def list_builds(self):
         try:
