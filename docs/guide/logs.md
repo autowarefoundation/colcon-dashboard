@@ -9,7 +9,7 @@ description: >-
 
 The dock opens with a pinned **build log** tab: the whole build, as a terminal shows it, with `Starting >>>` and `Finished <<<` lines between the output of every package. Click any package in the graph or the timeline to open its own tab next to it. Each tab has its own scrollback, so logs never interleave.
 
-<!-- TODO(images): dock with a failed package pane and the failures tab open. -->
+![The failure summary: the failed package, the step and the command that failed, and the end of its log](../assets/screens/failures.webp)
 
 - A pane follows new output until you scroll up. The **⤓ follow** button re-engages.
 - Panes open at the tail for an instant start. **⤒ load all** fetches the whole history in one click.

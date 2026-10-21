@@ -7,7 +7,7 @@ description: >-
 
 # The dashboard
 
-<!-- TODO(images): full-page screenshot with header, graph, timeline, and dock visible. -->
+![The whole page during a live build: the header, the progress counters, the dependency graph, and the log dock](../assets/screens/graph.webp)
 
 ## Header
 

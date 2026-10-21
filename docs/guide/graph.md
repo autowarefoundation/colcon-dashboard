@@ -9,7 +9,7 @@ description: >-
 
 Every package in the build, laid out left to right by dependency depth. An edge points from a dependency to the package that needs it.
 
-<!-- TODO(images): graph view mid-build, with building nodes and the failure blast radius. -->
+![The dependency graph zoomed in during a build: done packages in green, building packages in blue with a halo](../assets/screens/graph-zoom.webp)
 
 ## Node states
 

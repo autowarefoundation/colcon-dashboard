@@ -4,7 +4,7 @@ A live web dashboard for `colcon build`. It shows how many packages are done, bu
 
 **Documentation: <https://autowarefoundation.github.io/colcon-dashboard/>**
 
-<!-- TODO(images): hero screenshot of the graph view on a live build. -->
+![The dashboard during a live Autoware build: the timeline, the dependency graph, and the log of a failed package](https://raw.githubusercontent.com/autowarefoundation/colcon-dashboard/main/docs/assets/screens/overview.webp)
 
 The server uses only the Python standard library, with zero dependencies. It works on any colcon workspace (ROS 2, Autoware, or anything else that colcon builds). It reads the log files that colcon already writes under `log/`, so any build appears, from any terminal, with any options.
 

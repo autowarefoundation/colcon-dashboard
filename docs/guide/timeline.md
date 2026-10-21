@@ -9,7 +9,7 @@ description: >-
 
 A Gantt chart of every started package, with a dashed now line. The time axis stays at the top while you scroll the rows. A long package name ends in "…", and its tooltip shows the full name. Bar colors match the graph states.
 
-<!-- TODO(images): timeline of a parallel build, longest bars sorted on top. -->
+![The timeline of a parallel build, sorted by duration, with the longest packages on top](../assets/screens/timeline.webp)
 
 The **order** menu sorts the rows: by start time, by duration with the longest build first, by end time, or by status with failures on top. The choice persists.
 
