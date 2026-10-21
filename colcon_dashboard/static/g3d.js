@@ -21,6 +21,7 @@ export const G3 = {
 };
 
 export function hexRgb(h) {
+  if (h.startsWith('rgb')) return h.match(/[\d.]+/g).slice(0, 3).map(Number);  // mix3d output
   h = h.replace('#', '').trim();
   if (h.length === 3) h = h.split('').map(c => c + c).join('');
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16),
@@ -312,8 +313,10 @@ export function draw3d(now) {
     if (sset && !sset.has(name)) alpha *= 0.12;
     if (stKey === 'excluded') alpha *= 0.35;
 
-    ctx.globalAlpha = alpha;
+    const hot = name === G3.hovered;  // the package under the pointer lights up
+    ctx.globalAlpha = hot ? Math.max(alpha, 1) : alpha;
     ctx.fillStyle = doomed ? mix3d(c.surface, c.critical, 0.08) : pal.fill;
+    if (hot) ctx.fillStyle = mix3d(ctx.fillStyle, '#ffffff', 0.28);
     ctx.beginPath();
     ctx.roundRect(sx - w / 2, sy - h / 2, w, h, rad);
     ctx.fill();
@@ -324,7 +327,7 @@ export function draw3d(now) {
     ctx.globalAlpha = strokeAlpha;
     ctx.strokeStyle = doomed ? c.critical : (isNext ? c.accent : pal.stroke);
     ctx.lineWidth = Math.max(0.5,
-      (stKey === 'building' || stKey === 'failed' ? 1.5 : 1) * s * 1.4);
+      (stKey === 'building' || stKey === 'failed' ? 1.5 : 1) * s * 1.4) * (hot ? 1.7 : 1);
     if (sset && sset.has(name)) {  // a search match keeps an accent ring
       ctx.strokeStyle = c.accent;
       ctx.globalAlpha = Math.max(strokeAlpha, 0.9);
