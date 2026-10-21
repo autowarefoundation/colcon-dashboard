@@ -13,7 +13,7 @@ A live web dashboard for `colcon build`. It shows how many packages are done, bu
 
 <!-- TODO(images): hero screenshot of the graph view on a live build goes here. -->
 
-The server uses only the Python standard library, with zero dependencies. It works on any colcon workspace (ROS 2, Autoware, or anything else that colcon builds). For every build, colcon writes `events.log` and `logger_all.log` under `log/`. The dashboard reads these files and needs nothing from colcon itself. Any build shows up, from any terminal, with any options.
+The server uses only the Python standard library, with zero dependencies. It works on any colcon workspace (ROS 2, Autoware, or anything else that colcon builds). For every build, colcon writes `events.log` and `logger_all.log` under `log/`. The dashboard reads these files and needs nothing from colcon itself. Any build appears, from any terminal, with any options.
 
 === "Ubuntu PPA"
 

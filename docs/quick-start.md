@@ -15,7 +15,7 @@ $ colcon-dashboard .
 http://127.0.0.1:8642/?ws=%2Fhome%2Fuser%2Fws
 ```
 
-The dashboard needs nothing from colcon. It reads the log files that colcon already writes. Any build shows up, from any terminal, with any options.
+The dashboard needs nothing from colcon. It reads the log files that colcon already writes. Any build appears, from any terminal, with any options.
 
 One server runs per machine, on port 8642, and serves every workspace. The `ws` query parameter picks the workspace, so each browser tab can show a different one. A file lock refuses duplicate servers. The server keeps running after the build, so the pages stay available for the next build and for post-mortems.
 
