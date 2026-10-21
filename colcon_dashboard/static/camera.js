@@ -104,42 +104,70 @@ export function initPanZoom() {
     if (moved <= 4 && downNode) emit('open-pkg', downNode);
   });
   svg.addEventListener('pointerleave', () => { hideTooltip(); clearFocus(); });
+  // Pan and zoom do not change the view box on each step: that redraws
+  // every edge at screen scale, which lags when zoomed in. They draw a
+  // picture three views wide once, show the moving view over it with a
+  // CSS transform, and set the real view box once when the gesture ends.
+  let pic = null;  // { big: the drawn view box, vb: the view shown now }
+  const wrapRect = () => svg.parentElement.getBoundingClientRect();
+  const picStart = vb => {
+    const big = { x: vb.x - vb.w, y: vb.y - vb.h, w: 3 * vb.w, h: 3 * vb.h };
+    svg.classList.add('bigpan');
+    svg.setAttribute('viewBox', `${big.x} ${big.y} ${big.w} ${big.h}`);
+    mode().onViewBox?.(big);
+    pic = { big, vb };
+  };
+  const picShow = vb => {
+    if (!pic) picStart(vb);
+    const b = pic.big;
+    // a view that leaves the drawn picture: draw it again around this view
+    if (vb.x < b.x || vb.y < b.y || vb.x + vb.w > b.x + b.w || vb.y + vb.h > b.y + b.h) {
+      picEnd();
+      picStart(vb);
+    }
+    pic.vb = vb;
+    // the transform that makes the drawn picture (3x the wrapper, at -1x,
+    // -1x) look like the view vb in the wrapper
+    const r = wrapRect();
+    const W = r.width, H = r.height, D = pic.big;
+    const sD = Math.min(3 * W / D.w, 3 * H / D.h);
+    const s = Math.min(W / vb.w, H / vb.h);
+    const S = s / sD;
+    const tx = (W - vb.w * s) / 2 + W - S * (3 * W - D.w * sD) / 2 + s * (D.x - vb.x);
+    const ty = (H - vb.h * s) / 2 + H - S * (3 * H - D.h * sD) / 2 + s * (D.y - vb.y);
+    svg.style.transform = `translate(${tx}px, ${ty}px) scale(${S})`;
+  };
+  const picEnd = () => {
+    if (!pic) return;
+    const vb = pic.vb;
+    pic = null;
+    svg.classList.remove('bigpan');
+    svg.style.transform = '';
+    setViewBox(vb);
+  };
+  const shownVb = () => pic?.vb || App.vb;
+
+  let wheelTimer = null;
   svg.addEventListener('wheel', ev => {
     ev.preventDefault();
     if (!App.vb || drag) return;  // no zoom while a pan moves the picture
     breakFollow();
     Force.autoFit = false;
-    const [wx, wy] = clientToWorld(ev.clientX, ev.clientY);
-    const vb = App.vb;
-    const f = Math.min(Math.max((ev.deltaY > 0 ? 1.18 : 1 / 1.18),
-                                120 / vb.w), 200000 / vb.w);
+    const vb = shownVb();
+    const r = wrapRect();
+    const s = viewScale(vb, r);
+    const wx = vb.x + (ev.clientX - r.left - (r.width - vb.w * s) / 2) / s;
+    const wy = vb.y + (ev.clientY - r.top - (r.height - vb.h * s) / 2) / s;
+    // the zoom follows the wheel distance: a mouse notch (about 100 px)
+    // zooms about 25%, and a trackpad zooms smoothly in small steps
+    const px = ev.deltaY * (ev.deltaMode === 1 ? 33 : ev.deltaMode === 2 ? 400 : 1);
+    const f = Math.min(Math.max(Math.exp(px * 0.0022), 0.5, 120 / vb.w), 2, 200000 / vb.w);
     // keep the world point under the cursor fixed while scaling
-    setViewBox({
-      x: wx + (vb.x - wx) * f,
-      y: wy + (vb.y - wy) * f,
-      w: vb.w * f,
-      h: vb.h * f,
-    });
+    picShow({ x: wx + (vb.x - wx) * f, y: wy + (vb.y - wy) * f, w: vb.w * f, h: vb.h * f });
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(picEnd, 160);  // the gesture rests: draw it sharp
   }, { passive: false });
   let drag = null;
-  // The pan does not change the view box on each move: that redraws every
-  // edge at screen scale, which lags when zoomed in. It shows a picture
-  // three views wide, slides it with a transform, and sets the view box
-  // once when the drag ends.
-  const bigStart = () => {
-    const vb = drag.vb;
-    const big = { x: vb.x - vb.w, y: vb.y - vb.h, w: 3 * vb.w, h: 3 * vb.h };
-    svg.classList.add('bigpan');
-    svg.setAttribute('viewBox', `${big.x} ${big.y} ${big.w} ${big.h}`);
-    mode().onViewBox?.(big);
-    drag.big = true;
-  };
-  const bigEnd = () => {
-    svg.classList.remove('bigpan');
-    svg.style.transform = '';
-    drag.big = false;
-    setViewBox({ ...drag.vb, x: drag.vb.x - drag.dx / drag.s, y: drag.vb.y - drag.dy / drag.s });
-  };
   svg.addEventListener('pointerdown', ev => {
     if (!App.vb) return;
     downNode = ev.target.closest('.node')?.dataset.name || null;
@@ -157,8 +185,10 @@ export function initPanZoom() {
       }
     }
     breakFollow();  // a manual pan releases the build-follow camera
-    drag = { x: ev.clientX, y: ev.clientY, vb: { ...App.vb }, dx: 0, dy: 0, big: false,
-             s: viewScale(App.vb, svg.getBoundingClientRect()) };
+    clearTimeout(wheelTimer);
+    picEnd();  // a zoom still on the picture: settle it first
+    drag = { x: ev.clientX, y: ev.clientY, vb: { ...App.vb },
+             s: viewScale(App.vb, wrapRect()) };
     svg.classList.add('panning');
     svg.setPointerCapture(ev.pointerId);
   });
@@ -175,17 +205,9 @@ export function initPanZoom() {
     if (drag && App.vb) {
       moved = Math.max(moved,
         Math.abs(ev.clientX - drag.x) + Math.abs(ev.clientY - drag.y));
-      if (!drag.big) bigStart();
-      drag.dx = ev.clientX - drag.x;
-      drag.dy = ev.clientY - drag.y;
-      const r = svg.parentElement.getBoundingClientRect();
-      if (Math.abs(drag.dx) > 0.9 * r.width || Math.abs(drag.dy) > 0.9 * r.height) {
-        // past the drawn margin: settle here and slide on from this point
-        bigEnd();
-        drag = { ...drag, x: ev.clientX, y: ev.clientY, vb: { ...App.vb }, dx: 0, dy: 0 };
-        bigStart();
-      }
-      svg.style.transform = `translate(${drag.dx}px, ${drag.dy}px)`;
+      picShow({ ...drag.vb,
+                x: drag.vb.x - (ev.clientX - drag.x) / drag.s,
+                y: drag.vb.y - (ev.clientY - drag.y) / drag.s });
       return;
     }
     const g = ev.target.closest('.node');
@@ -194,7 +216,7 @@ export function initPanZoom() {
   });
   const end = () => {
     if (Force.dragging) { Force.dragging.fx = Force.dragging.fy = null; Force.dragging = null; }
-    if (drag?.big) bigEnd();
+    if (drag) picEnd();
     drag = null;
     svg.classList.remove('panning');
   };
