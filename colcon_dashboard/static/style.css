@@ -198,7 +198,7 @@ body.offline #sysmeters { display: none; }
   display: block;
   fill: currentColor;
 }
-#themeBtn, #stopBtn, #sysBtn, #bellBtn { padding: 4px 8px; }
+#themeBtn, #settingsBtn, #sysBtn, #bellBtn { padding: 4px 8px; }
 #helpBtn { padding: 4px 9px; font-weight: 650; }
 #bellBtn.on { color: var(--accent); border-color: var(--accent); }
 #bellBtn.blocked { color: var(--warning); border-color: var(--warning); }
@@ -385,11 +385,11 @@ body.offline #sysmeters { display: none; }
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 #scopeCtl { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
-#scopeCtl .seg { display: inline-flex; }
-#scopeCtl .seg button { border-radius: 0; margin-left: -1px; }
-#scopeCtl .seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
-#scopeCtl .seg button:last-child { border-radius: 0 6px 6px 0; }
-#scopeCtl .seg button.on {
+:is(#scopeCtl, #settings) .seg { display: inline-flex; }
+:is(#scopeCtl, #settings) .seg button { border-radius: 0; margin-left: -1px; }
+:is(#scopeCtl, #settings) .seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+:is(#scopeCtl, #settings) .seg button:last-child { border-radius: 0 6px 6px 0; }
+:is(#scopeCtl, #settings) .seg button.on {
   color: var(--accent);
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
@@ -871,6 +871,40 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   background: rgba(0, 0, 0, 0.35);
 }
 #help[hidden] { display: none; }
+
+/* settings dialog: the overlay and the box of the help overlay */
+#settings {
+  position: fixed;
+  inset: 0;
+  z-index: 46;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+#settings[hidden] { display: none; }
+#settings .wsbox.setbox { width: min(560px, 92vw); max-height: 88vh; overflow: auto; }
+.setbox .sclose { padding: 1px 7px; font-weight: 400; }
+.setbox section + section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--grid); }
+.setbox h3 { margin: 0 0 8px; font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.setbox h3 .sver { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 4px; }
+.setbox .srow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; padding: 4px 0; }
+.setbox .sk { width: 110px; flex: none; color: var(--ink2); }
+.setbox label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.setbox .snote { font-size: 12px; color: var(--muted); margin: 2px 0 6px 122px; }
+.setbox section:last-child .snote { margin-left: 0; margin-top: 8px; }
+.setbox dl { display: grid; grid-template-columns: 130px 1fr; gap: 5px 12px; margin: 0; font-size: 12px; }
+.setbox dt { color: var(--ink2); }
+.setbox dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.setbox code { font: 11.5px var(--mono); }
+.setbox .muted { color: var(--muted); }
+.setbox button.copy { padding: 0 5px; font-size: 11px; }
+.setbox #stopBtn { margin-top: 4px; }
+@media (max-width: 520px) {
+  .setbox .sk { width: 100%; }
+  .setbox .snote { margin-left: 0; }
+  .setbox dl { grid-template-columns: 1fr; }
+}
 #help .wsbox.helpbox { width: min(480px, 92vw); }  /* outspecify .wsbox */
 .helpbox table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .helpbox td { padding: 5px 8px; border-top: 1px solid var(--grid); color: var(--ink2); }
@@ -1024,7 +1058,8 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 .wshero p { margin: 0; color: var(--ink2); font-size: 14px; }
 #wspick .wsbox,
 #bpick .wsbox,
-#help .wsbox {
+#help .wsbox,
+#settings .wsbox {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1035,7 +1070,8 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 }
 #wspick .wshead,
 #bpick .wshead,
-#help .wshead {
+#help .wshead,
+#settings .wshead {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1307,6 +1343,7 @@ body.offline #ws, body.offline #buildid { border-color: rgba(255, 255, 255, 0.45
 #confirm code { font-family: var(--mono); background: var(--page); padding: 0 4px; border-radius: 4px; }
 /* the red of the Windows 7 close button: glossy on top, deep at the bottom */
 #confirm button.danger,
+#settings button.danger,
 #bpick button.danger {
   color: #fff;
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25);
@@ -1314,6 +1351,7 @@ body.offline #ws, body.offline #buildid { border-color: rgba(255, 255, 255, 0.45
   border-color: var(--critical-deep);
 }
 #confirm button.danger:hover,
+#settings button.danger:hover,
 #bpick button.danger:hover {
   border-color: var(--critical-deep);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 0 3px color-mix(in srgb, var(--critical) 22%, transparent);

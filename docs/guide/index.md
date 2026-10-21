@@ -11,7 +11,7 @@ description: >-
 
 ## Header
 
-The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The workspace path opens the workspace picker. The build id opens the build picker. The bell button turns on desktop notifications: the build finished, the build failed, or the first package failed. A second click adds a quiet chime. The ? button (or the ++question++ key) opens the keyboard and mouse reference. The power button stops the server, after a confirmation. When the server stops answering, the whole top panel turns red.
+The header shows the workspace path, the build id, a LIVE / COMPLETE / FAILED / STOPPED badge, and the parallel worker count. The workspace path opens the workspace picker. The build id opens the build picker. The bell button turns on desktop notifications: the build finished, the build failed, or the first package failed. A second click adds a quiet chime. The ? button (or the ++question++ key) opens the keyboard and mouse reference. The gear button opens the settings: the theme, the notifications, the log pane defaults, and a page layout reset. The settings also show the server configuration, and they hold the button that stops the server, after a confirmation. When the server stops answering, the whole top panel turns red.
 
 The browser tab mirrors the build even in the background. The title shows `[42%] workspace` while the build runs, and then ✓ or ✗. The favicon changes color with it.
 
@@ -52,4 +52,4 @@ After the build ends, one summary line replaces the tiles, for example "502 pack
 
 ## Theme
 
-The page starts in the light theme. The theme button switches between light and dark, and the page keeps your choice. Every view recolors instantly, including the 3D canvas.
+The page starts in the light theme. The theme button (or the settings) switches between light and dark, and the page keeps your choice. Every view recolors instantly, including the 3D canvas.

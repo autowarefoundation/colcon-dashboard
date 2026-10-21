@@ -44,7 +44,7 @@
   <button id="bellBtn" title="build notifications"></button>
   <button id="helpBtn" title="keyboard shortcuts and mouse gestures (?)">?</button>
   <button id="themeBtn" title="theme: light / dark">◐</button>
-  <button id="stopBtn" title="stop the dashboard server"><svg viewBox="0 0 24 24"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg></button>
+  <button id="settingsBtn" title="settings"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></button>
   </div>
 </header>
 
@@ -227,6 +227,32 @@
   <div class="cbox wsbox helpbox">
     <div class="wshead">Keyboard &amp; mouse</div>
     <table><tbody></tbody></table>
+  </div>
+</div>
+
+<div id="settings" hidden>
+  <div class="wsbox setbox" role="dialog" aria-label="Settings">
+    <div class="wshead">Settings <button class="sclose" title="close (Esc)">✕</button></div>
+    <section>
+      <h3>This browser</h3>
+      <div class="srow"><span class="sk">Theme</span>
+        <span class="seg" id="setTheme"><button data-v="light">light</button><button data-v="dark">dark</button></span></div>
+      <div class="srow"><span class="sk">Notifications</span>
+        <span class="seg" id="setNotify"><button data-v="off">off</button><button data-v="on">on</button><button data-v="sound">on + chime</button></span>
+        <button id="setNotifyTest" title="send a notification now">test</button></div>
+      <div class="snote" id="setNotifyNote" hidden></div>
+      <div class="srow"><span class="sk">Log panes</span>
+        <label><input type="checkbox" id="setTs"> timestamps</label>
+        <label><input type="checkbox" id="setWrap"> wrap long lines</label></div>
+      <div class="srow"><span class="sk">Page layout</span>
+        <button id="setReset" title="forget the view, the split, the dock height, and the graph layout">reset to the defaults</button></div>
+    </section>
+    <section>
+      <h3>Server <span class="sver"></span></h3>
+      <dl id="setServer"></dl>
+      <div class="snote">To change these, edit the configuration file, then restart the server with <code>colcon-dashboard --restart-service</code>.</div>
+      <div class="srow"><button id="stopBtn" class="danger" title="stop the dashboard server">Stop the server…</button></div>
+    </section>
   </div>
 </div>
 

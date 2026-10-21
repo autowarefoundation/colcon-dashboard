@@ -5,15 +5,16 @@ import { $ } from './util.js';
 
 export function initTheme() {
   applyTheme(savedTheme());
-  $('#themeBtn').onclick = () => {
-    const next = savedTheme() === 'light' ? 'dark' : 'light';
-    try { localStorage.setItem('cmc-theme', next); } catch (e) { /* not kept */ }
-    applyTheme(next);
-  };
+  $('#themeBtn').onclick = () => setTheme(savedTheme() === 'light' ? 'dark' : 'light');
+}
+
+export function setTheme(mode) {
+  try { localStorage.setItem('cmc-theme', mode); } catch (e) { /* not kept */ }
+  applyTheme(mode);
 }
 
 // light, unless the viewer picked dark (an old "auto" also means light)
-function savedTheme() {
+export function savedTheme() {
   try { return localStorage.getItem('cmc-theme') === 'dark' ? 'dark' : 'light'; }
   catch (e) { return 'light'; }
 }

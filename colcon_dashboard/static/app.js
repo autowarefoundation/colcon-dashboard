@@ -11,6 +11,7 @@ import { mode } from './modes.js';
 import { initNotify } from './notify.js';
 import { initBuildPicker, initStop, initWsPicker } from './pickers.js';
 import { startStatePolling, tickElapsed } from './poller.js';
+import { initSettings } from './settings.js';
 import { App } from './state.js';
 import { initTheme } from './theme.js';
 import { $, mirrorPressed } from './util.js';
@@ -27,6 +28,7 @@ initGraphSearch();
 initGanttPan();
 initNotify();
 initHelp();
+initSettings();
 $('#closeAll').onclick = () => {
   for (const name of [...App.panes.keys()]) closePane(name);
   activatePane(BUILD_PANE);

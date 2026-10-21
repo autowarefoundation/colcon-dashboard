@@ -22,7 +22,7 @@ ALLOWED = {
     'ansi': [],
     'app': ['ai', 'bus', 'camera', 'dock', 'g3d', 'gantt', 'gsearch',
             'header', 'help', 'modes', 'notify', 'pickers', 'poller',
-            'state', 'theme', 'util', 'views'],
+            'settings', 'state', 'theme', 'util', 'views'],
     'bus': [],
     # camera/force/graph/g3d/gsearch are one subsystem (the graph views)
     # and may import each other; only hoisted functions cross at load time
@@ -43,6 +43,7 @@ ALLOWED = {
     'notify': ['bus', 'logo', 'state', 'util'],
     'pickers': ['graph', 'header', 'state', 'toasts', 'util'],
     'poller': ['bus', 'header', 'modes', 'state', 'toasts', 'util'],
+    'settings': ['notify', 'state', 'theme', 'util'],
     'state': [],
     'theme': ['bus', 'util'],
     'toasts': ['util'],

@@ -114,38 +114,56 @@ export const BELL_ICONS = {
          '-.5.15-.78h-4c.01 1.1.9 2 2.01 2z"/></svg>',
 };
 
-export function initNotify() {
+// why desktop notifications cannot show, or null when they can
+export function notifyBlocked() {
+  return !('Notification' in window) ? 'this browser has no desktop notifications'
+    : !window.isSecureContext ? 'browsers allow them only on localhost or https; '
+                                + 'open the dashboard through localhost or an SSH tunnel'
+      : Notification.permission === 'denied' ? 'the browser blocks them for this site'
+        : null;
+}
+
+export function getNotifyMode() { return notifyMode; }
+
+export function setNotifyMode(m) {
+  notifyMode = MODES.includes(m) ? m : 'off';
+  localStorage.setItem('cmc-notify', notifyMode);
+  if (notifyMode !== 'off' && 'Notification' in window
+      && Notification.permission === 'default') {
+    Notification.requestPermission().then(applyBell, applyBell);
+  }
+  if (notifyMode === 'sound') ding();  // the click is the audio gesture
+  applyBell();
+}
+
+// a notification now, even with the page focused: shows that it works
+export function testNotify() {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try { new Notification('colcon-dashboard', { body: 'Notifications work.' }); } catch (e) { /* denied */ }
+  }
+  if (notifyMode === 'sound') ding();
+}
+
+function applyBell() {
   const btn = $('#bellBtn');
-  const apply = () => {
-    btn.classList.toggle('on', notifyMode !== 'off');
-    btn.innerHTML = BELL_ICONS[notifyMode] || BELL_ICONS.off;
-    btn.title = notifyMode === 'off'
-      ? 'notifications off - click to notify when the build finishes'
-      : notifyMode === 'on'
-        ? 'notifications on - click to also play a chime'
-        : 'notifications + chime - click to switch off';
-    btn.setAttribute('aria-pressed', notifyMode !== 'off' ? 'true' : 'false');
-    // the bell must not claim notifications that the browser refuses
-    const blocked = notifyMode === 'off' ? null
-      : !('Notification' in window) ? 'this browser has no desktop notifications'
-        : !window.isSecureContext ? 'browsers allow them only on localhost or https; '
-                                    + 'open the dashboard through localhost or an SSH tunnel'
-          : Notification.permission === 'denied' ? 'the browser blocks them for this site'
-            : null;
-    btn.classList.toggle('blocked', !!blocked);
-    if (blocked) btn.title += `\n\nDesktop notifications do not work: ${blocked}.`;
-  };
-  btn.onclick = () => {
-    notifyMode = MODES[(MODES.indexOf(notifyMode) + 1) % MODES.length];
-    localStorage.setItem('cmc-notify', notifyMode);
-    if (notifyMode !== 'off' && 'Notification' in window
-        && Notification.permission === 'default') {
-      Notification.requestPermission().then(apply, apply);
-    }
-    if (notifyMode === 'sound') ding();  // the click is the audio gesture
-    apply();
-  };
-  apply();
+  btn.classList.toggle('on', notifyMode !== 'off');
+  btn.innerHTML = BELL_ICONS[notifyMode] || BELL_ICONS.off;
+  btn.title = notifyMode === 'off'
+    ? 'notifications off - click to notify when the build finishes'
+    : notifyMode === 'on'
+      ? 'notifications on - click to also play a chime'
+      : 'notifications + chime - click to switch off';
+  btn.setAttribute('aria-pressed', notifyMode !== 'off' ? 'true' : 'false');
+  // the bell must not claim notifications that the browser refuses
+  const blocked = notifyMode === 'off' ? null : notifyBlocked();
+  btn.classList.toggle('blocked', !!blocked);
+  if (blocked) btn.title += `\n\nDesktop notifications do not work: ${blocked}.`;
+}
+
+export function initNotify() {
+  $('#bellBtn').onclick = () =>
+    setNotifyMode(MODES[(MODES.indexOf(notifyMode) + 1) % MODES.length]);
+  applyBell();
   // audio needs a user gesture per page load: the first interaction
   // primes the context, or a reloaded chime setting would stay silent
   const prime = () => {
