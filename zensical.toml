@@ -17,6 +17,7 @@ nav = [
   { "Getting started" = [
     { "Install" = "install.md" },
     { "Quick start" = "quick-start.md" },
+    { "Desktop app" = "desktop-app.md" },
     { "Configuration" = "configuration.md" },
     { "Remote machine" = "remote.md" },
     { "Troubleshooting" = "troubleshooting.md" },

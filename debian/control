@@ -14,6 +14,10 @@ Rules-Requires-Root: no
 Package: python3-colcon-dashboard
 Architecture: all
 Depends: ${misc:Depends}, ${python3:Depends}
+Recommends: python3-gi,
+            gir1.2-gtk-4.0,
+            gir1.2-adw-1,
+            gir1.2-webkit-6.0
 Description: live web dashboard for colcon builds
  Colcon Dashboard serves a single-page dashboard for a colcon
  workspace: a state-colored dependency graph with layered, force, and 3D
@@ -23,3 +27,8 @@ Description: live web dashboard for colcon builds
  One server per machine serves every workspace. Start it with the
  colcon-dashboard command, or install it as a systemd user service
  with colcon-dashboard --install-service.
+ .
+ The desktop app (Colcon Dashboard in the applications menu, or
+ colcon-dashboard --app) shows the dashboard in its own window and
+ starts and stops the server. It uses the recommended GTK 4,
+ libadwaita, and WebKitGTK packages.

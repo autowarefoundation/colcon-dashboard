@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Colcon Dashboard
+GenericName=Build Dashboard
+Comment=Watch colcon builds live: dependency graph, timeline, and logs
+Exec=colcon-dashboard --app
+Icon=io.github.autowarefoundation.ColconDashboard
+Terminal=false
+Categories=Development;
+Keywords=colcon;ROS;ROS 2;build;dashboard;autoware;
+StartupNotify=true
+StartupWMClass=io.github.autowarefoundation.ColconDashboard

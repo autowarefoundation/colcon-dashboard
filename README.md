@@ -16,6 +16,7 @@ The server uses only the Python standard library, with zero dependencies. It wor
 - **AI failure analysis**: one click starts a headless [claude](https://claude.com/claude-code) run on a failed package and streams the investigation live.
 - **System pressure**: a per-core heatmap plus CPU, RAM, and swap meters, because a colcon build can exhaust the machine.
 - **Build history**: every build and `colcon test` run, with outcomes, durations, and deltas against the previous run.
+- **Desktop app**: the dashboard in its own window, from the applications menu. The app starts and stops the server for you.
 
 ## Install
 
@@ -40,6 +41,8 @@ pipx upgrade colcon-dashboard
 Plain `pip install colcon-dashboard` also works in a virtual environment with Python 3.8 or newer.
 
 The service starts the server at login. Open <http://127.0.0.1:8642/> and pick your workspace. That is the whole setup. After an upgrade, run `colcon-dashboard --restart-service` to load the new version.
+
+To use the dashboard in its own window, run `colcon-dashboard --app`, or open Colcon Dashboard from the applications menu. The [desktop app page](https://autowarefoundation.github.io/colcon-dashboard/desktop-app/) lists what it needs.
 
 The [install page](https://autowarefoundation.github.io/colcon-dashboard/install/) covers the install from a checkout and the service commands.
 

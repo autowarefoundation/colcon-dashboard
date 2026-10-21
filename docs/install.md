@@ -84,6 +84,8 @@ The server needs Python 3.8 or newer and nothing else. It has zero dependencies.
 
 The service starts the server at login and restarts it on failure. Open <http://127.0.0.1:8642/> and pick your workspace. That is the whole setup.
 
+To use the dashboard in its own window instead of a browser, install the [desktop app](desktop-app.md).
+
 After an upgrade, run `colcon-dashboard --restart-service`. The running server stays on the old version until a restart.
 
 Without the service, `colcon-dashboard` starts the server in the terminal. It runs in the foreground until you press Ctrl+C.
@@ -105,10 +107,11 @@ colcon-dashboard --service-status
 
 ## Uninstall
 
-1. Remove the service first. If you remove the package first, the service file stays and fails at every login.
+1. Remove the service first. If you remove the package first, the service file stays and fails at every login. For a pipx or pip install, also remove the applications menu entry.
 
     ```bash
     colcon-dashboard --uninstall-service
+    colcon-dashboard --uninstall-desktop   # pipx or pip
     ```
 
 2. Remove the package:
@@ -121,7 +124,7 @@ colcon-dashboard --service-status
 3. To remove your settings and the list of recent workspaces too, delete these directories:
 
     ```bash
-    rm -r ~/.config/colcon-dashboard ~/.cache/colcon-dashboard
+    rm -r ~/.config/colcon-dashboard ~/.cache/colcon-dashboard ~/.local/share/colcon-dashboard
     ```
 
 The dashboard never changes your sources or your build results. Into the build log directories it writes only a small `.colcon-dashboard.json` file per run, and `claude-analysis.json` files for the AI failure analyses that you start. These files go away with the logs.
