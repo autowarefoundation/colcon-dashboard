@@ -9,7 +9,7 @@
   --surface: #fbfdff;
   --ink: #0a1f3d;
   --ink2: #3b5170;
-  --muted: #7a8ba3;
+  --muted: #5d6f88;  /* 4.7:1 on --page, WCAG AA for small text */
   --grid: #dbe5f0;
   --baseline: #b3c4d8;
   --border: rgba(10, 31, 61, 0.12);
@@ -146,14 +146,16 @@ button.on {
 }
 #topbar .brand { font-size: 14px; white-space: nowrap; display: flex; align-items: center; gap: 7px; }
 #topbar .brand b { font-weight: 650; }
-#topbar .brand .logo { width: 22px; height: 22px; display: block; }
-#topbar .brand .logo.dark { display: none; }
+#topbar .brand .logo { width: 22px; height: 22px; }
+/* each logo comes as a light and a dark image; the theme shows one */
+img.logo { display: inline-block; vertical-align: middle; }
+img.logo.dark { display: none; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) #topbar .brand .logo.light { display: none; }
-  :root:not([data-theme="light"]) #topbar .brand .logo.dark { display: block; }
+  :root:not([data-theme="light"]) img.logo.light { display: none; }
+  :root:not([data-theme="light"]) img.logo.dark { display: inline-block; }
 }
-:root[data-theme="dark"] #topbar .brand .logo.light { display: none; }
-:root[data-theme="dark"] #topbar .brand .logo.dark { display: block; }
+:root[data-theme="dark"] img.logo.light { display: none; }
+:root[data-theme="dark"] img.logo.dark { display: inline-block; }
 #topbar .meta {
   display: flex;
   align-items: baseline;
@@ -992,7 +994,7 @@ body.nows #dock, body.nows #topbar .meta { display: none; }
 body.nows #wspick { position: static; flex: 1; flex-direction: column; align-items: center; justify-content: flex-start; background: none; padding-top: 8vh; overflow: auto; }
 body.nows #wspick .wsbox { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); }
 body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 22px; max-width: min(620px, 92vw); }
-.wshero svg { width: 56px; height: 56px; }
+.wshero .logo { width: 64px; height: 64px; }
 .wshero h1 { margin: 8px 0 4px; font-size: 26px; font-weight: 650; letter-spacing: -0.01em; }
 .wshero p { margin: 0; color: var(--ink2); font-size: 14px; }
 #wspick .wsbox,

@@ -483,6 +483,10 @@ export function initBuildPicker() {
   overlay.addEventListener('click', ev => {
     if (ev.target === overlay) overlay.hidden = true;
   });
+  // Esc closes it, as the help table says for every overlay
+  document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && !overlay.hidden) overlay.hidden = true;
+  });
   const prune = $('#bprune');
   prune.onclick = async () => {
     if (!prune.classList.contains('sure')) {
@@ -517,10 +521,14 @@ export function initStop() {
       'and all dashboard pages go offline until you start it again.';
     btns.hidden = false;
     overlay.hidden = false;
+    overlay.querySelector('.cancel').focus();  // Enter cancels, Esc too
   };
   overlay.querySelector('.cancel').onclick = () => { overlay.hidden = true; };
   overlay.addEventListener('click', ev => {
     if (ev.target === overlay) overlay.hidden = true;
+  });
+  document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && !overlay.hidden) overlay.hidden = true;
   });
   const ok = overlay.querySelector('.ok');
   ok.onclick = async () => {
@@ -545,8 +553,9 @@ export function initStop() {
       App.stopped = true;
       setBadge('offline', 'STOPPED');
       text.innerHTML = '<b>Server stopped.</b> The page is now offline. ' +
-        'Start the server again with <code>colcon-dashboard</code>, ' +
-        'or run a build with the plugin switched on, then reload this page.';
+        'Start the server again with <code>colcon-dashboard --start-service</code> ' +
+        'if it runs as a service, or with <code>colcon-dashboard</code>. ' +
+        'Then reload this page.';
       btns.hidden = true;
     } else {
       text.textContent =

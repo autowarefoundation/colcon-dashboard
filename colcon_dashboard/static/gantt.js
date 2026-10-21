@@ -124,7 +124,9 @@ export function initGanttPan() {
     if (!drag) return;
     if (drag.moved <= 4 && drag.name && ev.type === 'pointerup') {
       emit('open-pkg', drag.name);
-      emit('focus-pkg', drag.name);
+      // in the side-by-side view, the graph flies to the package too; the
+      // Timeline-only view stays where the user put it
+      if (App.view !== 'gantt') emit('focus-pkg', drag.name);
     }
     drag = null;
     wrap.classList.remove('panning');
