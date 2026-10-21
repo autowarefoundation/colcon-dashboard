@@ -4,21 +4,22 @@ import { $ } from './util.js';
 /* ---------------- theme ---------------- */
 
 export function initTheme() {
-  const saved = localStorage.getItem('cmc-theme') || 'auto';
-  applyTheme(saved);
+  applyTheme(savedTheme());
   $('#themeBtn').onclick = () => {
-    const cur = localStorage.getItem('cmc-theme') || 'auto';
-    const next = cur === 'auto' ? 'light' : cur === 'light' ? 'dark' : 'auto';
-    localStorage.setItem('cmc-theme', next);
+    const next = savedTheme() === 'light' ? 'dark' : 'light';
+    try { localStorage.setItem('cmc-theme', next); } catch (e) { /* not kept */ }
     applyTheme(next);
   };
 }
+
+// light, unless the viewer picked dark (an old "auto" also means light)
+function savedTheme() {
+  try { return localStorage.getItem('cmc-theme') === 'dark' ? 'dark' : 'light'; }
+  catch (e) { return 'light'; }
+}
+
 // Material Symbols, Apache-2.0, inlined so the page stays self-contained
 export const THEME_ICONS = {
-  auto: '<svg viewBox="0 0 24 24"><path d="M10.85 12.65h2.3L12 9l-1.15 3.65z' +
-        'M20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 ' +
-        '23.31 15.31 20H20v-4.69L23.31 12 20 8.69zM14.3 16l-.7-2h-3.2l-.7 ' +
-        '2H7.8L11 7h2l3.2 9h-1.9z"/></svg>',
   light: '<svg viewBox="0 0 24 24"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 ' +
          '1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 ' +
          '3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 ' +
@@ -34,10 +35,8 @@ export const THEME_ICONS = {
 };
 
 export function applyTheme(mode) {
-  if (mode === 'auto') delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = mode;
-  $('#themeBtn').innerHTML = THEME_ICONS[mode] || THEME_ICONS.auto;
-  const next = { auto: 'light', light: 'dark', dark: 'system' }[mode] || 'light';
-  $('#themeBtn').title = `theme: ${mode === 'auto' ? 'system' : mode} - click for ${next}`;
+  document.documentElement.dataset.theme = mode;
+  $('#themeBtn').innerHTML = THEME_ICONS[mode];
+  $('#themeBtn').title = `theme: ${mode} - click for ${mode === 'light' ? 'dark' : 'light'}`;
   emit('theme-changed');
 }

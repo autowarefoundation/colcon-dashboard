@@ -52,4 +52,4 @@ After the build ends, one summary line replaces the tiles, for example "502 pack
 
 ## Theme
 
-The page follows the system theme. The theme button cycles system, light, and dark. Every view recolors instantly, including the 3D canvas.
+The page starts in the light theme. The theme button switches between light and dark, and the page keeps your choice. Every view recolors instantly, including the 3D canvas.

@@ -30,31 +30,6 @@
   --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
   --dock-h: 260px;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --page: #06101e;
-    --surface: #0c1a2d;
-    --ink: #e8f1fb;
-    --ink2: #b0c2d8;
-    --muted: #7489a4;
-    --grid: #1a2b42;
-    --baseline: #2c4160;
-    --border: rgba(214, 232, 252, 0.12);
-    --accent: #3a95ea;
-    --good: #2bd14a;
-    --warning: #f5b335;
-    --serious: #f08a3c;
-    --critical: #ef5a45;
-    --critical-deep: #b8301e;
-    --ctl-top: #17283f;
-    --ctl-bot: #0f1d31;
-    --ctl-border: #2a3f5c;
-    --ctl-hl: rgba(255, 255, 255, 0.07);
-    --ctl-shadow: rgba(0, 0, 0, 0.3);
-    --shine: rgba(255, 255, 255, 0.22);
-  }
-}
 :root[data-theme="dark"] {
   color-scheme: dark;
   --page: #06101e;
@@ -150,10 +125,6 @@ button.on {
 /* each logo comes as a light and a dark image; the theme shows one */
 img.logo { display: inline-block; vertical-align: middle; }
 img.logo.dark { display: none; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) img.logo.light { display: none; }
-  :root:not([data-theme="light"]) img.logo.dark { display: inline-block; }
-}
 :root[data-theme="dark"] img.logo.light { display: none; }
 :root[data-theme="dark"] img.logo.dark { display: inline-block; }
 #topbar .meta {
@@ -521,10 +492,6 @@ svg.efocus .edge.hl { stroke: var(--accent); stroke-width: 1.6; stroke-opacity: 
 #graph .node:hover rect.box, #graph .node.hot rect.box {
   filter: drop-shadow(0 0 3px var(--glow)) brightness(1.06);
   stroke-width: 2.2;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) #graph .node:hover rect.box,
-  :root:not([data-theme="light"]) #graph .node.hot rect.box { filter: drop-shadow(0 0 4px var(--glow)) brightness(1.3); }
 }
 :root[data-theme="dark"] #graph .node:hover rect.box,
 :root[data-theme="dark"] #graph .node.hot rect.box { filter: drop-shadow(0 0 4px var(--glow)) brightness(1.3); }
@@ -1009,14 +976,6 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   --t4: #2a78d6; --t5: #8250df; --t6: #0e7f86; --t7: #6e6a60;
   --t8: #85817a; --t9: #d03b3b; --t10: #0ca30c; --t11: #bf8700;
   --t12: #3987e5; --t13: #a475f9; --t14: #1b9aaa; --t15: #0b0b0b;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --t0: #7a7a72; --t1: #f2726f; --t2: #57ce53; --t3: #e2b93d;
-    --t4: #6da7ec; --t5: #c792ea; --t6: #56c8d8; --t7: #c3c2b7;
-    --t8: #8f8d85; --t9: #ff8a80; --t10: #7ae077; --t11: #ffd25e;
-    --t12: #86b6ef; --t13: #d7b3ff; --t14: #7fe3f0; --t15: #ffffff;
-  }
 }
 :root[data-theme="dark"] {
   --t0: #7a7a72; --t1: #f2726f; --t2: #57ce53; --t3: #e2b93d;
