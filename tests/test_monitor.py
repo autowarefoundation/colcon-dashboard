@@ -391,6 +391,13 @@ class ScanOnce(unittest.TestCase):
         pkg = json.loads(mon.state_json)["packages"]["a"]
         self.assertEqual((pkg["s"], pkg.get("tf")), ("failed", True))
 
+    def test_unchanged_build_reuses_the_package_table(self):
+        mon, state, _ = self.scan(mtime=time.time() - 600)
+        cached = mon._pkg_cached
+        mon.scan_once()  # no new events: the same table, a fresh state
+        self.assertIs(mon._pkg_cached, cached)
+        self.assertEqual(json.loads(mon.state_json)["packages"], state["packages"])
+
     def test_dead_build_states(self):
         mon, state, _ = self.scan(mtime=time.time() - 600)
         self.assertFalse(state["active"])

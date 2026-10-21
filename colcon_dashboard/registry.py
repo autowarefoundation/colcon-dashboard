@@ -125,6 +125,7 @@ class Registry:
             return None
         key = (ws, build)
         with self.lock:
+            self._stop_idle_pinned()
             mon = self.monitors.get(key)
             if mon is None:
                 mon = BuildMonitor(ws, self.log_base, pin_build=build)
@@ -136,6 +137,18 @@ class Registry:
         if touch:
             self.touch(ws)
         return mon
+
+    PINNED_IDLE = 600  # seconds without a request before a pinned monitor stops
+
+    def _stop_idle_pinned(self):
+        """A monitor for an old build (opened from the build picker) keeps a
+        thread and a log buffer. Stop it when nobody asked for it for a
+        while; the next request starts a fresh one. Call with self.lock."""
+        now = time.time()
+        for key, mon in list(self.monitors.items()):
+            if key[1] is not None and now - mon.last_request > self.PINNED_IDLE:
+                del self.monitors[key]
+                mon.stopped = True
 
     def _auto_pruned(self, ws, deleted):
         """After a monitor auto-prunes: mirror the manual-prune cleanup."""

@@ -95,6 +95,8 @@ class BuildMonitor:
         self._prev_cpu = {}
         self._builds_cache = None
         self._outcome_mem = {}  # build_dir -> (events.log mtime, outcome)
+        self._pkg_key = self._graph_key = None  # the inputs of the cached tables
+        self._pkg_cached = None
         self.analyses = {}  # (build_dir, pkg) -> AIAnalysis
         self.active_flag = False
         self.prev_info = None  # the previous run's outcome, for comparisons
@@ -437,56 +439,65 @@ class BuildMonitor:
         epoch0 = parse_build_id_time(build_id) or (ev.mtime() - ev.last_t)
 
         jobs = ev.jobs
-        done = {n for n, j in jobs.items() if j["ended"] is not None and j["rc"] == 0}
-        packages = {}
-        for name, job in jobs.items():
-            entry = {}
-            if job["ended"] is not None:
-                if job["rc"] == 0 and job["test_failed"]:
-                    st = "failed"  # a test run: the tests failed, not the job
-                    entry["tf"] = True
-                elif job["rc"] == 0:
-                    st = "done"
-                elif job["rc"] == "SIGINT":
-                    st = "aborted"
+        # The package table changes only with new events or when the build
+        # stops: rebuild it then, not on every tick (it stats every log file).
+        pkg_key = (build_id, ev.offset, bool(active))
+        if pkg_key == self._pkg_key:
+            packages, counts = self._pkg_cached
+        else:
+            done = {n for n, j in jobs.items() if j["ended"] is not None and j["rc"] == 0}
+            job_names = set(jobs)
+            packages = {}
+            for name, job in jobs.items():
+                entry = {}
+                if job["ended"] is not None:
+                    if job["rc"] == 0 and job["test_failed"]:
+                        st = "failed"  # a test run: the tests failed, not the job
+                        entry["tf"] = True
+                    elif job["rc"] == 0:
+                        st = "done"
+                    elif job["rc"] == "SIGINT":
+                        st = "aborted"
+                    else:
+                        st = "failed"
+                        entry["rc"] = job["rc"]
+                elif job["started"] is not None:
+                    st = "building" if active else "aborted"
+                    entry["ph"] = job["phase"]
+                    if job["pct"] is not None:
+                        entry["pct"] = job["pct"]
+                elif job["skipped"]:
+                    st = "skipped"
                 else:
-                    st = "failed"
-                    entry["rc"] = job["rc"]
-            elif job["started"] is not None:
-                st = "building" if active else "aborted"
-                entry["ph"] = job["phase"]
-                if job["pct"] is not None:
-                    entry["pct"] = job["pct"]
-            elif job["skipped"]:
-                st = "skipped"
-            else:
-                blockers = job["deps"] & set(jobs) - done
-                failed_deps = {b for b in blockers
-                               if jobs[b]["ended"] is not None and jobs[b]["rc"] != 0}
-                if failed_deps or any(jobs[b]["skipped"] for b in blockers):
-                    st = "blocked"
-                elif not blockers:
-                    st = "ready" if active else "skipped"
-                else:
-                    st = "waiting" if active else "skipped"
-            entry["s"] = st
-            if job["started"] is not None:
-                entry["t0"] = round(epoch0 + job["started"], 2)
-            if job["ended"] is not None:
-                entry["t1"] = round(epoch0 + job["ended"], 2)
-            if job["stderr_lines"]:
-                entry["err"] = job["stderr_lines"]
-            if job["started"] is not None:
-                try:
-                    entry["log"] = os.path.getsize(
-                        os.path.join(build_dir, name, "stdout_stderr.log"))
-                except OSError:
-                    pass
-            packages[name] = entry
+                    blockers = job["deps"] & job_names - done
+                    failed_deps = {b for b in blockers
+                                   if jobs[b]["ended"] is not None and jobs[b]["rc"] != 0}
+                    if failed_deps or any(jobs[b]["skipped"] for b in blockers):
+                        st = "blocked"
+                    elif not blockers:
+                        st = "ready" if active else "skipped"
+                    else:
+                        st = "waiting" if active else "skipped"
+                entry["s"] = st
+                if job["started"] is not None:
+                    entry["t0"] = round(epoch0 + job["started"], 2)
+                if job["ended"] is not None:
+                    entry["t1"] = round(epoch0 + job["ended"], 2)
+                if job["stderr_lines"]:
+                    entry["err"] = job["stderr_lines"]
+                if job["started"] is not None:
+                    try:
+                        entry["log"] = os.path.getsize(
+                            os.path.join(build_dir, name, "stdout_stderr.log"))
+                    except OSError:
+                        pass
+                packages[name] = entry
 
-        counts = {}
-        for p in packages.values():
-            counts[p["s"]] = counts.get(p["s"], 0) + 1
+            counts = {}
+            for p in packages.values():
+                counts[p["s"]] = counts.get(p["s"], 0) + 1
+            self._pkg_key = pkg_key
+            self._pkg_cached = (packages, counts)
 
         state = {
             "workspace": self.workspace,
@@ -504,30 +515,39 @@ class BuildMonitor:
             "seq": self.seq,
         }
 
-        idx = self.index.packages
-        graph_pkgs = {}
-        for name in set(idx) | set(jobs) | ev.unselected:
-            if name in self.direct_deps:
-                deps = sorted(self.direct_deps[name])
-            else:
-                deps = sorted(idx.get(name, {}).get("deps") or [])
-            graph_pkgs[name] = {
-                "deps": deps,
-                "build_type": idx.get(name, {}).get("build_type", ""),
-                "path": idx.get(name, {}).get("path", ""),
-                "in_build": name in jobs,
-            }
-        prev = None
-        if self.prev_info:
-            prev = {"id": self.prev_info.get("id"),
-                    "duration": self.prev_info.get("duration"),
-                    "durations": self.prev_info.get("pkg_durations") or {}}
-        graph = {"build_id": build_id, "packages": graph_pkgs, "prev": prev}
+        graph_key = (build_id, ev.offset, self.index.scanned_at,
+                     id(self.prev_info))
+        graph = None
+        if graph_key != self._graph_key:
+            idx = self.index.packages
+            graph_pkgs = {}
+            for name in set(idx) | set(jobs) | ev.unselected:
+                if name in self.direct_deps:
+                    deps = sorted(self.direct_deps[name])
+                else:
+                    deps = sorted(idx.get(name, {}).get("deps") or [])
+                graph_pkgs[name] = {
+                    "deps": deps,
+                    "build_type": idx.get(name, {}).get("build_type", ""),
+                    "path": idx.get(name, {}).get("path", ""),
+                    "in_build": name in jobs,
+                }
+            prev = None
+            if self.prev_info:
+                prev = {"id": self.prev_info.get("id"),
+                        "duration": self.prev_info.get("duration"),
+                        "durations": self.prev_info.get("pkg_durations") or {}}
+            graph = {"build_id": build_id, "packages": graph_pkgs, "prev": prev}
+            self._graph_key = graph_key
 
         self.seq += 1
+        state_json = json.dumps(state, separators=(",", ":"))
+        graph_json = (json.dumps(graph, separators=(",", ":"))
+                      if graph is not None else None)
         with self.lock:
-            self.state_json = json.dumps(state, separators=(",", ":"))
-            self.graph_json = json.dumps(graph, separators=(",", ":"))
+            self.state_json = state_json
+            if graph_json is not None:
+                self.graph_json = graph_json
 
     def run(self):
         while not self.stopped:

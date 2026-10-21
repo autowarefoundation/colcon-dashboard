@@ -81,6 +81,15 @@ class ApiTest(unittest.TestCase):
         except urllib.error.HTTPError as e:
             return e.code
 
+    def test_idle_pinned_monitor_stops(self):
+        reg = Handler.registry
+        mon = reg.monitor(self.ws, BUILD_ID)
+        mon.last_request -= reg.PINNED_IDLE + 1
+        fresh = reg.monitor(self.ws, BUILD_ID)
+        self.assertTrue(mon.stopped)
+        self.assertIsNot(fresh, mon)
+        self.assertFalse(fresh.stopped)
+
     def test_cross_site_post_is_refused(self):
         host = self.base.split("//", 1)[1]
         evil = {"Origin": "https://evil.example"}
