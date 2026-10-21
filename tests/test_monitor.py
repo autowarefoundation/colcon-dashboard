@@ -12,7 +12,7 @@ from colcon_dashboard.monitor import (
 )
 from tests.helpers import (
     ended, event_line, make_build, queued, started, stderr_line,
-    stdout_line,
+    stdout_line, test_failure,
 )
 
 BUILD_ID = "build_2026-08-09_10-00-00"
@@ -47,6 +47,19 @@ class ComputeOutcome(unittest.TestCase):
         ])
         self.assertEqual(info["outcome"], "failed")
         self.assertEqual(info["failed"], 1)
+
+    def test_test_failures_fail_the_run(self):
+        # colcon test: the job ends with rc 0, and a TestFailure event says
+        # that its tests failed
+        _, info = self.outcome([
+            queued(0.1, "a"), queued(0.1, "b"),
+            started(0.2, "a"), test_failure(0.9, "a"), ended(1.0, "a"),
+            started(1.1, "b"), ended(2.0, "b"),
+            stdout_line(2.1, "b", "TestFailure: echoed, not an event\n"),
+            SHUTDOWN,
+        ])
+        self.assertEqual(info["outcome"], "failed")
+        self.assertEqual((info["failed"], info["test_failed"]), (0, 1))
 
     def test_sigint_aborted(self):
         _, info = self.outcome([
@@ -342,6 +355,17 @@ class ScanOnce(unittest.TestCase):
         self.assertEqual(graph["packages"]["c"]["deps"], ["b"])
         self.assertEqual(graph["packages"]["b"]["deps"], ["a"])
         self.assertTrue(graph["packages"]["c"]["in_build"])
+
+    def test_failed_tests_mark_the_package_failed(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        make_build(self.tmp.name, BUILD_ID, [
+            queued(0.1, "a"), started(0.2, "a"), test_failure(0.9, "a"),
+            ended(1.0, "a"), SHUTDOWN])
+        mon = BuildMonitor(self.tmp.name)
+        mon.scan_once()
+        pkg = json.loads(mon.state_json)["packages"]["a"]
+        self.assertEqual((pkg["s"], pkg.get("tf")), ("failed", True))
 
     def test_dead_build_states(self):
         mon, state, _ = self.scan(mtime=time.time() - 600)

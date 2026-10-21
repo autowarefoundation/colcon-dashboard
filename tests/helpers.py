@@ -34,6 +34,11 @@ def ended(t, name, rc=0):
                       "{{'identifier': '{}', 'rc': {}}}".format(name, rc_repr))
 
 
+def test_failure(t, name):
+    """colcon test sends this when a package's tests fail; its rc stays 0."""
+    return event_line(t, name, "TestFailure", "{{'identifier': '{}'}}".format(name))
+
+
 def stdout_line(t, name, text):
     return event_line(t, name, "StdoutLine", "{{'line': {!r}}}".format(text.encode()))
 

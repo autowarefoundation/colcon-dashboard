@@ -36,6 +36,12 @@ export function fmtDur(sec) {
   return parts.map(([v, unit]) => v + unit).join(' ');
 }
 
+// why a package failed: its exit code, or "tests failed" for a colcon
+// test run, which keeps the exit code at 0 (p.tf)
+export function failNote(p) {
+  return p?.tf ? 'tests failed' : `rc ${p?.rc ?? '?'}`;
+}
+
 // the exact time in words, for tooltips: "44 minutes 12.4 seconds"
 export function fmtDurLong(sec) {
   if (sec == null || !isFinite(sec)) return '–';

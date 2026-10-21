@@ -114,7 +114,7 @@ class EventLog:
             job = self.jobs[name] = {
                 "deps": set(), "queued": None, "started": None, "ended": None,
                 "rc": None, "skipped": False, "phase": "", "pct": None,
-                "stderr_lines": 0,
+                "stderr_lines": 0, "test_failed": False,
             }
         return job
 
@@ -193,6 +193,11 @@ class EventLog:
             pm = PROGRESS_RE.search(payload)
             if pm:
                 self._job(name)["phase"] = pm.group(1).decode("utf-8", "replace")
+        elif event == b"TestFailure":
+            # colcon test keeps the job's rc at 0 when tests fail and sends
+            # this event instead
+            self._job(name)["test_failed"] = True
+            self.buildlog.append(f"[{t:9.3f}s] Tests failed in {name}")
         elif event == b"JobSkipped":
             self._job(name)["skipped"] = True
         elif event == b"JobUnselected":

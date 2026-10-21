@@ -379,6 +379,7 @@ export function outcomeHtml(b) {
   if (b.total) {
     const parts = [`${b.done}/${b.total}`];
     if (b.failed) parts.push(`${b.failed} failed`);
+    if (b.test_failed) parts.push(`${b.test_failed} with failing tests`);
     if (b.aborted) parts.push(`${b.aborted} aborted`);
     if (b.skipped) parts.push(`${b.skipped} skipped`);
     h += `<span class="wmeta bstats">${parts.join(' · ')}</span>`;

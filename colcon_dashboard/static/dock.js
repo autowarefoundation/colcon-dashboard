@@ -5,7 +5,7 @@ import { label } from './graph.js';
 import { mode } from './modes.js';
 import { App } from './state.js';
 import { toast } from './toasts.js';
-import { $, copyText, esc, fmtDur, wsParam } from './util.js';
+import { $, copyText, esc, failNote, fmtDur, wsParam } from './util.js';
 
 /* ---------------- log dock ---------------- */
 
@@ -538,7 +538,7 @@ export function buildFailItem(name, st) {
   el.innerHTML = `
     <div class="fhead">
       <button class="fjump mono" title="find this package in the graph">${esc(label(name))}</button>
-      <span class="chip failed">rc ${esc(st.rc ?? '?')}</span>
+      <span class="chip failed">${esc(failNote(st))}</span>
       ${dur ? `<span class="fmeta">failed after ${dur}</span>` : ''}
       <span class="grow"></span>
       <button class="askai" ${App.ai ? '' : 'hidden'} title="explain this failure with the claude CLI">✦ ask claude</button>
@@ -666,7 +666,7 @@ on('build-changed', (s, first) => {
 });
 
 on('pkg-failed', name => {
-  toast(`<b>${name}</b> failed (rc ${App.pkgs[name]?.rc ?? '?'}) - click to open its log`, '',
+  toast(`<b>${name}</b> failed (${failNote(App.pkgs[name])}) - click to open its log`, '',
         () => openPane(name));
   openPane(name);
 });

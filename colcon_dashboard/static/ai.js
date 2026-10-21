@@ -1,7 +1,7 @@
 import { on } from './bus.js';
 import { openPane, pollPane, STATE_DOT } from './dock.js';
 import { App } from './state.js';
-import { wsParam } from './util.js';
+import { failNote, wsParam } from './util.js';
 
 /* ---- AI failure analysis: shell out to the claude CLI on the server ---- */
 
@@ -40,7 +40,7 @@ export function updatePaneHeads() {
     const st = App.pkgs[name];
     const chip = p.el.querySelector('.chip');
     const s = st ? st.s : 'waiting';
-    chip.textContent = s + (st?.rc != null && s === 'failed' ? ` rc ${st.rc}` : '');
+    chip.textContent = s + (s === 'failed' && (st.tf || st.rc != null) ? ` ${failNote(st)}` : '');
     chip.className = 'chip ' + s;
     const ask = p.el.querySelector('.askai');
     if (ask) ask.hidden = !(App.ai && s === 'failed');

@@ -3,7 +3,7 @@ import { fitGraph, setViewBox } from './camera.js';
 import { GS, runGraphSearch } from './gsearch.js';
 import { mode } from './modes.js';
 import { App } from './state.js';
-import { $, esc, fmtDur, svgEl, WS } from './util.js';
+import { $, esc, failNote, fmtDur, svgEl, WS } from './util.js';
 
 /* ---------------- graph ---------------- */
 
@@ -513,7 +513,7 @@ export function showNodeTooltip(name, ev) {
   if (p) {
     let st = p.s;
     if (p.s === 'building' && p.ph) st += ` · ${p.ph}` + (p.pct != null ? ` ${p.pct}%` : '');
-    if (p.s === 'failed') st += ` · rc ${p.rc ?? '?'}`;
+    if (p.s === 'failed') st += ` · ${failNote(p)}`;
     rows.push(`state <b>${st}</b>`);
     const dur = p.t1 ? p.t1 - p.t0
       : p.t0 && App.active ? (Date.now() / 1000 - p.t0) : null;

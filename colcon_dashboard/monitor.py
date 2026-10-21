@@ -155,7 +155,7 @@ class BuildMonitor:
         return os.path.join(self.log_base, candidates[-1]) if candidates else None
 
     OUTCOME_FILE = ".colcon-dashboard.json"
-    OUTCOME_V = 2  # bump when _compute_outcome grows new fields
+    OUTCOME_V = 3  # bump when _compute_outcome grows new fields
 
     def _read_outcome(self, build_dir):
         try:
@@ -171,6 +171,7 @@ class BuildMonitor:
         """One streaming pass over events.log; cached in the build folder."""
         path = os.path.join(build_dir, "events.log")
         total = done = failed = aborted = skipped = 0
+        test_failed = set()  # names: colcon test keeps their rc at 0
         shutdown = False
         starts = {}     # name bytes -> start t
         durations = {}  # per-package seconds, successful jobs only
@@ -204,6 +205,10 @@ class BuildMonitor:
                                     - starts[em.group(2)], 1)
                         else:
                             failed += 1
+                    elif b"TestFailure" in line:
+                        m = EVENT_RE.match(line)
+                        if m and m.group(3) == b"TestFailure":
+                            test_failed.add(m.group(2))
                     elif b"JobSkipped" in line:
                         skipped += 1
                     elif b"EventReactorShutdown" in line:
@@ -214,7 +219,7 @@ class BuildMonitor:
             return None  # the build still runs: nothing to cache
         # Skipped jobs never emit JobEnded, so a finished run satisfies
         # done+failed+aborted+skipped == total even after a failure cascade.
-        if failed:
+        if failed or test_failed:
             outcome = "failed"
         elif aborted or not shutdown \
                 or done + failed + aborted + skipped < total:
@@ -229,7 +234,8 @@ class BuildMonitor:
             duration = round(float(m.group(1)), 1)
         info = {"v": self.OUTCOME_V, "outcome": outcome, "done": done,
                 "total": total, "failed": failed, "aborted": aborted,
-                "skipped": skipped, "duration": duration,
+                "skipped": skipped, "test_failed": len(test_failed),
+                "duration": duration,
                 "pkg_durations": durations}
         try:
             with open(os.path.join(build_dir, self.OUTCOME_FILE), "w") as f:
@@ -413,7 +419,10 @@ class BuildMonitor:
         for name, job in jobs.items():
             entry = {}
             if job["ended"] is not None:
-                if job["rc"] == 0:
+                if job["rc"] == 0 and job["test_failed"]:
+                    st = "failed"  # a test run: the tests failed, not the job
+                    entry["tf"] = True
+                elif job["rc"] == 0:
                     st = "done"
                 elif job["rc"] == "SIGINT":
                     st = "aborted"
