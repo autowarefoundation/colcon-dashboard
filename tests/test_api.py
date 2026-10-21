@@ -72,6 +72,33 @@ class ApiTest(unittest.TestCase):
         except urllib.error.HTTPError as e:
             return e.code, e.read(), ""
 
+    def request(self, path, method="GET", headers=None):
+        req = urllib.request.Request(self.base + path, data=b"" if method == "POST" else None,
+                                     method=method, headers=headers or {})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                return r.status
+        except urllib.error.HTTPError as e:
+            return e.code
+
+    def test_cross_site_post_is_refused(self):
+        host = self.base.split("//", 1)[1]
+        evil = {"Origin": "https://evil.example"}
+        self.assertEqual(self.request("/api/favorite?ws=/nope", "POST", evil), 403)
+        self.assertEqual(self.request("/api/favorite?ws=/nope", "POST",
+                                      {"Sec-Fetch-Site": "cross-site"}), 403)
+        # the dashboard page itself, and clients without Origin, pass
+        self.assertEqual(self.request("/api/favorite?ws=/nope", "POST",
+                                      {"Origin": "http://" + host}), 200)
+        self.assertEqual(self.request("/api/favorite?ws=/nope", "POST"), 200)
+
+    def test_foreign_host_header_is_refused(self):
+        # DNS rebinding: a foreign name that resolves to 127.0.0.1
+        port = self.server.server_address[1]
+        self.assertEqual(self.request("/api/ping", headers={"Host": f"evil.example:{port}"}), 403)
+        for host in (f"localhost:{port}", f"127.0.0.1:{port}", f"[::1]:{port}"):
+            self.assertEqual(self.request("/api/ping", headers={"Host": host}), 200, host)
+
     def post(self, path):
         req = urllib.request.Request(self.base + path, data=b"", method="POST")
         try:

@@ -9,6 +9,13 @@ description: >-
 
 Workspace endpoints take a `ws=<path>` query parameter. Add `build=<build id>` to read an older build.
 
+The server refuses requests that a web page on another site sends. It answers `403` in these cases:
+
+- A POST with an `Origin` header that differs from the server's own address, or with `Sec-Fetch-Site: cross-site`. Without this check, any open web page could delete build logs or stop the server.
+- Any request with a `Host` header that names another machine. The header must be an IP address, `localhost`, or the host name of this machine. This check blocks DNS rebinding (a foreign domain name that points at `127.0.0.1`).
+
+Clients that send no `Origin` header, such as `curl` and the `colcon-dashboard` command, pass.
+
 | Endpoint | Returns |
 |---|---|
 | `/api/workspaces` | The recent workspaces, with live build info where known |

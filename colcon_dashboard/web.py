@@ -1,7 +1,9 @@
 """The HTTP layer: the API endpoints and the static single-page UI."""
 
+import ipaddress
 import json
 import os
+import socket
 import threading
 import time
 from http.server import BaseHTTPRequestHandler
@@ -18,6 +20,47 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 MIME = {".html": "text/html", ".js": "text/javascript", ".css": "text/css",
         ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon"}
+
+
+def _local_names():
+    names = {"localhost"}
+    for name in (socket.gethostname(), socket.getfqdn()):
+        if name:
+            names.add(name.lower())
+    return names
+
+
+LOCAL_NAMES = _local_names()
+
+
+def host_allowed(host):
+    """Accept a Host header that names this machine: an IP address,
+    localhost, or the machine's own name. A DNS rebinding attack points a
+    foreign domain name at 127.0.0.1, and its Host header fails here."""
+    if not host:
+        return True  # HTTP/1.0 clients; browsers always send Host
+    name = host.lower()
+    if name.startswith("["):  # [::1]:8642
+        name = name[1:name.find("]")] if "]" in name else name[1:]
+    elif name.count(":") == 1:
+        name = name.rsplit(":", 1)[0]
+    try:
+        ipaddress.ip_address(name)
+        return True
+    except ValueError:
+        pass
+    return name in LOCAL_NAMES or name.endswith(".localhost")
+
+
+def same_origin(headers):
+    """Refuse a request that a page on another site sent. Browsers send
+    Origin with every cross-site POST, also with mode: 'no-cors'. The CLI
+    and curl send no Origin and pass."""
+    origin = headers.get("Origin")
+    if origin is not None:
+        return urlparse(origin).netloc.lower() == (headers.get("Host") or "").lower()
+    site = headers.get("Sec-Fetch-Site")
+    return site in (None, "same-origin", "none")
 
 
 def query_int(q, key, default):
@@ -42,6 +85,18 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _trusted(self, post):
+        """Answer 403 to a foreign Host header, or to a POST from another
+        site: without this, any web page could stop the server, delete
+        build logs, or start claude runs."""
+        if not host_allowed(self.headers.get("Host")):
+            self._send(403, json.dumps({"error": "unknown Host header"}))
+            return False
+        if post and not same_origin(self.headers):
+            self._send(403, json.dumps({"error": "cross-site request"}))
+            return False
+        return True
+
     def _monitor(self, q):
         ws = q.get("ws", [None])[0]
         if not ws:
@@ -49,6 +104,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.registry.monitor(ws, q.get("build", [None])[0])
 
     def do_POST(self):
+        if not self._trusted(post=True):
+            return
         url = urlparse(self.path)
         q = parse_qs(url.query)
         path = unquote(url.path)
@@ -181,6 +238,8 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(200, json.dumps(result))
 
     def do_GET(self):
+        if not self._trusted(post=False):
+            return
         url = urlparse(self.path)
         q = parse_qs(url.query)
         path = unquote(url.path)
