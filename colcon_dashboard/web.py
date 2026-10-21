@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from . import __version__
 from .ai import CLAUDE_BIN
-from .config import CONFIG
+from .config import CONFIG, save_extra_roots
 from .events import BUILD_DIR_RE
 from .monitor import prune_builds, remove_build_dir
 from .registry import discover_all, update_status
@@ -71,6 +71,8 @@ class Handler(BaseHTTPRequestHandler):
             self.registry.set_favorite(
                 os.path.realpath(os.path.expanduser(ws)), fav)
             return self._send(200, json.dumps({"ok": True}))
+        if path == "/api/scan-roots/set":
+            return self._set_scan_roots(q)
         if path in ("/api/builds/delete", "/api/builds/prune"):
             return self._manage_builds(path, q)
         if path.startswith("/api/analyze/"):
@@ -99,6 +101,30 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps(
                 {"ok": True, "started": started}))
         self._send(404, json.dumps({"error": "not found"}))
+
+    def _set_scan_roots(self, q):
+        """Replace the extra_roots list in config.ini with q's paths."""
+        roots = []
+        for p in q.get("path", []):
+            p = p.strip()
+            if not p:
+                continue
+            if any(c in p for c in ",;#\n"):  # the ini syntax needs them
+                return self._send(400, json.dumps(
+                    {"error": "a path with , ; # or a newline"}))
+            p = os.path.abspath(os.path.expanduser(p))
+            # a root already in the list may be gone (an unplugged drive)
+            if p not in CONFIG.extra_roots and not os.path.isdir(p):
+                return self._send(400, json.dumps(
+                    {"error": "not a directory: " + p}))
+            if p not in roots:
+                roots.append(p)
+        if save_extra_roots(roots, CONFIG.path) is None:
+            return self._send(500, json.dumps(
+                {"error": "cannot write " + CONFIG.path}))
+        CONFIG.extra_roots = roots
+        CONFIG.exists = True
+        return self._send(200, json.dumps({"ok": True, "roots": roots}))
 
     def _manage_builds(self, path, q):
         ws = q.get("ws", [None])[0]
@@ -187,6 +213,12 @@ class Handler(BaseHTTPRequestHandler):
             if update:
                 overview["update"] = update
             return self._send(200, json.dumps(overview))
+        if path == "/api/scan-roots":
+            return self._send(200, json.dumps({
+                "home": os.path.expanduser("~"),
+                "roots": CONFIG.extra_roots,
+                "config_path": CONFIG.path,
+            }))
         if path == "/api/discover":
             found = [{"path": p, **self.registry.stats(p)}
                      for p in discover_all(CONFIG.extra_roots)]

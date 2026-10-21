@@ -4,7 +4,8 @@ import os
 import tempfile
 import unittest
 
-from colcon_dashboard.config import Config, TEMPLATE, write_template
+from colcon_dashboard.config import (Config, TEMPLATE, save_extra_roots,
+                                     write_template)
 
 
 class ConfigFile(unittest.TestCase):
@@ -128,6 +129,52 @@ class TemplateFile(unittest.TestCase):
             f.write("")
         self.assertIsNone(write_template(
             os.path.join(blocker, "sub", "config.ini")))
+
+
+class SaveExtraRoots(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = os.path.join(self.tmp.name, "config.ini")
+
+    def save(self, text, roots):
+        if text is not None:
+            with open(self.path, "w") as f:
+                f.write(text)
+        self.assertEqual(save_extra_roots(roots, self.path), self.path)
+        with open(self.path) as f:
+            return f.read()
+
+    def test_replaces_the_line_and_keeps_the_rest(self):
+        text = ("# top\n[server]\nport = 9000\n\n[discover]\n"
+                "# a note\nextra_roots = /old,\n    /older\n\n[ui]\n"
+                "editor_url = x\n")
+        out = self.save(text, ["/a", "/b"])
+        self.assertEqual(out, text.replace(
+            "extra_roots = /old,\n    /older\n", "extra_roots = /a, /b\n"))
+        cfg = Config(path=self.path)
+        self.assertEqual(cfg.extra_roots, ["/a", "/b"])
+        self.assertEqual(cfg.port, 9000)
+
+    def test_uncomments_below_the_template_example(self):
+        out = self.save(TEMPLATE, ["/a"])
+        self.assertIn("#extra_roots = /mnt/data, ~/ros\nextra_roots = /a\n",
+                      out)
+        self.assertEqual(Config(path=self.path).extra_roots, ["/a"])
+
+    def test_missing_file_starts_from_the_template(self):
+        out = self.save(None, ["/a"])
+        self.assertTrue(out.startswith(TEMPLATE.splitlines()[0]))
+        self.assertEqual(Config(path=self.path).extra_roots, ["/a"])
+
+    def test_adds_the_section(self):
+        out = self.save("[server]\nport = 9000", ["/a"])
+        self.assertEqual(out, "[server]\nport = 9000\n\n[discover]\n"
+                              "extra_roots = /a\n")
+
+    def test_empty_list_unsets(self):
+        self.save("[discover]\nextra_roots = /a\n", [])
+        self.assertEqual(Config(path=self.path).extra_roots, [])
 
 
 if __name__ == "__main__":

@@ -99,6 +99,56 @@ def write_template(path=None):
     return path
 
 
+def save_extra_roots(roots, path=None):
+    """Write roots as the [discover] extra_roots line of the ini file.
+
+    Edits that one line in place, so every comment and every other key
+    stays as the user wrote it. A missing file starts from the template.
+    Returns the written path, or None when the write fails.
+    """
+    path = path or config_path()
+    try:
+        with open(path) as f:
+            lines = f.read().splitlines(keepends=True)
+    except FileNotFoundError:
+        lines = TEMPLATE.splitlines(keepends=True)
+    except (OSError, UnicodeDecodeError):
+        return None
+    if lines and not lines[-1].endswith("\n"):
+        lines[-1] += "\n"
+    new = "extra_roots = %s\n" % ", ".join(roots)
+    head = next((i for i, ln in enumerate(lines)
+                 if ln.strip().lower() == "[discover]"), None)
+    if head is None:
+        lines += ["\n", "[discover]\n", new]
+    else:
+        end = next((i for i in range(head + 1, len(lines))
+                    if lines[i].startswith("[")), len(lines))
+        key = re.compile(r"extra_roots\s*[=:]")
+        at = next((i for i in range(head + 1, end)
+                   if key.match(lines[i])), None)
+        if at is not None:
+            stop = at + 1  # an indented line continues the value
+            while stop < end and lines[stop].strip() and \
+                    lines[stop][0] in " \t":
+                stop += 1
+            lines[at:stop] = [new]
+        else:
+            # below the commented example, else under the header
+            hint = [i for i in range(head + 1, end)
+                    if re.match(r"#\s*extra_roots", lines[i])]
+            lines.insert((hint[-1] if hint else head) + 1, new)
+    tmp = path + ".tmp"
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(tmp, "w") as f:
+            f.write("".join(lines))
+        os.replace(tmp, path)  # a crash mid-write never truncates it
+    except OSError:
+        return None
+    return path
+
+
 class Config:
     """A typed view over the ini file; unset keys resolve to None."""
 

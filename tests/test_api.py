@@ -18,6 +18,7 @@ from http.server import ThreadingHTTPServer
 
 from colcon_dashboard import __version__
 from colcon_dashboard import registry as registry_mod
+from colcon_dashboard.config import CONFIG, Config
 from colcon_dashboard.registry import Registry
 from colcon_dashboard.web import Handler
 from tests.helpers import ended, event_line, make_build, queued, started
@@ -181,6 +182,40 @@ class ApiTest(unittest.TestCase):
     def test_delete_rejects_bad_build_id(self):
         st, r = self.post("/api/builds/delete?ws=" + self.wsq()
                           + "&build=../../etc")
+        self.assertEqual(st, 400)
+
+    def use_tmp_config(self):
+        saved = (CONFIG.path, CONFIG.exists, CONFIG.extra_roots)
+        CONFIG.path = os.path.join(self.tmp.name, "cfg", "config.ini")
+        self.addCleanup(lambda: (setattr(CONFIG, "path", saved[0]),
+                                 setattr(CONFIG, "exists", saved[1]),
+                                 setattr(CONFIG, "extra_roots", saved[2])))
+        return CONFIG.path
+
+    def test_scan_roots_are_saved_in_config_ini(self):
+        path = self.use_tmp_config()
+        root = os.path.join(self.tmp.name, "roots")
+        os.makedirs(root, exist_ok=True)
+        q = urllib.parse.quote(root)
+        # the same root twice keeps one entry
+        st, body = self.post("/api/scan-roots/set?path=%s&path=%s" % (q, q))
+        self.assertEqual(st, 200)
+        self.assertEqual(body["roots"], [root])
+        d = json.loads(self.get("/api/scan-roots")[1])
+        self.assertEqual(d["roots"], [root])
+        self.assertEqual(d["config_path"], path)
+        self.assertEqual(Config(path=path).extra_roots, [root])
+        st, body = self.post("/api/scan-roots/set")
+        self.assertEqual(body["roots"], [])
+        self.assertEqual(Config(path=path).extra_roots, [])
+
+    def test_scan_root_must_be_a_directory(self):
+        self.use_tmp_config()
+        missing = urllib.parse.quote(os.path.join(self.tmp.name, "nope"))
+        st, _ = self.post("/api/scan-roots/set?path=" + missing)
+        self.assertEqual(st, 400)
+        st, _ = self.post("/api/scan-roots/set?path=" +
+                          urllib.parse.quote(self.tmp.name + ",x"))
         self.assertEqual(st, 400)
 
     def test_unknown_api_is_404(self):

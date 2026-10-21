@@ -13,7 +13,9 @@ Workspace endpoints take a `ws=<path>` query parameter. Add `build=<build id>` t
 |---|---|
 | `/api/workspaces` | The recent workspaces, with live build info where known |
 | `/api/config` | The server version and the loaded config values |
-| `/api/discover` | Colcon workspaces found under the home directory |
+| `/api/discover` | Colcon workspaces found under the home directory and the scan roots |
+| `/api/scan-roots` | The home directory, the `extra_roots` list, and the config.ini path |
+| `/api/scan-roots/set?path=&path=` (POST) | Replaces the `extra_roots` list in config.ini. A new path must be a directory |
 | `/api/register?ws=` (POST) | Registers a workspace, like opening it in the page |
 | `/api/favorite?ws=&fav=1` (POST) | Pins or unpins a workspace |
 | `/api/builds/delete?ws=&build=` (POST) | Deletes the logs of one build |
