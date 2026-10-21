@@ -1,20 +1,31 @@
 /* Colcon Mission Control */
 
+/* The palette comes from the logo, after Windows 7: the green of its
+   progress bar, the blue of the Harmony wallpaper, the deep navy at the
+   dark edge of that wallpaper, and the red of its close button. */
 :root {
   color-scheme: light;
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --ink: #0b0b0b;
-  --ink2: #52514e;
-  --muted: #898781;
-  --grid: #e1e0d9;
-  --baseline: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.10);
-  --accent: #2a78d6;
-  --good: #0ca30c;
-  --warning: #fab219;
-  --serious: #ec835a;
-  --critical: #d03b3b;
+  --page: #f2f6fb;
+  --surface: #fbfdff;
+  --ink: #0a1f3d;
+  --ink2: #3b5170;
+  --muted: #7a8ba3;
+  --grid: #dbe5f0;
+  --baseline: #b3c4d8;
+  --border: rgba(10, 31, 61, 0.12);
+  --accent: #1e7fd9;
+  --good: #06b025;
+  --warning: #f0a30a;
+  --serious: #e8741f;
+  --critical: #d3402b;
+  --critical-deep: #a5200f;
+  /* controls run from a lighter top to a deeper bottom, like the logo */
+  --ctl-top: #ffffff;
+  --ctl-bot: #e8eff8;
+  --ctl-border: #bccbdd;
+  --ctl-hl: rgba(255, 255, 255, 0.95);
+  --ctl-shadow: rgba(10, 31, 61, 0.08);
+  --shine: rgba(255, 255, 255, 0.4);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
   --dock-h: 260px;
@@ -22,28 +33,50 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --ink: #ffffff;
-    --ink2: #c3c2b7;
-    --muted: #898781;
-    --grid: #2c2c2a;
-    --baseline: #383835;
-    --border: rgba(255, 255, 255, 0.10);
-    --accent: #3987e5;
+    --page: #06101e;
+    --surface: #0c1a2d;
+    --ink: #e8f1fb;
+    --ink2: #b0c2d8;
+    --muted: #7489a4;
+    --grid: #1a2b42;
+    --baseline: #2c4160;
+    --border: rgba(214, 232, 252, 0.12);
+    --accent: #3a95ea;
+    --good: #2bd14a;
+    --warning: #f5b335;
+    --serious: #f08a3c;
+    --critical: #ef5a45;
+    --critical-deep: #b8301e;
+    --ctl-top: #17283f;
+    --ctl-bot: #0f1d31;
+    --ctl-border: #2a3f5c;
+    --ctl-hl: rgba(255, 255, 255, 0.07);
+    --ctl-shadow: rgba(0, 0, 0, 0.3);
+    --shine: rgba(255, 255, 255, 0.22);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #0d0d0d;
-  --surface: #1a1a19;
-  --ink: #ffffff;
-  --ink2: #c3c2b7;
-  --muted: #898781;
-  --grid: #2c2c2a;
-  --baseline: #383835;
-  --border: rgba(255, 255, 255, 0.10);
-  --accent: #3987e5;
+  --page: #06101e;
+  --surface: #0c1a2d;
+  --ink: #e8f1fb;
+  --ink2: #b0c2d8;
+  --muted: #7489a4;
+  --grid: #1a2b42;
+  --baseline: #2c4160;
+  --border: rgba(214, 232, 252, 0.12);
+  --accent: #3a95ea;
+  --good: #2bd14a;
+  --warning: #f5b335;
+  --serious: #f08a3c;
+  --critical: #ef5a45;
+  --critical-deep: #b8301e;
+  --ctl-top: #17283f;
+  --ctl-bot: #0f1d31;
+  --ctl-border: #2a3f5c;
+  --ctl-hl: rgba(255, 255, 255, 0.07);
+  --ctl-shadow: rgba(0, 0, 0, 0.3);
+  --shine: rgba(255, 255, 255, 0.22);
 }
 
 * { box-sizing: border-box; }
@@ -60,14 +93,33 @@ body {
 button, select {
   font: inherit;
   color: var(--ink2);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: linear-gradient(var(--ctl-top), var(--ctl-bot));
+  border: 1px solid var(--ctl-border);
   border-radius: 6px;
   padding: 3px 9px;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 var(--ctl-hl), 0 1px 2px var(--ctl-shadow);
+  transition: border-color 0.15s, box-shadow 0.15s, color 0.15s;
 }
-button:hover { color: var(--ink); border-color: var(--baseline); }
-button.on { color: var(--accent); border-color: var(--accent); }
+button:hover, select:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--ctl-border));
+  box-shadow: inset 0 1px 0 var(--ctl-hl), 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+button:active {
+  background: linear-gradient(var(--ctl-bot), var(--ctl-top));
+  box-shadow: inset 0 1px 2px var(--ctl-shadow);
+}
+button:focus-visible, select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 1px;
+}
+button.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: linear-gradient(color-mix(in srgb, var(--accent) 6%, var(--ctl-top)),
+                              color-mix(in srgb, var(--accent) 16%, var(--ctl-bot)));
+}
 .mono { font-family: var(--mono); }
 
 /* ---- header ---- */
@@ -82,9 +134,16 @@ button.on { color: var(--accent); border-color: var(--accent); }
   flex-wrap: wrap;   /* a squeezed window wraps rather than crushing the chips */
   row-gap: 6px;
 }
-#topbar .brand { font-size: 14px; white-space: nowrap; }
+#topbar .brand { font-size: 14px; white-space: nowrap; display: flex; align-items: center; gap: 7px; }
 #topbar .brand b { font-weight: 650; }
-#topbar .brand .hex { color: var(--accent); }
+#topbar .brand .logo { width: 22px; height: 22px; display: block; }
+#topbar .brand .logo.dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) #topbar .brand .logo.light { display: none; }
+  :root:not([data-theme="light"]) #topbar .brand .logo.dark { display: block; }
+}
+:root[data-theme="dark"] #topbar .brand .logo.light { display: none; }
+:root[data-theme="dark"] #topbar .brand .logo.dark { display: block; }
 #topbar .meta {
   display: flex;
   align-items: baseline;
@@ -137,7 +196,6 @@ body.offline #topbar {
   border-bottom-color: var(--critical);
 }
 body.offline #topbar .brand,
-body.offline #topbar .brand .hex,
 body.offline #topbar .meta,
 body.offline #topbar .meta .mono {
   color: #fff;
@@ -145,6 +203,7 @@ body.offline #topbar .meta .mono {
 body.offline #topbar button {
   color: #fff;
   background: transparent;
+  box-shadow: none;
   border-color: rgba(255, 255, 255, 0.45);
 }
 body.offline #sysmeters { display: none; }
@@ -229,26 +288,30 @@ body.offline #sysmeters { display: none; }
   background: var(--surface);
   border-bottom: 1px solid var(--grid);
 }
+/* the Windows 7 progress bar: a sunken track, glossy fills */
 #meter {
   display: flex;
   gap: 2px; /* surface gap between segments */
-  height: 8px;
-  border-radius: 4px;
+  height: 10px;
+  border-radius: 5px;
   overflow: hidden;
   background: var(--grid);
+  box-shadow: inset 0 1px 2px var(--ctl-shadow);
   margin-bottom: 10px;
 }
 #meter .seg { height: 100%; flex: 0 0 0%; transition: flex-basis 0.6s ease; }
-#meter .seg.done { background: var(--good); }
-#meter .seg.failed { background: var(--critical); }
-#meter .seg.aborted { background: var(--serious); }
+#meter .seg.done { background: linear-gradient(var(--shine), transparent 70%), var(--good); }
+#meter .seg.failed { background: linear-gradient(var(--shine), transparent 70%), var(--critical); }
+#meter .seg.aborted { background: linear-gradient(var(--shine), transparent 70%), var(--serious); }
 #meter .seg.building {
-  background: repeating-linear-gradient(
-    45deg, var(--accent) 0 6px, color-mix(in srgb, var(--accent) 55%, var(--surface)) 6px 12px);
-  background-size: 200% 100%;
+  background:
+    linear-gradient(var(--shine), transparent 70%),
+    repeating-linear-gradient(
+      45deg, var(--accent) 0 6px, color-mix(in srgb, var(--accent) 55%, var(--surface)) 6px 12px);
+  background-size: 100% 100%, 200% 100%;
   animation: slide 1.2s linear infinite;
 }
-@keyframes slide { to { background-position: -17px 0; } }
+@keyframes slide { to { background-position: 0 0, -17px 0; } }
 #tiles { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-end; }
 .tile { min-width: 64px; }
 .tile .label {
@@ -292,6 +355,7 @@ body.offline #sysmeters { display: none; }
 #viewbar .vtab {
   border: none;
   background: none;
+  box-shadow: none;
   padding: 3px 2px;
   margin-right: 8px;
   color: var(--muted);
@@ -555,6 +619,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   margin-left: 6px;
   border: none;
   background: none;
+  box-shadow: none;
   font-size: 10.5px;
   color: var(--muted);
   cursor: pointer;
@@ -579,7 +644,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 }
 .ltab.on { background: var(--surface); color: var(--ink); border-color: var(--baseline); }
 .ltab .dot { width: 7px; height: 7px; border-radius: 50%; }
-.ltab .x { color: var(--muted); padding: 0 1px; border: 0; background: none; font-size: 12px; }
+.ltab .x { color: var(--muted); padding: 0 1px; border: 0; background: none; box-shadow: none; font-size: 12px; }
 .ltab .x:hover { color: var(--critical); }
 #panes { flex: 1; min-height: 0; position: relative; }
 #panes .placeholder {
@@ -674,6 +739,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 .fitem .fjump {
   border: none;
   background: none;
+  box-shadow: none;
   padding: 0;
   font-weight: 650;
   color: var(--critical);
@@ -684,7 +750,11 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 .fitem .grow { flex: 1; }
 .fitem .fopen { padding: 1px 7px; font-size: 11px; }
 .fitem .askai { padding: 1px 7px; font-size: 11px; color: var(--accent); border-color: var(--accent); font-weight: 650; }
-.fitem .askai:hover { background: var(--accent); color: #fff; }
+.fitem .askai:hover {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--accent) 70%, #000);
+  background: linear-gradient(var(--shine), transparent 55%), var(--accent);
+}
 .fitem .ftail {
   margin: 0;
   padding: 6px 10px;
@@ -730,6 +800,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   margin-left: auto;
   border: none;
   background: none;
+  box-shadow: none;
   color: var(--muted);
   cursor: pointer;
 }
@@ -798,6 +869,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   right: 3px;
   border: none;
   background: none;
+  box-shadow: none;
   padding: 0 4px;
   font-size: 10px;
   color: var(--muted);
@@ -822,7 +894,11 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   border-color: var(--accent);
   font-weight: 650;
 }
-.pane .phead .askai:hover { background: var(--accent); color: #fff; }
+.pane .phead .askai:hover {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--accent) 70%, #000);
+  background: linear-gradient(var(--shine), transparent 55%), var(--accent);
+}
 .pane .askrow {
   flex: none;
   display: flex;
@@ -943,6 +1019,7 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 .wsrow .wpath { flex: 1; }
 .wsrow .star {
   background: none;
+  box-shadow: none;
   border: none;
   padding: 0 2px;
   font-size: 14px;
@@ -972,6 +1049,7 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 .wshead .wshead-r { display: inline-flex; align-items: center; gap: 12px; }
 .linkbtn {
   background: none;
+  box-shadow: none;
   border: none;
   padding: 0;
   font-size: 11px;
@@ -1073,6 +1151,7 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
   font: 12px var(--mono);
   color: var(--ink);
   background: none;
+  box-shadow: none;
   border: 1px solid transparent;
   border-radius: 4px;
   padding: 1px 4px;
@@ -1083,6 +1162,7 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 #rootnote { font-size: 11px; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
 .wsrow .rootdel {
   background: none;
+  box-shadow: none;
   border: none;
   padding: 0 2px;
   color: var(--muted);
@@ -1116,6 +1196,7 @@ body.offline #ws, body.offline #buildid { border-color: rgba(255, 255, 255, 0.45
 #bpick .wsadd { display: flex; margin-top: 12px; }
 .wsrow .del {
   background: none;
+  box-shadow: none;
   border: none;
   padding: 0 2px;
   font-size: 13px;
@@ -1168,11 +1249,18 @@ body.offline #ws, body.offline #buildid { border-color: rgba(255, 255, 255, 0.45
 #confirm .cbtns[hidden] { display: none; }
 #confirm button[disabled] { opacity: 0.6; cursor: wait; }
 #confirm code { font-family: var(--mono); background: var(--page); padding: 0 4px; border-radius: 4px; }
+/* the red of the Windows 7 close button: glossy on top, deep at the bottom */
 #confirm button.danger,
 #bpick button.danger {
   color: #fff;
-  background: var(--critical);
-  border-color: var(--critical);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25);
+  background: linear-gradient(var(--shine), transparent 50%), linear-gradient(var(--critical), var(--critical-deep));
+  border-color: var(--critical-deep);
+}
+#confirm button.danger:hover,
+#bpick button.danger:hover {
+  border-color: var(--critical-deep);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 0 3px color-mix(in srgb, var(--critical) 22%, transparent);
 }
 
 /* toasts */

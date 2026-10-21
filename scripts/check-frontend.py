@@ -37,8 +37,10 @@ ALLOWED = {
     'gsearch': ['camera', 'state', 'util'],
     'header': ['bus', 'state', 'util'],
     'help': ['util'],
+    # logo.js is a copy of the logo generator; it imports nothing
+    'logo': [],
     'modes': ['state'],
-    'notify': ['bus', 'state', 'util'],
+    'notify': ['bus', 'logo', 'state', 'util'],
     'pickers': ['graph', 'header', 'state', 'toasts', 'util'],
     'poller': ['bus', 'header', 'modes', 'state', 'toasts', 'util'],
     'state': [],
