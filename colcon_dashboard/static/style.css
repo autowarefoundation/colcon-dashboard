@@ -894,7 +894,8 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 .wsempty { color: var(--muted); padding: 10px; }
 #wspick .wsadd,
 #bpick .wsadd { display: flex; gap: 8px; margin-top: 12px; }
-#wspick #wsinput {
+#wspick #wsinput,
+#wspick #rootinput {
   flex: 1;
   font: 12px var(--mono);
   color: var(--ink);
@@ -903,6 +904,126 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   border-radius: 6px;
   padding: 4px 10px;
 }
+.wshead .wshead-r { display: inline-flex; align-items: center; gap: 12px; }
+.linkbtn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--accent);
+  cursor: pointer;
+}
+.linkbtn:hover { color: var(--accent); text-decoration: underline; }
+.linkbtn:disabled { color: var(--muted); text-decoration: none; cursor: default; }
+#wspick #wsinput { display: block; width: 100%; box-sizing: border-box; padding: 7px 10px; font-size: 13px; margin-bottom: 4px; }
+#wspick #wsinput:focus { outline: none; border-color: var(--accent); }
+#wslist { max-height: 60vh; gap: 2px; overflow-x: hidden; }
+/* a fixed top: the dialog must not jump while a search resizes the list */
+#wspick { align-items: flex-start; padding-top: 12vh; box-sizing: border-box; }
+/* section headers: Starred, Recent, Found on disk */
+.wssec {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wssec .linkbtn { text-transform: none; letter-spacing: 0; }
+/* one line per workspace: dot, name, dimmed parent, time, star */
+#wslist .wsrow, #wslist .wsgroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  min-width: 0;
+}
+#wslist .wsrow:hover, #wslist .wsgroup:hover,
+#wslist .kbd { background: var(--page); border-color: var(--grid); }
+#wslist .kbd { border-color: var(--accent); }
+#wslist .wsrow.cur { border-color: var(--accent); }
+#wslist .sub { margin-left: 22px; }
+#wslist .wname {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 650 12.5px var(--mono);
+  white-space: nowrap;
+}
+#wslist .wmeta { flex: none; font-size: 11px; color: var(--muted); white-space: nowrap; }
+#wslist .wdir {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  font: 11.5px var(--mono);
+  color: var(--muted);
+}
+#wslist .wsrow.sub .wdir { direction: ltr; }
+#wslist .wdot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--baseline);
+}
+#wslist .wdot.passed { background: var(--good); }
+#wslist .wdot.failed { background: var(--critical); }
+#wslist .wdot.aborted { background: var(--serious); }
+#wslist .wdot.missing { background: none; border: 1px dashed var(--baseline); box-sizing: border-box; }
+#wslist .wdot.live { background: var(--accent); animation: wspulse 1.4s ease-in-out infinite; }
+@keyframes wspulse { 50% { opacity: 0.35; } }
+#wslist .wprog {
+  flex: none;
+  width: 64px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--grid);
+  overflow: hidden;
+}
+#wslist .wprog span { display: block; height: 100%; background: var(--accent); }
+#wslist .wsrow .star { visibility: hidden; font-size: 13px; }
+#wslist .wsrow:hover .star, #wslist .kbd .star, #wslist .wsrow .star.on { visibility: visible; }
+#wslist .wsgroup { cursor: pointer; color: var(--ink); }
+#wslist .wsgroup .caret { flex: none; width: 8px; font-size: 10px; color: var(--muted); transition: transform 0.12s; }
+#wslist .wsgroup.open .caret { transform: rotate(90deg); }
+#wslist .wsgroup .wname { font-weight: 400; }
+#wslist .wsgroup .wcount { flex: 1; font-size: 11px; color: var(--muted); white-space: nowrap; }
+#wslist[hidden], #wspick #wsinput[hidden], .wshead .wssort[hidden] { display: none; }
+#wsroots .wssec { padding-top: 4px; }
+#rootlist { display: flex; flex-direction: column; gap: 4px; }
+#rootlist .wsrow:hover { border-color: var(--grid); background: none; }
+#rootlist .rootedit {
+  flex: 1;
+  font: 12px var(--mono);
+  color: var(--ink);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: -2px -5px;
+}
+#rootlist .rootedit:hover { border-color: var(--border); }
+#rootlist .rootedit:focus { border-color: var(--accent); outline: none; background: var(--page); }
+#rootnote { font-size: 11px; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
+.wsrow .rootdel {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.wsrow .rootdel:hover { color: var(--critical); }
 /* the workspace and build switchers look like the menus they are */
 #ws, #buildid {
   border: 1px solid var(--border);

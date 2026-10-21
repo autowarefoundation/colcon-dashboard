@@ -19,6 +19,7 @@ from http.server import ThreadingHTTPServer
 from colcon_dashboard import __version__
 from colcon_dashboard import registry as registry_mod
 from colcon_dashboard.config import CONFIG, Config
+from colcon_dashboard.monitor import BuildMonitor
 from colcon_dashboard.registry import Registry
 from colcon_dashboard.web import Handler
 from tests.helpers import ended, event_line, make_build, queued, started
@@ -221,6 +222,21 @@ class ApiTest(unittest.TestCase):
     def test_unknown_api_is_404(self):
         st, _, _ = self.get("/api/nonsense?ws=" + self.wsq())
         self.assertEqual(st, 404)
+
+
+class WorkspaceStats(unittest.TestCase):
+    def test_last_outcome_comes_from_the_cached_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = os.path.join(tmp, "ws")
+            old = make_build(ws, "build_2026-01-01_10-00-00", [queued(0.1, "a")])
+            new = make_build(ws, BUILD_ID, [queued(0.1, "a")])
+            reg = Registry()
+            self.assertIsNone(reg.stats(ws)["last_outcome"])  # not cached yet
+            for bdir, outcome in ((old, "passed"), (new, "failed")):
+                with open(os.path.join(bdir, BuildMonitor.OUTCOME_FILE), "w") as f:
+                    json.dump({"v": BuildMonitor.OUTCOME_V, "outcome": outcome}, f)
+            reg.stats_cache.clear()
+            self.assertEqual(reg.stats(ws)["last_outcome"], "failed")
 
 
 class DiscoverAll(unittest.TestCase):

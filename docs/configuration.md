@@ -37,7 +37,11 @@ extra_roots =           ; e.g. /mnt/data, ~/ros - more directories for
 
 ## Extra scan roots
 
-The Scan button in the workspace picker searches your home directory for colcon workspaces. If your workspaces are on another drive, add their parent directories to `extra_roots`. Separate the directories with commas or newlines:
+When the workspace picker opens for the first time, it searches your home directory for colcon workspaces. If your workspaces are on another drive, add their parent directories as scan roots.
+
+You can edit the scan roots in the page. Open the workspace picker and click "Scan roots…". Type a directory and click Add. To change a root, edit its path and press Enter. To remove a root, click ✕. The page saves the list as the `extra_roots` key in `config.ini` and changes only that line. A change applies at once, with no restart.
+
+You can also set `extra_roots` in the file by hand. Separate the directories with commas or newlines:
 
 ```ini
 [discover]

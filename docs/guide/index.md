@@ -17,7 +17,11 @@ The browser tab mirrors the build even in the background. The title shows `[42%]
 
 ## Workspace picker
 
-The workspace picker lists your recent workspaces with their build count, log size, and last build time. It shows live progress for workspaces that build now. The list sorts by the last build time. A workspace that builds now has the newest build, so it sits on top. A star pins a favorite, and a sort menu reorders the list by favorites, build count, or log size. The picker also opens any path and scans your home directory for colcon workspaces.
+The workspace picker has three sections: "Starred", "Recent", and "Found on disk". Each row shows the workspace name, its parent directory, and the time since the last build. A dot shows the result of the last build: green for passed, red for failed, orange for aborted, and gray when the result is not known yet. A workspace that builds now shows a progress bar. Hover a row to see the build count and the log size. A star moves a workspace to "Starred", and a sort menu reorders each section by last build, build count, or log size.
+
+The box at the top filters the list as you type. The arrow keys move through the rows, and Enter opens the highlighted row. If you paste a path and press Enter, the page opens that path. Escape clears the box, and a second Escape closes the picker.
+
+The picker scans for colcon workspaces when it opens for the first time. The scan searches your home directory and the scan roots (see [Configuration](../configuration.md#extra-scan-roots)). If three or more found workspaces share a parent directory, the picker folds them into one row. Click the row to unfold it. "rescan" in the section header runs the scan again.
 
 If `check_updates = true` is set in the [config file](../configuration.md), a dismissible line appears here when PyPI has a newer release. The server makes no other network request, ever.
 

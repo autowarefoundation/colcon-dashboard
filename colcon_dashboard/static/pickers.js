@@ -7,10 +7,9 @@ import { $, esc, fmtAgo, fmtBytes, fmtDur, PINNED_BUILD, WS, wsParam } from './u
 export const WS_SORTS = {
   // a workspace building now has the newest build, so "last built"
   // naturally keeps it on top; the active key covers stats-cache lag
-  built:     w => [!w.active, -(w.last_build || 0)],
-  favorites: w => [!w.fav, !w.active, -(w.last_used || 0)],
-  builds:    w => [-(w.builds || 0), !w.active],
-  logs:      w => [-(w.log_size || 0), !w.active],
+  built:  w => [!w.active, -(w.last_build || 0)],
+  builds: w => [-(w.builds || 0), !w.active],
+  logs:   w => [-(w.log_size || 0), !w.active],
 };
 
 export function sortWs(items) {
@@ -26,43 +25,165 @@ export function sortWs(items) {
   });
 }
 
-export function renderWsList(items) {
-  const list = $('#wslist');
-  list.innerHTML = '';
-  items = sortWs(items);
-  if (!items.length) {
-    list.innerHTML =
-      '<div class="wsempty">No workspaces yet. Open a path below, or scan for workspaces.</div>';
-    return;
+export let wsItems = [];  // the recents, plus the scan's finds
+// the last scan result, kept for the page's lifetime: a scan walks the
+// whole home directory, so reopening the picker reuses it
+let foundItems = null;
+let wsScanning = false;
+let wsQuery = '';
+let wsHome = '';
+const openGroups = new Set();  // expanded parent directories
+const GROUP_MIN = 3;  // this many finds in one directory fold into a group
+
+export function tildePath(p) {
+  return wsHome && (p === wsHome || p.startsWith(wsHome + '/'))
+    ? '~' + p.slice(wsHome.length) : p;
+}
+
+const parentDir = p => p.slice(0, p.lastIndexOf('/')) || '/';
+const looksLikePath = q => /^[/~]/.test(q);
+
+function wsRow(w, inGroup) {
+  const a = document.createElement('a');
+  a.className = 'wsrow' + (WS === w.path ? ' cur' : '') + (inGroup ? ' sub' : '');
+  a.href = `?ws=${encodeURIComponent(w.path)}`;
+  const shown = tildePath(w.path);
+  const cut = shown.lastIndexOf('/') + 1;
+  const state = w.active ? 'live'
+              : w.exists === false ? 'missing' : (w.last_outcome || 'none');
+  const tip = [shown];
+  if (w.active) tip.push(`building ${w.done ?? '?'}/${w.total ?? '?'}`);
+  else if (w.last_outcome) tip.push(`last build ${w.last_outcome}`);
+  if (w.builds) tip.push(`${w.builds} builds, ${fmtBytes(w.log_size)} logs`);
+  a.title = tip.join('\n');
+  let right;
+  if (w.active && w.total) {
+    const pct = Math.round(100 * (w.done || 0) / w.total);
+    right = `<span class="wprog"><span style="width:${pct}%"></span></span>`;
+  } else {
+    right = `<span class="wmeta">${w.exists === false ? 'missing'
+      : w.last_build ? fmtAgo(w.last_build) : 'never built'}</span>`;
   }
-  for (const w of items) {
-    const a = document.createElement('a');
-    a.className = 'wsrow' + (WS === w.path ? ' cur' : '');
-    a.href = `?ws=${encodeURIComponent(w.path)}`;
-    const bits = [];
-    if (w.active) bits.push(`<span class="live">building ${w.done ?? '?'}/${w.total ?? '?'}</span>`);
-    if (w.builds) bits.push(`${w.builds} builds · ${fmtBytes(w.log_size)} logs`);
-    if (w.last_build) bits.push(`built ${fmtAgo(w.last_build)}`);
-    if (w.found) bits.push('found');
-    if (w.exists === false) bits.push('missing');
-    a.innerHTML =
-      `<button class="star${w.fav ? ' on' : ''}" title="favorite">★</button>` +
-      `<span class="wpath">${w.path}</span>` +
-      `<span class="wmeta">${bits.join(' · ')}</span>`;
-    a.querySelector('.star').onclick = async ev => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      try {
-        await fetch(`/api/favorite?ws=${encodeURIComponent(w.path)}` +
-                    `&fav=${w.fav ? 0 : 1}`, { method: 'POST' });
-      } catch (e) { /* server gone */ }
-      openWsPicker();
+  a.innerHTML =
+    `<span class="wdot ${state}"></span>` +
+    `<span class="wname">${esc(shown.slice(cut))}</span>` +
+    // rtl cuts a long directory from the left; the marks keep "/" in place
+    `<span class="wdir">${inGroup ? '' : `&lrm;${esc(shown.slice(0, cut))}&lrm;`}</span>` +
+    right +
+    `<button class="star${w.fav ? ' on' : ''}" title="${w.fav ? 'unstar' : 'star'}">★</button>`;
+  a.querySelector('.star').onclick = async ev => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    try {
+      await fetch(`/api/favorite?ws=${encodeURIComponent(w.path)}` +
+                  `&fav=${w.fav ? 0 : 1}`, { method: 'POST' });
+    } catch (e) { /* server gone */ }
+    openWsPicker();
+  };
+  return a;
+}
+
+function wsSection(list, title, extra) {
+  const h = document.createElement('div');
+  h.className = 'wssec';
+  h.innerHTML = `<span>${title}</span>`;
+  if (extra) h.appendChild(extra);
+  list.appendChild(h);
+}
+
+function renderFound(list, found) {
+  const rescan = document.createElement('button');
+  rescan.className = 'linkbtn';
+  rescan.textContent = wsScanning ? 'scanning…' : 'rescan';
+  rescan.disabled = wsScanning;
+  rescan.onclick = scanWs;
+  wsSection(list, `Found on disk${found.length ? ` (${found.length})` : ''}`, rescan);
+  const byDir = new Map();
+  for (const w of found) {
+    const d = parentDir(w.path);
+    if (!byDir.has(d)) byDir.set(d, []);
+    byDir.get(d).push(w);
+  }
+  const done = new Set();
+  for (const w of found) {
+    const d = parentDir(w.path);
+    const members = byDir.get(d);
+    if (members.length < GROUP_MIN) {
+      list.appendChild(wsRow(w));
+      continue;
+    }
+    if (done.has(d)) continue;
+    done.add(d);
+    const open = openGroups.has(d) || !!wsQuery;  // a search shows its hits
+    const g = document.createElement('div');
+    g.className = 'wsgroup' + (open ? ' open' : '');
+    g.tabIndex = -1;
+    const newest = Math.max(...members.map(m => m.last_build || 0));
+    g.innerHTML =
+      '<span class="caret">▸</span>' +
+      `<span class="wname">${esc(tildePath(d))}/</span>` +
+      `<span class="wcount">${members.length} workspaces</span>` +
+      `<span class="wmeta">${newest ? fmtAgo(newest) : ''}</span>`;
+    g.onclick = () => {
+      if (openGroups.has(d)) openGroups.delete(d); else openGroups.add(d);
+      renderWsList();
     };
-    list.appendChild(a);
+    list.appendChild(g);
+    if (open) for (const m of members) list.appendChild(wsRow(m, true));
+  }
+  if (!found.length && !wsScanning && !wsQuery) {
+    list.insertAdjacentHTML('beforeend',
+      '<div class="wsempty">No other workspaces found. Add a scan root to search more directories.</div>');
   }
 }
 
-export let wsItems = [];
+export function renderWsList() {
+  const list = $('#wslist');
+  list.innerHTML = '';
+  const q = wsQuery.toLowerCase();
+  const match = w => !q || w.path.toLowerCase().includes(q)
+                     || tildePath(w.path).toLowerCase().includes(q);
+  const items = sortWs(wsItems.filter(match));
+  const starred = items.filter(w => w.fav);
+  const recent = items.filter(w => !w.fav && !w.found);
+  const found = items.filter(w => !w.fav && w.found);
+  if (starred.length) {
+    wsSection(list, 'Starred');
+    starred.forEach(w => list.appendChild(wsRow(w)));
+  }
+  if (recent.length) {
+    wsSection(list, 'Recent');
+    recent.forEach(w => list.appendChild(wsRow(w)));
+  }
+  if (q && !items.length) {
+    list.innerHTML = looksLikePath(wsQuery)
+      ? `<div class="wsempty">No workspace matches. Press Enter to open <b>${esc(wsQuery)}</b>.</div>`
+      : '<div class="wsempty">No workspace matches.</div>';
+    return;
+  }
+  if (!q || found.length) renderFound(list, found);
+}
+
+function mergeFound() {
+  const known = new Set(wsItems.map(w => w.path));
+  for (const w of foundItems) {
+    if (!known.has(w.path)) wsItems.push({ ...w, exists: true, found: true });
+  }
+}
+
+export async function scanWs() {
+  if (wsScanning) return;
+  wsScanning = true;
+  renderWsList();
+  try {
+    const d = await (await fetch('/api/discover')).json();
+    foundItems = d.workspaces || [];
+    wsItems = wsItems.filter(w => !w.found);  // a removed root drops its finds
+    mergeFound();
+  } catch (e) { /* server gone */ }
+  wsScanning = false;
+  renderWsList();
+}
 
 export function showUpdateNote(update) {
   $('#updnote')?.remove();
@@ -84,17 +205,108 @@ export function showUpdateNote(update) {
 }
 
 export async function openWsPicker() {
+  const first = $('#wspick').hidden;
   $('#wspick').hidden = false;
   const list = $('#wslist');
-  list.innerHTML = '<div class="wsempty">loading…</div>';
+  if (first) {
+    showScanRoots(false);
+    $('#wsinput').focus();
+  }
+  if (!wsItems.length) list.innerHTML = '<div class="wsempty">loading…</div>';
   try {
     const d = await (await fetch('/api/workspaces')).json();
+    wsHome = d.home || '';
     wsItems = d.workspaces || [];
-    renderWsList(wsItems);
+    if (foundItems) mergeFound();
+    renderWsList();
     showUpdateNote(d.update);
+    if (!foundItems) scanWs();  // the first open scans by itself
   } catch (e) {
     list.innerHTML = '<div class="wsempty">The server does not answer.</div>';
   }
+}
+
+// the extra_roots list as the server last reported it
+let scanRoots = [];
+
+export function renderScanRoots(d) {
+  scanRoots = d.roots || [];
+  const list = $('#rootlist');
+  list.innerHTML = '';
+  const home = document.createElement('div');
+  home.className = 'wsrow';
+  home.innerHTML = `<span class="wpath">${esc(d.home)}</span>` +
+    '<span class="tag">home</span>';
+  list.appendChild(home);
+  scanRoots.forEach((root, i) => {
+    const div = document.createElement('div');
+    div.className = 'wsrow';
+    div.innerHTML =
+      '<input class="rootedit" type="text" spellcheck="false" title="edit, then press Enter">' +
+      '<button class="rootdel" title="remove this scan root">✕</button>';
+    const input = div.querySelector('.rootedit');
+    input.value = root;
+    const commit = () => {
+      const p = input.value.trim();
+      if (p === root) return;
+      const next = [...scanRoots];
+      if (p) next[i] = p; else next.splice(i, 1);
+      saveScanRoots(next).then(ok => { if (!ok) input.value = root; });
+    };
+    input.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') input.blur();
+      if (ev.key === 'Escape') { input.value = root; input.blur(); }
+    });
+    input.addEventListener('change', commit);
+    div.querySelector('.rootdel').onclick =
+      () => saveScanRoots(scanRoots.filter((_, j) => j !== i));
+    list.appendChild(div);
+  });
+  $('#rootnote').textContent = `Saved as extra_roots in ${d.config_path}`;
+}
+
+export async function loadScanRoots() {
+  try {
+    renderScanRoots(await (await fetch('/api/scan-roots')).json());
+  } catch (e) {
+    $('#rootlist').innerHTML = '<div class="wsempty">The server does not answer.</div>';
+  }
+}
+
+export async function saveScanRoots(roots) {
+  const qs = roots.map(p => `path=${encodeURIComponent(p)}`).join('&');
+  try {
+    const r = await (await fetch(`/api/scan-roots/set?${qs}`,
+                                 { method: 'POST' })).json();
+    if (!r.ok) {
+      toast(`Not saved: ${esc(r.error)}`);
+      return false;
+    }
+  } catch (e) { return false; /* server gone */ }
+  loadScanRoots();
+  scanWs();
+  return true;
+}
+
+// the scan roots panel takes the place of the list while it is open
+function showScanRoots(on) {
+  $('#wsroots').hidden = !on;
+  $('#wslist').hidden = on;
+  $('#wsinput').hidden = on;
+  $('#wspick .wssort').hidden = on;
+  $('#rootsbtn').textContent = on ? 'Done' : 'Scan roots…';
+  if (on) loadScanRoots();
+  else if (!$('#wspick').hidden) $('#wsinput').focus();
+}
+
+function moveWsHighlight(step) {
+  const rows = [...$('#wslist').querySelectorAll('.wsrow, .wsgroup')];
+  if (!rows.length) return;
+  const at = rows.findIndex(r => r.classList.contains('kbd'));
+  rows[at]?.classList.remove('kbd');
+  const next = rows[Math.max(0, Math.min(rows.length - 1, at + step))];
+  next.classList.add('kbd');
+  next.scrollIntoView({ block: 'nearest' });
 }
 
 export function initWsPicker() {
@@ -105,36 +317,45 @@ export function initWsPicker() {
   sortSel.value = WS_SORTS[savedSort] ? savedSort : 'built';
   sortSel.onchange = () => {
     localStorage.setItem('cmc-wssort', sortSel.value);
-    renderWsList(wsItems);
+    renderWsList();
   };
   const overlay = $('#wspick');
   overlay.addEventListener('click', ev => {
     if (ev.target === overlay && WS) overlay.hidden = true;
   });
-  const go = () => {
-    const p = $('#wsinput').value.trim();
-    if (p) location.search = `?ws=${encodeURIComponent(p)}`;
-  };
-  $('#wsopen').onclick = go;
-  $('#wsinput').addEventListener('keydown', ev => {
-    if (ev.key === 'Enter') go();
+  const input = $('#wsinput');
+  input.addEventListener('input', () => {
+    wsQuery = input.value.trim();
+    renderWsList();
   });
-  $('#wsscan').onclick = async () => {
-    $('#wsscan').textContent = 'Scanning…';
-    $('#wsscan').disabled = true;
-    try {
-      const d = await (await fetch('/api/discover')).json();
-      const known = new Set(wsItems.map(w => w.path));
-      for (const w of d.workspaces || []) {
-        if (!known.has(w.path)) {
-          wsItems.push({ ...w, exists: true, found: true });
-        }
-      }
-      renderWsList(wsItems);
-    } catch (e) { /* server gone */ }
-    $('#wsscan').textContent = 'Scan';
-    $('#wsscan').disabled = false;
+  input.addEventListener('keydown', ev => {
+    if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+      ev.preventDefault();
+      moveWsHighlight(ev.key === 'ArrowDown' ? 1 : -1);
+    } else if (ev.key === 'Enter') {
+      const hit = $('#wslist .kbd');
+      const rows = $('#wslist').querySelectorAll('a.wsrow');
+      if (hit?.href) location.href = hit.href;
+      else if (hit) hit.click();  // a group: fold or unfold it
+      else if (looksLikePath(wsQuery)) {
+        location.search = `?ws=${encodeURIComponent(wsQuery)}`;
+      } else if (rows.length === 1) location.href = rows[0].href;
+    } else if (ev.key === 'Escape') {
+      if (input.value) {
+        input.value = wsQuery = '';
+        renderWsList();
+      } else if (WS) overlay.hidden = true;
+    }
+  });
+  $('#rootsbtn').onclick = () => showScanRoots($('#wsroots').hidden);
+  const addRoot = async () => {
+    const p = $('#rootinput').value.trim();
+    if (p && await saveScanRoots([...scanRoots, p])) $('#rootinput').value = '';
   };
+  $('#rootadd').onclick = addRoot;
+  $('#rootinput').addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') addRoot();
+  });
   if (!WS) openWsPicker();
 }
 

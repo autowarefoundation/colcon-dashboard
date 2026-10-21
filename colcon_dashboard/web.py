@@ -209,6 +209,7 @@ class Handler(BaseHTTPRequestHandler):
             }))
         if path == "/api/workspaces":
             overview = self.registry.overview()
+            overview["home"] = os.path.expanduser("~")
             update = update_status()
             if update:
                 overview["update"] = update

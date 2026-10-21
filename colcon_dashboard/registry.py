@@ -78,19 +78,31 @@ class Registry:
         cached = self.stats_cache.get(ws)
         if cached and now - cached[0] < 60:
             return cached[1]
-        out = {"builds": 0, "log_size": 0, "last_build": None}
+        out = {"builds": 0, "log_size": 0, "last_build": None,
+               "last_outcome": None}
         log_dir = os.path.join(ws, self.log_base)
-        newest = None
+        newest = newest_name = None
         try:
             for name in os.listdir(log_dir):
                 if name.startswith("build_"):
                     out["builds"] += 1
                     t = parse_build_id_time(name)
                     if t and (newest is None or t > newest):
-                        newest = t
+                        newest, newest_name = t, name
         except OSError:
             pass
         out["last_build"] = newest
+        if newest_name:
+            # only the outcome the monitor already cached: a cold
+            # events.log pass per listed workspace costs too much here
+            try:
+                with open(os.path.join(log_dir, newest_name,
+                                       BuildMonitor.OUTCOME_FILE)) as f:
+                    info = json.load(f)
+                if info.get("v") == BuildMonitor.OUTCOME_V:
+                    out["last_outcome"] = info.get("outcome")
+            except (OSError, ValueError, AttributeError):
+                pass
         total = 0
         for dirpath, _dirnames, filenames in os.walk(log_dir):
             for fn in filenames:

@@ -174,18 +174,25 @@
 <div id="wspick" hidden>
   <div class="cbox wsbox">
     <div class="wshead">Workspaces
-      <label class="wssort">sort <select id="wssort">
-        <option value="built">last built</option>
-        <option value="favorites">favorites</option>
-        <option value="builds">build count</option>
-        <option value="logs">log size</option>
-      </select></label>
+      <span class="wshead-r">
+        <label class="wssort">sort <select id="wssort">
+          <option value="built">last built</option>
+          <option value="builds">build count</option>
+          <option value="logs">log size</option>
+        </select></label>
+        <button id="rootsbtn" class="linkbtn" title="the directories that the scan searches">Scan roots…</button>
+      </span>
     </div>
+    <input id="wsinput" type="text" placeholder="Search, or paste a path and press Enter" spellcheck="false" autocomplete="off">
     <div id="wslist"></div>
-    <div class="wsadd">
-      <input id="wsinput" type="text" placeholder="/path/to/workspace" spellcheck="false">
-      <button id="wsopen">Open</button>
-      <button id="wsscan" title="search your home directory and the extra_roots in config.ini for colcon workspaces">Scan</button>
+    <div id="wsroots" hidden>
+      <div class="wssec"><span>Scan roots</span></div>
+      <div id="rootlist"></div>
+      <div class="wsadd">
+        <input id="rootinput" type="text" placeholder="/mnt/data" spellcheck="false">
+        <button id="rootadd">Add</button>
+      </div>
+      <div id="rootnote"></div>
     </div>
   </div>
 </div>
