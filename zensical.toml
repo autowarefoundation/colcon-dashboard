@@ -18,6 +18,8 @@ nav = [
     { "Install" = "install.md" },
     { "Quick start" = "quick-start.md" },
     { "Configuration" = "configuration.md" },
+    { "Remote machine" = "remote.md" },
+    { "Troubleshooting" = "troubleshooting.md" },
   ] },
   { "The dashboard" = [
     "guide/index.md",

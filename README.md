@@ -37,7 +37,7 @@ colcon-dashboard --install-service
 pipx upgrade colcon-dashboard
 ```
 
-Plain `pip install colcon-dashboard` also works, in any Python 3.8+ environment.
+Plain `pip install colcon-dashboard` also works in a virtual environment with Python 3.8 or newer.
 
 The service starts the server at login. Open <http://127.0.0.1:8642/> and pick your workspace. That is the whole setup. After an upgrade, run `colcon-dashboard --restart-service` to load the new version.
 
@@ -49,9 +49,11 @@ Build as you always do, and open the page of your workspace:
 
 ```text
 $ colcon build
-$ colcon-dashboard .
-http://127.0.0.1:8642/?ws=%2Fhome%2Fuser%2Fws
+$ colcon-dashboard . --open
+already running: http://127.0.0.1:8642/?ws=%2Fhome%2Fuser%2Fws
 ```
+
+This is the output when the service runs the server. Without the service, the same command starts the server in the terminal, in the foreground, until you press Ctrl+C.
 
 Expose the port only to a network that you trust. The server trusts every caller.
 

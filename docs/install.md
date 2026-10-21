@@ -30,6 +30,15 @@ The server needs Python 3.8 or newer and nothing else. It has zero dependencies.
     colcon-dashboard --install-service
     ```
 
+    If pipx is not installed, install it first. On Ubuntu:
+
+    ```bash
+    sudo apt install pipx
+    pipx ensurepath
+    ```
+
+    Then open a new terminal, so that `~/.local/bin` is on your `PATH`.
+
     To upgrade to the newest release:
 
     ```bash
@@ -38,12 +47,17 @@ The server needs Python 3.8 or newer and nothing else. It has zero dependencies.
 
 === "pip"
 
-    Plain pip works in any Python 3.8+ environment:
+    Plain pip works in a virtual environment with Python 3.8 or newer:
 
     ```bash
-    pip install colcon-dashboard
-    colcon-dashboard --install-service
+    python3 -m venv ~/.venvs/colcon-dashboard
+    ~/.venvs/colcon-dashboard/bin/pip install colcon-dashboard
+    ~/.venvs/colcon-dashboard/bin/colcon-dashboard --install-service
     ```
+
+    On Ubuntu 23.04 and newer (ROS 2 Jazzy and later), the system pip refuses `pip install` outside a virtual environment, with the error `externally-managed-environment`. Use the PPA or pipx there.
+
+    The service runs the Python of the environment that installed it. If you move or delete that environment, run `--install-service` again from the new one.
 
     To upgrade to the newest release:
 
@@ -72,7 +86,7 @@ The service starts the server at login and restarts it on failure. Open <http://
 
 After an upgrade, run `colcon-dashboard --restart-service`. The running server stays on the old version until a restart.
 
-Without the service, `colcon-dashboard` starts the server by hand.
+Without the service, `colcon-dashboard` starts the server in the terminal. It runs in the foreground until you press Ctrl+C.
 
 ## Service commands
 
@@ -86,3 +100,28 @@ colcon-dashboard --stop-service
 colcon-dashboard --restart-service      # e.g. after a config.ini change
 colcon-dashboard --service-status
 ```
+
+`--install-service` needs systemd user services. Most containers, and WSL without systemd, do not have them. There, run the server in a terminal, or in the background with `nohup colcon-dashboard >/dev/null 2>&1 &`.
+
+## Uninstall
+
+1. Remove the service first. If you remove the package first, the service file stays and fails at every login.
+
+    ```bash
+    colcon-dashboard --uninstall-service
+    ```
+
+2. Remove the package:
+
+    ```bash
+    sudo apt remove python3-colcon-dashboard   # PPA
+    pipx uninstall colcon-dashboard            # pipx
+    ```
+
+3. To remove your settings and the list of recent workspaces too, delete these directories:
+
+    ```bash
+    rm -r ~/.config/colcon-dashboard ~/.cache/colcon-dashboard
+    ```
+
+The dashboard never changes your sources or your build results. Into the build log directories it writes only a small `.colcon-dashboard.json` file per run, and `claude-analysis.json` files for the AI failure analyses that you start. These files go away with the logs.
