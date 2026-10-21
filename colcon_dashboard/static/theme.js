@@ -37,5 +37,7 @@ export function applyTheme(mode) {
   if (mode === 'auto') delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = mode;
   $('#themeBtn').innerHTML = THEME_ICONS[mode] || THEME_ICONS.auto;
+  const next = { auto: 'light', light: 'dark', dark: 'system' }[mode] || 'light';
+  $('#themeBtn').title = `theme: ${mode === 'auto' ? 'system' : mode} - click for ${next}`;
   emit('theme-changed');
 }

@@ -97,3 +97,27 @@ export function fmtBytes(n) {
   while (n >= 1024 && i < 4) { n /= 1024; i++; }
   return n.toFixed(n >= 10 || i === 0 ? 0 : 1) + units[i];
 }
+
+// Toggle buttons show their state with the .on class. Mirror it into
+// aria-pressed, so screen readers hear it too, for every toggle at once.
+export function mirrorPressed(root = document.body) {
+  const sync = b => {
+    if (b.classList.contains('on')) b.setAttribute('aria-pressed', 'true');
+    else if (b.hasAttribute('aria-pressed')) b.setAttribute('aria-pressed', 'false');
+  };
+  root.querySelectorAll('button.on').forEach(sync);
+  new MutationObserver(list => {
+    for (const m of list) {
+      if (m.type === 'attributes') {
+        if (m.target.tagName === 'BUTTON') sync(m.target);
+        continue;
+      }
+      for (const n of m.addedNodes) {  // new panes come with buttons already on
+        if (n.nodeType !== 1) continue;
+        if (n.tagName === 'BUTTON') sync(n);
+        n.querySelectorAll('button.on').forEach(sync);
+      }
+    }
+  }).observe(root, { subtree: true, childList: true, attributes: true,
+                     attributeFilter: ['class'] });
+}

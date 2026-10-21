@@ -1308,3 +1308,10 @@ body.offline #ws, body.offline #buildid { border-color: rgba(255, 255, 255, 0.45
 }
 .toast.info { border-color: var(--accent); }
 .toast b { font-family: var(--mono); }
+.toast { display: flex; align-items: flex-start; gap: 8px; }
+.toast .tbody { flex: 1; min-width: 0; }
+.toast .tclose {
+  flex: none; border: none; background: none; box-shadow: none;
+  padding: 0 2px; font-size: 11px; line-height: 1.4; color: var(--muted);
+}
+.toast .tclose:hover { color: var(--ink); }

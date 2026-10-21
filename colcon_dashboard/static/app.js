@@ -13,10 +13,11 @@ import { initBuildPicker, initStop, initWsPicker } from './pickers.js';
 import { startStatePolling, tickElapsed } from './poller.js';
 import { App } from './state.js';
 import { initTheme } from './theme.js';
-import { $ } from './util.js';
+import { $, mirrorPressed } from './util.js';
 import { initViews } from './views.js';
 
 initTheme();
+mirrorPressed();
 const deepPkg = initViews();  // a #pkg=... deep link, or null
 initPanZoom();
 initStop();
