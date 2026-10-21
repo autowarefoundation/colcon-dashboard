@@ -356,7 +356,10 @@ export function initWsPicker() {
   $('#rootinput').addEventListener('keydown', ev => {
     if (ev.key === 'Enter') addRoot();
   });
-  if (!WS) openWsPicker();
+  if (!WS) {
+    document.body.classList.add('nows');  // the start page (style.css)
+    openWsPicker();
+  }
 }
 
 /* ---- build picker: browse and manage previous builds ---- */

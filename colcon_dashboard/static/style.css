@@ -852,6 +852,16 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   background: rgba(0, 0, 0, 0.35);
 }
 #wspick[hidden] { display: none; }
+#wspick .wshero { display: none; }
+/* the start page: no workspace yet, so the picker is the whole page */
+body.nows #stats, body.nows #viewbar, body.nows #viz, body.nows #dockbar,
+body.nows #dock, body.nows #topbar .meta { display: none; }
+body.nows #wspick { position: static; flex: 1; flex-direction: column; align-items: center; justify-content: flex-start; background: none; padding-top: 8vh; overflow: auto; }
+body.nows #wspick .wsbox { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); }
+body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 22px; max-width: min(620px, 92vw); }
+.wshero svg { width: 56px; height: 56px; }
+.wshero h1 { margin: 8px 0 4px; font-size: 26px; font-weight: 650; letter-spacing: -0.01em; }
+.wshero p { margin: 0; color: var(--ink2); font-size: 14px; }
 #wspick .wsbox,
 #bpick .wsbox,
 #help .wsbox {
