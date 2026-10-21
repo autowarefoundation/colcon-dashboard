@@ -9,4 +9,5 @@ export function toast(html, cls = '', onclick = null, ttl = 9000) {
   t.onclick = () => { if (onclick) onclick(); t.remove(); };
   $('#toasts').appendChild(t);
   setTimeout(() => t.remove(), ttl);
+  return t;
 }

@@ -207,6 +207,7 @@ export function createPane(name) {
 }
 
 export function resetPane(p) {
+  p.trimmed = false;
   p.offset = -1;
   p.buf = '';
   p.lines = 0;
@@ -217,7 +218,7 @@ export function resetPane(p) {
 }
 
 export function updateEarlierBtn(p) {
-  if (p.earlierBtn) p.earlierBtn.style.display = p.start > 0 ? '' : 'none';
+  if (p.earlierBtn) p.earlierBtn.style.display = p.start > 0 || p.trimmed ? '' : 'none';
 }
 
 /* ---- per-pane log search ---- */
@@ -320,7 +321,16 @@ export function updateSearchCount(p) {
 
 export async function loadEarlier(p) {
   // prepend the whole history before p.start, keeping the view in place
-  if (p.loadingEarlier || !p.start) return;
+  if (p.loadingEarlier || !(p.start || p.trimmed)) return;
+  if (p.trimmed) {
+    // the line cap dropped lines from the top: load the whole log again,
+    // up to the partial last line that waits in p.buf
+    p.pre.textContent = '';
+    p.lines = 0;
+    p.hits = [];
+    p.start = p.offset - new TextEncoder().encode(p.buf).length;
+    p.trimmed = false;
+  }
   p.loadingEarlier = true;
   p.earlierBtn.textContent = '⤒ loading…';
   const base = p.fixed
@@ -355,6 +365,7 @@ export async function loadEarlier(p) {
     }
     p.start = start;
     updateEarlierBtn(p);
+    if (p.query) runSearch(p);
   } catch (e) { /* transient */ }
   p.earlierBtn.textContent = '⤒ load all';
   p.loadingEarlier = false;
@@ -447,6 +458,7 @@ export async function pollPane(p) {
         'dot ' + (p.running ? 'c-building' : 'c-done');
     }
     if (r.reset) {
+      p.trimmed = false;
       p.pre.textContent = '';
       p.buf = '';
       p.lines = 0;
@@ -490,9 +502,18 @@ export function appendLog(p, data) {
     }
     if (p.query) updateSearchCount(p);
   }
+  let trimmed = false;
   while (!p.noTrim && p.lines > 6000 && p.pre.firstChild) {
+    // one log line is its text node, after its timestamp span when it has one
+    const ts = p.pre.firstChild.classList?.contains('ts');
     p.pre.removeChild(p.pre.firstChild);
+    if (ts && p.pre.firstChild) p.pre.removeChild(p.pre.firstChild);
     p.lines--;
+    trimmed = true;
+  }
+  if (trimmed && !p.trimmed) {
+    p.trimmed = true;  // the start of the log is gone: offer to load it again
+    updateEarlierBtn(p);
   }
   if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
 }
@@ -662,11 +683,35 @@ on('build-changed', (s, first) => {
       if (!pane.summary) resetPane(pane);
     closePane(FAIL_PANE);  // the new build has no failures yet
     failDismissed = false;
+    liveFails = 0;
+    moreToast?.remove();
+    moreToast = null;
   }
 });
 
+// A failure cascade can fail dozens of packages within seconds. Each of
+// the first few gets a toast and a pane. The rest go into one counting
+// toast and the failure summary, so the dock and the screen stay usable.
+const AUTO_OPEN = 6;   // panes that open by themselves in one build
+const TOAST_EACH = 3;  // failures that get a toast of their own
+let liveFails = 0;
+let moreToast = null;
+
 on('pkg-failed', name => {
-  toast(`<b>${name}</b> failed (${failNote(App.pkgs[name])}) - click to open its log`, '',
-        () => openPane(name));
-  openPane(name);
+  liveFails++;
+  if (liveFails <= TOAST_EACH) {
+    toast(`<b>${name}</b> failed (${failNote(App.pkgs[name])}) - click to open its log`, '',
+          () => openPane(name));
+  } else {
+    moreToast?.remove();
+    const more = liveFails - TOAST_EACH;
+    moreToast = toast(`<b>${more}</b> more package${more === 1 ? '' : 's'} failed`
+                      + ' - click to open the failure summary', '',
+                      () => { failDismissed = false; openPane(FAIL_PANE); });
+  }
+  if (liveFails > AUTO_OPEN) return;  // the failure summary lists the rest
+  const cur = App.panes.get(App.activePane);
+  // never take the dock away from a package log that the user reads
+  if (!cur || cur.fixed || cur.name === FAIL_PANE) openPane(name);
+  else if (!App.panes.has(name)) createPane(name);
 });
