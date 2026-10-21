@@ -28,7 +28,12 @@ export function clientToWorld(clientX, clientY) {
 
 export function setViewBox(vb) {
   App.vb = vb;
-  $('#graph').setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  const svg = $('#graph');
+  svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  // zoomed far out, the 11px labels shrink below ~6px and read as noise:
+  // draw the nodes as plain colored boxes and fade the finished edges
+  const s = Math.min(svg.clientWidth / vb.w, svg.clientHeight / vb.h);
+  svg.classList.toggle('far', s > 0 && s * 11 < 6);
 }
 export function bboxOf(names) {
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;

@@ -415,6 +415,10 @@ svg.nfocus .node:not(.hl) { opacity: 0.14; }
   animation: edgebreathe 1.6s ease-in-out infinite;
 }
 .edge.edone { stroke: var(--good); stroke-opacity: 0.3; }
+#graph.far .node text { display: none; }
+#graph.far .edge.edone { stroke-opacity: 0.1; }
+#graph.far .node.done rect.box { fill: color-mix(in srgb, var(--good) 45%, var(--surface)); stroke: none; }
+#graph.far .node.waiting rect.box, #graph.far .node.skipped rect.box { fill: var(--grid); }
 @keyframes edgebreathe { 50% { stroke-opacity: 0.25; } }
 .pkt { fill: var(--accent); opacity: 0.85; }
 svg.efocus .pktg:not(.hl) { opacity: 0.08; }
