@@ -323,7 +323,7 @@ export function draw3d(now) {
                    (w - 3 * s) * p.pct / 100, 2.5 * s);
     }
     const fontPx = 11 * s;
-    if (fontPx > 4.5) {
+    if (fontPx > 3.2) {
       ctx.font = `${stKey === 'building' || stKey === 'failed' ? '600 ' : ''}` +
                  `${fontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`;
       ctx.fillStyle = pal.text;

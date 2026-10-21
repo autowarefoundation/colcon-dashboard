@@ -30,10 +30,10 @@ export function setViewBox(vb) {
   App.vb = vb;
   const svg = $('#graph');
   svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
-  // zoomed far out, the 11px labels shrink below ~6px and read as noise:
+  // zoomed far out, the 11px labels shrink below ~4px and read as noise:
   // draw the nodes as plain colored boxes and fade the finished edges
   const s = Math.min(svg.clientWidth / vb.w, svg.clientHeight / vb.h);
-  svg.classList.toggle('far', s > 0 && s * 11 < 6);
+  svg.classList.toggle('far', s > 0 && s * 11 < 4.3);
 }
 export function bboxOf(names) {
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
