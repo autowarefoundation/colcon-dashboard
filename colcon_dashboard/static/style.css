@@ -479,6 +479,14 @@ body.offline #sysmeters { display: none; }
 #vsplit { flex: none; width: 6px; cursor: col-resize; background: var(--border); }
 #vsplit:hover { background: var(--accent); }
 #vsplit[hidden] { display: none; }
+/* a narrow window stacks the two panes: side by side, the timeline gets too
+   thin to read. The divider drags sideways only, so it hides. */
+@media (max-width: 760px) {
+  #viz.split { flex-direction: column; }
+  /* equal halves: a percentage basis would not resolve in this column */
+  #viz.split #ganttpane, #viz.split #graphpane { flex: 1 1 0; min-height: 0; }
+  #viz.split #vsplit { display: none; }
+}
 #gantt .gname { cursor: pointer; }
 #gantt .gname:hover { fill: var(--accent); }
 
@@ -660,6 +668,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 }
 #closeAll:hover { color: var(--critical); }
 #closeAll[hidden] { display: none; }
+.ltab:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: -2px; }
 .ltab {
   display: inline-flex;
   align-items: center;
@@ -681,7 +690,6 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 .ltab .x:hover { color: var(--critical); }
 #panes { flex: 1; min-height: 0; position: relative; }
 #panes .placeholder {
-.ltab:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: -2px; }
   position: absolute;
   inset: 0;
   display: flex;
@@ -1066,6 +1074,8 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 .wsrow:hover { border-color: var(--accent); background: var(--page); }
 .wsrow.cur { border-color: var(--accent); }
 .wsrow .wpath { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.wsrow .wpath .bwhen, .wsrow .wpath .bago { white-space: nowrap; }
+.wsrow .wpath .bago { color: var(--muted); margin-left: 6px; font-family: var(--sans); font-size: 11px; }
 .wsrow .wmeta { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .wsrow .wmeta .live { color: var(--accent); font-weight: 650; }
 .wsempty { color: var(--muted); padding: 10px; }
@@ -1074,8 +1084,6 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 #wspick #wsinput,
 #wspick #rootinput {
   flex: 1;
-.wsrow .wpath .bwhen, .wsrow .wpath .bago { white-space: nowrap; }
-.wsrow .wpath .bago { color: var(--muted); margin-left: 6px; font-family: var(--sans); font-size: 11px; }
   font: 12px var(--mono);
   color: var(--ink);
   background: var(--page);
@@ -1322,7 +1330,6 @@ body.offline #ws, body.offline #buildid { border-color: rgba(255, 255, 255, 0.45
   cursor: pointer;
 }
 .toast.info { border-color: var(--accent); }
-.toast b { font-family: var(--mono); }
 .toast { display: flex; align-items: flex-start; gap: 8px; }
 .toast .tbody { flex: 1; min-width: 0; }
 .toast .tclose {

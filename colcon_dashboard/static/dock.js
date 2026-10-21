@@ -162,9 +162,14 @@ export function createPane(name) {
   };
   if (p.earlierBtn) p.earlierBtn.onclick = () => loadEarlier(p);
   const tsBtn = pane.querySelector('.tsbtn');
+  if (tsBtn && localStorage.getItem('cmc-ts') === '0') {
+    p.pre.classList.remove('showts');
+    tsBtn.classList.remove('on');
+  }
   if (tsBtn) tsBtn.onclick = () => {
     const on = p.pre.classList.toggle('showts');
     tsBtn.classList.toggle('on', on);
+    localStorage.setItem('cmc-ts', on ? '1' : '0');
     if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
   };
   const wrapBtn = pane.querySelector('.wrapbtn');
@@ -405,12 +410,12 @@ export function activatePane(name) {
   for (const [n, p] of App.panes) {
     p.el.classList.toggle('on', n === name);
     p.tabEl.classList.toggle('on', n === name);
+    p.tabEl.setAttribute('aria-selected', n === name ? 'true' : 'false');
   }
   emit('pane-changed', name);
 }
 
 export function closePane(name) {
-    p.tabEl.setAttribute('aria-selected', n === name ? 'true' : 'false');
   const p = App.panes.get(name);
   if (!p || p.fixed) return;
   // every close path counts as a dismissal, "close all" included
@@ -556,12 +561,12 @@ export function createFailPane() {
     if (ev.target.classList.contains('x')) closePane(FAIL_PANE);
     else activatePane(FAIL_PANE);
   };
+  tabKeys(tab, FAIL_PANE, true);
   $('#logtabs').appendChild(tab);
   const pane = document.createElement('div');
   pane.className = 'pane';
   pane.innerHTML = `
     <div class="phead">
-  tabKeys(tab, FAIL_PANE, true);
       <span class="pname">failed packages</span>
       <span class="chip failed">…</span>
       <span class="grow"></span>

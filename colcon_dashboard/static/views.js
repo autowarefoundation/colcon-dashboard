@@ -122,14 +122,22 @@ export function initViews() {
       gf.classList.toggle('on', atEnd);
     }
   });
+  const markScope = () => {
+    $('#scopeBuild').classList.toggle('on', App.scope === 'build');
+    $('#scopeAll').classList.toggle('on', App.scope === 'all');
+  };
   const setScope = scope => {
     if (App.scope === scope) return;
     App.scope = scope;
-    $('#scopeBuild').classList.toggle('on', scope === 'build');
-    $('#scopeAll').classList.toggle('on', scope === 'all');
+    localStorage.setItem('cmc-scope', scope);
+    markScope();
     App.vb = null;  // refit to the new extent
     buildGraphView();
   };
+  if (localStorage.getItem('cmc-scope') === 'all') {  // before the first graph
+    App.scope = 'all';
+    markScope();
+  }
   $('#scopeBuild').onclick = () => setScope('build');
   $('#scopeAll').onclick = () => setScope('all');
 
@@ -158,17 +166,22 @@ export function initViews() {
   });
 
   const bar = $('#dockbar');
+  const dockH = h => Math.min(innerHeight * 0.75, Math.max(90, h));
+  const savedDock = parseFloat(localStorage.getItem('cmc-dock-h'));
+  if (savedDock) document.documentElement.style.setProperty('--dock-h', dockH(savedDock) + 'px');
   bar.addEventListener('pointerdown', ev => {
     ev.preventDefault();
     const startY = ev.clientY;
     const startH = $('#dock').getBoundingClientRect().height;
     const move = e => {
-      const h = Math.min(innerHeight * 0.75, Math.max(90, startH + (startY - e.clientY)));
+      const h = dockH(startH + (startY - e.clientY));
       document.documentElement.style.setProperty('--dock-h', h + 'px');
     };
     const up = () => {
       removeEventListener('pointermove', move);
       removeEventListener('pointerup', up);
+      localStorage.setItem('cmc-dock-h',
+        parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dock-h')));
     };
     addEventListener('pointermove', move);
     addEventListener('pointerup', up);
