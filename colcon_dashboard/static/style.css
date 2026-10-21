@@ -1330,3 +1330,14 @@ body.offline #ws, body.offline #buildid { border-color: rgba(255, 255, 255, 0.45
   padding: 0 2px; font-size: 11px; line-height: 1.4; color: var(--muted);
 }
 .toast .tclose:hover { color: var(--ink); }
+.toast b { font-family: var(--mono); }
+
+/* reduced motion: no breathing, pulsing, sliding, or flowing. The states
+   stay readable by their colors and outlines. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  #pktlayer { display: none; }  /* the SVG flow droplets, which CSS cannot pause */
+}

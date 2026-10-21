@@ -9,11 +9,14 @@ import { $ } from './util.js';
 
 /* ---------------- 3D mode: perspective canvas over the same simulation ---- */
 
+// with reduced motion asked for, the camera never orbits by itself
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
+
 export const G3 = {
   yaw: -0.6, pitch: 0.28, dist: 2600, tx: 0, ty: 0, tz: 0, F: 560,
   // auto: the camera orbits by itself. fitting: it keeps framing the
   // cloud while the simulation spreads it. A grab ends both.
-  raf: null, auto: true, fitting: false, hovered: null, downNode: null, drag: null, moved: 0,
+  raf: null, auto: !REDUCED.matches, fitting: false, hovered: null, downNode: null, drag: null, moved: 0,
   colors: null, pal: null, particles: new Map(), lastT: 0, bound: false,
 };
 
@@ -69,7 +72,11 @@ export function enter3d(alpha = 1, keep = false) {
   tokens3d();
   startForce(alpha, true, keep);
   if (!keep) fit3d();
-  if (!G3.bound) bind3d();
+  if (!G3.bound) {
+    bind3d();
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'wheel'])
+      G3.cv.addEventListener(type, wake3d, { passive: true });
+  }
   if (!G3.raf && App.view !== 'gantt') {
     G3.lastT = performance.now();
     G3.raf = requestAnimationFrame(loop3d);
@@ -85,8 +92,17 @@ export function exit3d() {
 
 export function fit3d() {
   frameAll3d();
-  G3.auto = true;
+  G3.auto = !REDUCED.matches;
   G3.fitting = true;
+  wake3d();
+}
+
+// The loop stops when nothing moves (see loop3d); input and new state
+// start it again.
+function wake3d() {
+  if (G3.raf || !G3.ctx || App.layoutMode !== '3d' || App.view === 'gantt') return;
+  G3.lastT = performance.now();
+  G3.raf = requestAnimationFrame(loop3d);
 }
 
 function frameAll3d() {
@@ -163,7 +179,12 @@ export function loop3d(now) {
   if (G3.auto && !G3.drag) G3.yaw += dt * 0.1;
   stepParticles3d(dt);
   draw3d(now);
-  G3.raf = requestAnimationFrame(loop3d);
+  // redraw only while something moves: the 3D view must not take CPU
+  // from colcon on the same machine when it just sits there
+  const easing = Math.abs((G3.hovered ? 1 : 0) - (G3.dimEase || 0)) > 0.01;
+  if (G3.auto || G3.drag || Force.alpha > 0.004 || App.active || easing) {
+    G3.raf = requestAnimationFrame(loop3d);
+  }
 }
 
 export function draw3d(now) {
@@ -430,9 +451,9 @@ registerMode('3d', {
   show: () => { if (!G3.raf) enter3d(0.15, true); },
   hide: () => { stopForce(); exit3d(); },
   fit: fit3d,
-  followFrontier: frontier3d,
-  onState: () => update3dPlanes(),
-  resize: resize3d,
+  followFrontier: () => { frontier3d(); wake3d(); },
+  onState: () => { update3dPlanes(); wake3d(); },
+  resize: () => { resize3d(); wake3d(); },
   focusPkg: name => {
     const n = Force.nodes.find(f => f.name === name);
     if (!n) return;
@@ -440,9 +461,11 @@ registerMode('3d', {
     G3.fitting = false;
     G3.tx = n.cx; G3.ty = n.cy; G3.tz = n.cz;
     G3.dist = 500;
+    wake3d();
   },
 });
 
 on('theme-changed', () => {
   if (G3.colors) tokens3d();  // refresh the 3D canvas palette
+  wake3d();
 });
