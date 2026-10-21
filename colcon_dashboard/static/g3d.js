@@ -212,7 +212,7 @@ export function draw3d(now) {
   G3.dimEase = (G3.dimEase || 0) + ((chainNow ? 1 : 0) - (G3.dimEase || 0)) * 0.12;
   if (!chainNow && G3.dimEase < 0.02) G3.lastChain = null;
   const chain = G3.dimEase > 0.02 ? G3.lastChain : null;
-  const dimMul = 1 - 0.9 * G3.dimEase;    // eased focus dim
+  const dimMul = 1 - 0.65 * G3.dimEase;   // eased focus dim, to 35% as in 2D
   const discMul = 1 - 0.65 * G3.dimEase;
   const sset = GS.set;                    // active graph search matches
   const proj = new Map();

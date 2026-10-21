@@ -528,7 +528,7 @@ svg.efocus .edge.hl { stroke: var(--accent); stroke-width: 1.6; stroke-opacity: 
 }
 :root[data-theme="dark"] #graph .node:hover rect.box,
 :root[data-theme="dark"] #graph .node.hot rect.box { filter: drop-shadow(0 0 4px var(--glow)) brightness(1.3); }
-svg.nfocus .node:not(.hl) { opacity: 0.14; }
+svg.nfocus .node:not(.hl) { opacity: 0.35; }  /* faded, but still readable */
 .node rect.box {
   fill: var(--surface);
   stroke: var(--baseline);
