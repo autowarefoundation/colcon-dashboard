@@ -2,14 +2,14 @@
 icon: lucide/app-window
 description: >-
   Open Colcon Dashboard from the applications menu, in its own window. The
-  app starts the server when none runs, and it controls the server.
+  app starts the server when none runs, controls it, and stays in the tray.
 ---
 
 # Desktop app
 
 The desktop app shows the dashboard in its own window, with an entry in the applications menu. You do not have to open a browser or remember the port.
 
-When you open the app and no server runs, the app starts one. The header bar shows the server state, and its menu restarts or stops the server. The menu also turns on the systemd user service, which starts the server at login.
+When you open the app and no server runs, the app starts one. The header bar shows the server state, and its menu restarts or stops the server. The menu also turns on the systemd user service, which starts the server at login. When you close the window, the app keeps running as an icon in the system tray.
 
 ## Install
 
@@ -55,7 +55,7 @@ The header bar holds these controls:
 
 - The server state: running, working, or stopped. Hover over it to see the address and what runs the server (the service or a background process).
 - The reload button.
-- The menu: reload, open the page in the browser, fullscreen, restart or stop the server, start the server at login, add the app to the applications menu, the keyboard shortcuts, and the About window.
+- The menu: reload, open the page in the browser, fullscreen, restart or stop the server, start the server at login, add the app to the applications menu, the keyboard shortcuts, the About window, keep running in the tray, and quit.
 
 The header bar takes the light or dark theme of the page. Desktop notifications from the bell button show as system notifications. Links to the documentation, GitHub, and your editor open in their usual apps.
 
@@ -67,11 +67,24 @@ The app keeps the window size, the zoom level, and the last page that you viewed
 | ++f11++ | Fullscreen |
 | ++ctrl+plus++ / ++ctrl+minus++ / ++ctrl+0++ | Zoom in, zoom out, reset the zoom |
 | ++ctrl+shift+i++ or ++f12++ | The web inspector |
-| ++ctrl+q++ | Close the app |
+| ++ctrl+q++ | Quit the app (the server keeps running) |
+
+## The tray icon
+
+When you close the window, the window hides, and the app stays in the system tray. Build notifications still arrive. The first time, a notification says where the app went.
+
+- Click the icon to show or hide the window.
+- Right-click the icon for the menu: the server state, start, restart, or stop the server, start the server at login, open the page in the browser, and quit.
+
+The icon turns gray when the server stops. Hover over it to see the server state and the build progress.
+
+To quit the app, choose **Quit** in the tray menu or in the window menu, or press ++ctrl+q++. To make the close button quit the app instead, turn off **Keep Running in the Tray** in the window menu.
+
+The tray needs a tray host. KDE, waybar, and swaybar have one. On Ubuntu, the AppIndicator extension (on by default) is the host. A plain GNOME desktop has no tray. There the close button quits the app.
 
 ## The server
 
-If you close the window, the server keeps running. Other browser pages and the CLI still use it.
+If you quit the app, the server keeps running. Other browser pages and the CLI still use it.
 
 If the app starts the server and the service is not installed, the server runs as a background process. Its output goes to `~/.cache/colcon-dashboard/server.log`.
 

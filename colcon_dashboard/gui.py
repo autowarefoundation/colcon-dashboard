@@ -27,6 +27,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk, WebKit  # noqa: E402
 from . import __version__, desktop  # noqa: E402
 from .cli import register_workspace, read_server  # noqa: E402
 from .registry import CACHE_DIR  # noqa: E402
+from .tray import Tray  # noqa: E402
 
 STATE_FILE = os.path.join(CACHE_DIR, "desktop.json")
 LOGOS = {"light": os.path.join(desktop.PKG_DIR, "static", "logo.svg"),
@@ -95,6 +96,8 @@ class Window(Adw.ApplicationWindow):
         self.status = None        # the last desktop.server_status()
         self.busy = False         # a start, stop, or restart runs
         self.want = None          # the page to open once the server answers
+        self.quitting = False     # a close that quits, not one that hides
+        self.tray = None
         self.set_default_size(state.get("w", 1400), state.get("h", 900))
         if state.get("max"):
             self.maximize()
@@ -127,7 +130,12 @@ class Window(Adw.ApplicationWindow):
         self.stack.set_visible_child_name("starting")
 
         self.add_actions()
+        conn = app.get_dbus_connection()
+        if conn is not None:
+            self.tray = Tray(conn, desktop.APP_ID, LOGOS["dark"],  # panels are mostly dark
+                             self.toggle_visible, self.on_tray_available)
         self.connect("close-request", self.on_close)
+        self.connect("notify::visible", lambda *a: self.update_tray())
         GLib.timeout_add_seconds(2, self.poll)
         self.poll(first=True)
 
@@ -150,6 +158,10 @@ class Window(Adw.ApplicationWindow):
         about.append("Keyboard Shortcuts", "win.shortcuts")
         about.append("About Colcon Dashboard", "win.about")
         menu.append_section(None, about)
+        app = Gio.Menu()
+        app.append("Keep Running in the Tray", "win.close-to-tray")
+        app.append("Quit", "app.quit")
+        menu.append_section(None, app)
         return menu
 
     def build_web(self):
@@ -232,6 +244,11 @@ class Window(Adw.ApplicationWindow):
             "start-at-login", None, GLib.Variant.new_boolean(desktop.service_installed()))
         self.login_action.connect("activate", lambda a, _p: self.set_login(not a.get_state().get_boolean()))
         self.add_action(self.login_action)
+        self.tray_action = Gio.SimpleAction.new_stateful(
+            "close-to-tray", None, GLib.Variant.new_boolean(self.state.get("close_to_tray", True)))
+        self.tray_action.connect("activate", self.act_close_to_tray)
+        self.tray_action.set_enabled(False)  # until a tray host answers
+        self.add_action(self.tray_action)
         self.lookup_action("install-desktop").set_enabled(not desktop.desktop_installed())
 
     # -- the server -------------------------------------------------------
@@ -262,6 +279,7 @@ class Window(Adw.ApplicationWindow):
             self.start()  # opening the app means: show me the dashboard
         elif self.stack.get_visible_child_name() != "down":
             self.stack.set_visible_child_name("down")
+        self.update_tray()
 
     def show_pill(self, st):
         for cls in ("running", "starting", "stopped"):
@@ -289,6 +307,7 @@ class Window(Adw.ApplicationWindow):
         self.show_pill(self.status)
         self.waiting.set_title(waiting_title)
         self.stack.set_visible_child_name("starting")
+        self.update_tray()
 
         def done(result):
             ok, msg = result
@@ -385,6 +404,7 @@ class Window(Adw.ApplicationWindow):
         title = web.get_title() or ""
         self.title.set_subtitle("" if title == "Colcon Dashboard" else title)
         self.set_title(title or "Colcon Dashboard")
+        self.update_tray()
 
     def on_load_failed(self, web, _event, uri, error):
         self.poll()  # the server went away: the poll shows the right page
@@ -482,16 +502,99 @@ class Window(Adw.ApplicationWindow):
         self.state["zoom"] = self.web.get_zoom_level()
 
     def toast(self, text):
-        self.toasts.add_toast(Adw.Toast(title=GLib.markup_escape_text(text), timeout=5))
+        if self.get_visible():
+            self.toasts.add_toast(Adw.Toast(title=GLib.markup_escape_text(text), timeout=5))
+        else:  # in the tray: a toast shows nowhere
+            self.notify_system(text)
+
+    def notify_system(self, text, title="Colcon Dashboard"):
+        note = Gio.Notification.new(title)
+        note.set_body(text)
+        self.get_application().send_notification("app", note)
+
+    # -- the tray -----------------------------------------------------------
+
+    def on_tray_available(self, ok):
+        self.tray_action.set_enabled(ok)
+        if ok:
+            self.update_tray()
+        elif not self.get_visible():
+            self.present()  # the tray went away: never leave the window unreachable
+
+    def update_tray(self):
+        if not self.tray:
+            return
+        st = self.status or {}
+        alive, busy = st.get("alive", False), self.busy
+        state = "working" if busy else "running" if alive else "stopped"
+        page = self.web.get_title() or ""
+        tip = f"The server is {state}." + (
+            f" {page}" if alive and page and page != "Colcon Dashboard" else "")
+        self.tray.set_state(tip, gray=not alive and not busy)
+        idle = not busy
+        self.tray.set_menu([
+            {"label": "Hide Colcon Dashboard" if self.get_visible() else "Show Colcon Dashboard",
+             "action": self.toggle_visible},
+            None,
+            {"label": f"Server: {state}", "enabled": False},
+            {"label": "Start the Server", "enabled": idle and not alive, "action": self.start},
+            {"label": "Restart the Server", "enabled": idle and alive,
+             "action": lambda: self.act_restart()},
+            {"label": "Stop the Server", "enabled": idle and alive, "action": lambda: self.act_stop()},
+            {"label": "Start the Server at Login", "checked": st.get("service", False),
+             "enabled": idle and st.get("systemd", False),
+             "action": lambda: self.set_login(not st.get("service", False))},
+            None,
+            {"label": "Open in Browser", "enabled": alive, "action": lambda: self.act_browser()},
+            {"label": "Quit", "action": self.quit_app},
+        ])
+
+    def toggle_visible(self):
+        if self.get_visible():
+            self.close()  # hides to the tray, and keeps the state
+        else:
+            self.present()
+
+    def act_close_to_tray(self, action, _param):
+        on = not action.get_state().get_boolean()
+        action.set_state(GLib.Variant.new_boolean(on))
+        self.state["close_to_tray"] = on
+        save_state(self.state)
+
+    def quit_app(self):
+        self.quitting = True
+        if self.get_visible():
+            self.close()
+        else:  # a hidden window may skip close-request: end it here
+            if self.tray:
+                self.tray.close()
+            self.destroy()
 
     def on_close(self, *_):
+        to_tray = (not self.quitting and self.tray is not None and self.tray.available
+                   and self.state.get("close_to_tray", True))
+        self.save_window()
+        if to_tray:
+            self.set_visible(False)
+            if not self.state.get("tray_hint"):
+                self.state["tray_hint"] = True
+                save_state(self.state)
+                self.notify_system("Colcon Dashboard keeps running in the tray. Click its icon"
+                                   " to open the window, or right-click it for the server.")
+            return True
+        if self.tray:
+            self.tray.close()
+        return False
+
+    def save_window(self):
+        if not self.get_visible():
+            return  # hidden: the size was saved when it hid
         w, h = self.get_default_size()
         self.state.update(w=w, h=h, max=self.is_maximized())
         uri = self.web.get_uri()
         if uri and self.same_origin(uri):
             self.state["uri"] = uri
         save_state(self.state)
-        return False
 
 
 class App(Adw.Application):
@@ -515,7 +618,7 @@ class App(Adw.Application):
             desktop.DATA_DIR)
         Gtk.Window.set_default_icon_name(desktop.APP_ID)
         quit_action = Gio.SimpleAction.new("quit", None)
-        quit_action.connect("activate", lambda *a: self.window.close() if self.window else self.quit())
+        quit_action.connect("activate", lambda *a: self.window.quit_app() if self.window else self.quit())
         self.add_action(quit_action)
         for action, keys in (("app.quit", ["<Ctrl>q"]), ("win.reload", ["<Ctrl>r", "F5"]),
                              ("win.fullscreen", ["F11"]),

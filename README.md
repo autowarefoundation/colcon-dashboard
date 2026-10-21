@@ -16,7 +16,7 @@ The server uses only the Python standard library, with zero dependencies. It wor
 - **AI failure analysis**: one click starts a headless [claude](https://claude.com/claude-code) run on a failed package and streams the investigation live.
 - **System pressure**: a per-core heatmap plus CPU, RAM, and swap meters, because a colcon build can exhaust the machine.
 - **Build history**: every build and `colcon test` run, with outcomes, durations, and deltas against the previous run.
-- **Desktop app**: the dashboard in its own window, from the applications menu. The app starts and stops the server for you.
+- **Desktop app**: the dashboard in its own window, from the applications menu. The app starts and stops the server for you, and it stays in the system tray.
 
 ## Install
 
