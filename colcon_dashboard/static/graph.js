@@ -371,6 +371,7 @@ export function updateNodes() {
     if (doomed.has(name)) cls += ' doomed';
     if (next.has(name)) cls += ' next';
     if (g.classList.contains('hl')) cls += ' hl';  // keep the hover highlight
+    if (g.classList.contains('hot')) cls += ' hot';  // keep the grabbed node lit
     if (GS.set?.has(name)) cls += ' smatch';       // keep the search highlight
     if (g.getAttribute('class') !== cls) g.setAttribute('class', cls);
     const inner = g.firstChild;

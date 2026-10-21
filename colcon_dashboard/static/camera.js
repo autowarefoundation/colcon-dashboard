@@ -168,9 +168,14 @@ export function initPanZoom() {
     wheelTimer = setTimeout(picEnd, 160);  // the gesture rests: draw it sharp
   }, { passive: false });
   let drag = null;
+  // A drag captures the pointer, and the browser then moves :hover to the
+  // svg itself. The grabbed node keeps its glow through the .hot class.
+  let hotNode = null;
   svg.addEventListener('pointerdown', ev => {
     if (!App.vb) return;
-    downNode = ev.target.closest('.node')?.dataset.name || null;
+    hotNode = ev.target.closest('.node');
+    hotNode?.classList.add('hot');
+    downNode = hotNode?.dataset.name || null;
     moved = 0;
     Force.autoFit = false;
     if (App.layoutMode === 'force' && downNode) {
@@ -215,6 +220,8 @@ export function initPanZoom() {
     else { hideTooltip(); clearFocus(); }
   });
   const end = () => {
+    hotNode?.classList.remove('hot');
+    hotNode = null;
     if (Force.dragging) { Force.dragging.fx = Force.dragging.fy = null; Force.dragging = null; }
     if (drag) picEnd();
     drag = null;
