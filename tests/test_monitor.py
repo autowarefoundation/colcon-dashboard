@@ -463,11 +463,15 @@ class ScanOnce(unittest.TestCase):
             f.write(SHUTDOWN)
         mon.scan_once()  # it ended: notify
         mon.scan_once()  # and only once
-        for _ in range(100):
+        # the command runs in a thread: wait for its whole line, then a
+        # moment more, so that a second (wrong) run would show too
+        for _ in range(200):
             if os.path.exists(out):
-                break
+                with open(out) as f:
+                    if f.read().endswith("\n"):
+                        break
             time.sleep(0.05)
-        time.sleep(0.2)
+        time.sleep(0.3)
         with open(out) as f:
             self.assertEqual(f.read(), "failed | 0 of 1 packages in 1m 39s, 1 failed\n")
 
