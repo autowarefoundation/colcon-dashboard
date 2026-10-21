@@ -9,9 +9,10 @@ from colcon_dashboard.registry import _ver_key
 
 class FmtHelpers(unittest.TestCase):
     def test_fmt_dur(self):
-        self.assertEqual(fmt_dur(0), "0:00")
-        self.assertEqual(fmt_dur(61), "1:01")
-        self.assertEqual(fmt_dur(3661), "1:01:01")
+        self.assertEqual(fmt_dur(0), "0s")
+        self.assertEqual(fmt_dur(61), "1m 1s")
+        self.assertEqual(fmt_dur(120), "2m")
+        self.assertEqual(fmt_dur(3661), "1h 1m 1s")
 
     def test_fmt_bytes(self):
         self.assertEqual(fmt_bytes(0), "0B")

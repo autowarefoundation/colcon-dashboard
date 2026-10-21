@@ -15,12 +15,14 @@ Option defaults resolve as: command line > config.ini > built-in.
 import argparse
 import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
 import sys
 import time
 import urllib.request
+import webbrowser
 
 try:
     import fcntl
@@ -94,9 +96,13 @@ def register_workspace(info, workspace, timeout=2.0):
 
 
 def fmt_dur(sec):
+    """44s, 12m 5s, 1h 0m 5s: units, like the page shows them."""
     sec = max(0, int(round(sec)))
     h, m, s = sec // 3600, sec % 3600 // 60, sec % 60
-    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+    parts = [(h, "h"), (m, "m"), (s, "s")] if h else [(m, "m"), (s, "s")] if m else [(s, "s")]
+    while len(parts) > 1 and parts[-1][0] == 0:
+        parts.pop()
+    return " ".join(f"{v}{u}" for v, u in parts)
 
 
 def fmt_bytes(n):
@@ -138,7 +144,23 @@ def unit_path():
 
 
 def systemctl(*args):
-    return subprocess.run(["systemctl", "--user", *args]).returncode
+    try:
+        return subprocess.run(["systemctl", "--user", *args]).returncode
+    except OSError:  # no systemctl at all
+        return 127
+
+
+def user_systemd_works():
+    """False in most containers and in WSL without systemd: there is no
+    systemctl, or no user session bus to talk to."""
+    if not shutil.which("systemctl"):
+        return False
+    try:
+        return subprocess.run(["systemctl", "--user", "show-environment"],
+                              stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL).returncode == 0
+    except OSError:
+        return False
 
 
 def wait_for_server(deadline=6.0):
@@ -154,11 +176,20 @@ def wait_for_server(deadline=6.0):
 
 def install_service():
     """Install and start the systemd user service."""
+    if not user_systemd_works():
+        raise SystemExit(
+            "systemd user services do not work here (no systemctl, or no user\n"
+            "session bus, as in many containers and in WSL without systemd).\n"
+            "Run the server in a terminal instead:  colcon-dashboard\n"
+            "or in the background:  nohup colcon-dashboard >/dev/null 2>&1 &")
     path = unit_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         f.write(SERVICE_UNIT.format(exe=sys.executable))
     print(f"wrote {path}")
+    # the unit names this interpreter: after a reinstall from another
+    # place (apt, pipx, a venv), run --install-service again
+    print(f"the service runs: {sys.executable} -m colcon_dashboard")
     info = read_server()
     if probe_server(info):  # hand the lock to the service
         os.kill(info["pid"], signal.SIGTERM)
@@ -310,48 +341,85 @@ def prune_cmd(info, alive, workspace, keep, log_base):
     print(f"deleted {deleted} runs, freed {fmt_bytes(freed)}")
 
 
-def main():
+EXAMPLES = """\
+examples:
+  colcon-dashboard .                 start the server (or reuse it) and open this workspace
+  colcon-dashboard . --open          the same, and open it in the browser
+  colcon-dashboard --install-service run the server at login, as a systemd user service
+  colcon-dashboard --status          the build status of this workspace, in the terminal
+  colcon-dashboard --prune --keep 5  delete all but the newest 5 builds and 5 test runs
+
+The settings file is ~/.config/colcon-dashboard/config.ini. A flag always wins over it.
+"""
+
+# the actions: at most one per call
+ACTIONS = ("stop", "stop_all", "list_workspaces", "status", "prune", "install_service",
+           "uninstall_service", "start_service", "stop_service", "restart_service",
+           "service_status")
+
+
+def build_parser():
     ap = argparse.ArgumentParser(
-        description="Colcon Dashboard - live colcon build dashboard")
+        prog="colcon-dashboard",
+        description="Colcon Dashboard - live colcon build dashboard",
+        epilog=EXAMPLES, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("workspace", nargs="?", default=None,
                     help="workspace to open (optional: the page can pick one)")
     ap.add_argument("--version", action="version",
                     version=f"colcon-dashboard {__version__}")
-    ap.add_argument("--port", type=int, default=None,
-                    help=f"HTTP port (default: {GLOBAL_PORT})")
-    ap.add_argument("--host", default=None,
-                    help="bind address (default: 127.0.0.1)")
-    ap.add_argument("--log-base", default=None,
-                    help="log directory relative to a workspace"
-                         " (default: log)")
-    ap.add_argument("--keep", type=int, default=3,
-                    help="how many runs of each kind --prune keeps"
-                         " (default: 3)")
-    act = ap.add_mutually_exclusive_group()
-    act.add_argument("--stop", action="store_true",
+    srv = ap.add_argument_group("server")
+    srv.add_argument("--open", action="store_true",
+                     help="open the dashboard in the browser")
+    srv.add_argument("--port", type=int, default=None,
+                     help=f"HTTP port (default: {GLOBAL_PORT})")
+    srv.add_argument("--host", default=None,
+                     help="bind address (default: 127.0.0.1)")
+    srv.add_argument("--log-base", default=None,
+                     help="log directory relative to a workspace"
+                          " (default: log)")
+    srv.add_argument("--stop", action="store_true",
                      help="stop the dashboard server")
-    act.add_argument("--stop-all", action="store_true", help=argparse.SUPPRESS)
-    act.add_argument("--list", action="store_true", dest="list_workspaces",
+    srv.add_argument("--stop-all", action="store_true", help=argparse.SUPPRESS)
+    srv.add_argument("--list", action="store_true", dest="list_workspaces",
                      help="list the known workspaces")
-    act.add_argument("--status", action="store_true",
+    srv.add_argument("--status", action="store_true",
                      help="print the workspace's build status and exit")
-    act.add_argument("--prune", action="store_true",
+    mnt = ap.add_argument_group("maintenance")
+    mnt.add_argument("--prune", action="store_true",
                      help="delete all but the newest runs of each kind"
                           " (see --keep)")
-    act.add_argument("--install-service", action="store_true",
-                     help="install and start the systemd user service")
-    act.add_argument("--uninstall-service", action="store_true",
-                     help="stop, disable, and remove the systemd user service")
-    act.add_argument("--start-service", action="store_true",
-                     help="start the systemd user service")
-    act.add_argument("--stop-service", action="store_true",
-                     help="stop the systemd user service")
-    act.add_argument("--restart-service", action="store_true",
-                     help="restart the systemd user service"
-                          " (e.g. after a config.ini change)")
-    act.add_argument("--service-status", action="store_true",
-                     help="show the systemd user service status")
+    mnt.add_argument("--keep", type=int, default=None,
+                     help="how many runs of each kind --prune keeps"
+                          " (default: 3)")
+    svc = ap.add_argument_group("systemd user service")
+    svc.add_argument("--install-service", action="store_true",
+                     help="install and start the service, which starts the"
+                          " server at login")
+    svc.add_argument("--uninstall-service", action="store_true",
+                     help="stop, disable, and remove the service")
+    svc.add_argument("--start-service", action="store_true",
+                     help="start the service")
+    svc.add_argument("--stop-service", action="store_true",
+                     help="stop the service")
+    svc.add_argument("--restart-service", action="store_true",
+                     help="restart the service (for example after a"
+                          " config.ini change)")
+    svc.add_argument("--service-status", action="store_true",
+                     help="show the service status")
+    return ap
+
+
+def main():
+    ap = build_parser()
     args = ap.parse_args()
+    chosen = [a for a in ACTIONS if getattr(args, a)]
+    if len(chosen) > 1:
+        ap.error("choose one of: " + ", ".join(
+            "--" + ("list" if a == "list_workspaces" else a.replace("_", "-"))
+            for a in chosen))
+    if args.keep is not None and not args.prune:
+        ap.error("--keep works only with --prune")
+    keep = args.keep if args.keep is not None else 3
 
     if args.install_service:
         return install_service()
@@ -392,7 +460,7 @@ def main():
 
     if args.prune:
         return prune_cmd(info, alive, resolve_workspace(args.workspace),
-                         args.keep, log_base)
+                         keep, log_base)
 
     if args.list_workspaces:
         if alive:
@@ -420,6 +488,16 @@ def main():
         if workspace:
             register_workspace(info, workspace)
         print(f"already running: {server_url(info, workspace)}")
+        # the running server keeps its own address: say so, not ignore it
+        if args.port is not None and args.port != info.get("port"):
+            print(f"note: --port {args.port} has no effect: the server already"
+                  f" runs on port {info.get('port')}. Stop it first (--stop,"
+                  " or --stop-service for the service).")
+        if args.host is not None and args.host != info.get("host"):
+            print(f"note: --host {args.host} has no effect: the server already"
+                  f" binds {info.get('host')}. Stop it first.")
+        if args.open:
+            webbrowser.open(server_url(info, workspace))
         return
 
     # one server per machine: hold an exclusive lock on the server file
@@ -443,6 +521,8 @@ def main():
             where = "--port" if args.port is not None else CONFIG.path
             raise SystemExit(f"port {explicit_port} is in use ({where})")
         server = ThreadingHTTPServer((host, 0), Handler)  # any free port
+        print(f"port {port} is in use: serving on port"
+              f" {server.server_address[1]} instead")
     port = server.server_address[1]
 
     lock_file.seek(0)
@@ -454,8 +534,9 @@ def main():
     Handler.registry = registry
     if workspace:
         registry.monitor(workspace)
-    if CONFIG.auto_prune_keep and CONFIG.auto_prune_keep >= 1:
-        # the headless service must watch builds to auto-prune them
+    if (CONFIG.auto_prune_keep and CONFIG.auto_prune_keep >= 1) or CONFIG.notify_command:
+        # the headless service must watch builds to auto-prune them, and
+        # to run the [notify] command when one ends
         for entry in list(registry.recents):
             if os.path.isdir(entry.get("path", "")):
                 registry.monitor(entry["path"], touch=False)
@@ -472,6 +553,9 @@ def main():
             print(f"  lan: http://{ip}:{port}/  (visible to your network)")
     if workspace:
         print(f"  workspace: {server_url(info, workspace)}")
+    print("  stop: Ctrl+C, or colcon-dashboard --stop")
+    if args.open:
+        webbrowser.open(server_url(info, workspace))
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -63,7 +63,8 @@ TEMPLATE = """\
 [builds]
 # After a build finishes, delete old runs, keeping the newest N of
 # each kind (build_*/test_*). Unset or -1: never delete anything.
-#auto_prune_keep = 10
+# For example 10 keeps the newest 10 builds and 10 test runs.
+#auto_prune_keep = -1
 
 [ai]
 # The claude CLI used for failure analysis (default: found on PATH).
