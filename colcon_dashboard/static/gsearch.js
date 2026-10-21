@@ -1,3 +1,4 @@
+import { emit } from './bus.js';
 import { zoomToPkg } from './camera.js';
 import { App } from './state.js';
 import { $ } from './util.js';
@@ -65,7 +66,13 @@ export function initGraphSearch() {
     timer = setTimeout(runGraphSearch, 200);
   };
   input.onkeydown = ev => {
-    if (ev.key === 'Enter') {
+    if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+      // Ctrl+Enter opens the log of the current match (the first one
+      // before any stepping), so the keyboard alone reaches a package log
+      ev.preventDefault();
+      const name = GS.matches[Math.max(0, GS.idx)];
+      if (name) emit('open-pkg', name);
+    } else if (ev.key === 'Enter') {
       ev.preventDefault();
       stepGraphSearch(ev.shiftKey ? -1 : 1);
     } else if (ev.key === 'Escape') {

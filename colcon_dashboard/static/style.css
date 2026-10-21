@@ -668,6 +668,7 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
 .ltab .x:hover { color: var(--critical); }
 #panes { flex: 1; min-height: 0; position: relative; }
 #panes .placeholder {
+.ltab:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: -2px; }
   position: absolute;
   inset: 0;
   display: flex;

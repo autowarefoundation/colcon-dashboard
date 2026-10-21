@@ -17,6 +17,28 @@ export const BUILD_PANE = '\0build';  // the pinned whole-build terminal view
 
 export const FAIL_PANE = '\0failures';  // the aggregated failure summary
 
+// The log tabs work from the keyboard: Enter or Space opens a tab,
+// Delete closes it, and the arrow keys move between tabs.
+function tabKeys(tab, name, closable) {
+  tab.tabIndex = 0;
+  tab.setAttribute('role', 'tab');
+  tab.addEventListener('keydown', ev => {
+    if (ev.target !== tab) return;  // the close button handles its own keys
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      activatePane(name);
+    } else if (ev.key === 'Delete' && closable) {
+      const next = tab.previousElementSibling?.matches('.ltab')
+        ? tab.previousElementSibling : tab.nextElementSibling;
+      closePane(name);
+      if (next?.matches('.ltab')) next.focus();
+    } else if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') {
+      const to = ev.key === 'ArrowRight' ? tab.nextElementSibling : tab.previousElementSibling;
+      if (to?.matches('.ltab')) to.focus();
+    }
+  });
+}
+
 export function openPane(name) {
   if (!App.panes.has(name)) createPane(name);
   activatePane(name);
@@ -95,6 +117,7 @@ export function createPane(name) {
   };
   tab.title = fixed ? 'double-click to fit the whole graph'
                     : 'double-click to find this package in the graph';
+  tabKeys(tab, name, !fixed);
   $('#logtabs').appendChild(tab);
 
   const pane = document.createElement('div');
@@ -387,6 +410,7 @@ export function activatePane(name) {
 }
 
 export function closePane(name) {
+    p.tabEl.setAttribute('aria-selected', n === name ? 'true' : 'false');
   const p = App.panes.get(name);
   if (!p || p.fixed) return;
   // every close path counts as a dismissal, "close all" included
@@ -537,6 +561,7 @@ export function createFailPane() {
   pane.className = 'pane';
   pane.innerHTML = `
     <div class="phead">
+  tabKeys(tab, FAIL_PANE, true);
       <span class="pname">failed packages</span>
       <span class="chip failed">…</span>
       <span class="grow"></span>

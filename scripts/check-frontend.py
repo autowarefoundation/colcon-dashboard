@@ -34,7 +34,7 @@ ALLOWED = {
             'util'],
     'gantt': ['bus', 'graph', 'gsearch', 'state', 'util'],
     'graph': ['bus', 'camera', 'gsearch', 'modes', 'state', 'util'],
-    'gsearch': ['camera', 'state', 'util'],
+    'gsearch': ['bus', 'camera', 'state', 'util'],
     'header': ['bus', 'state', 'util'],
     'help': ['util'],
     # logo.js is a copy of the logo generator; it imports nothing
