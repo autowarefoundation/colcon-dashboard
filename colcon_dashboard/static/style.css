@@ -1069,7 +1069,14 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
   color: var(--ink);
 }
 .wsrow .wpath { flex: 1; }
-.wsrow .star {
+/* a row's star or delete button sits next to its link, over the row's end */
+.wsitem { position: relative; }
+.wsitem > .star, .wsitem > .del {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+}
+#wslist .wsitem > .wsrow { padding-right: 36px; }
+#bpick .wsitem > .wsrow { padding-right: 72px; }  /* room for "delete?" */
+.wsitem > .star {
   background: none;
   box-shadow: none;
   border: none;
@@ -1078,8 +1085,8 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
   color: var(--baseline);
   cursor: pointer;
 }
-.wsrow .star:hover { color: var(--warning); }
-.wsrow .star.on { color: var(--warning); }
+.wsitem > .star:hover { color: var(--warning); }
+.wsitem > .star.on { color: var(--warning); }
 .wsrow:hover { border-color: var(--accent); background: var(--page); }
 .wsrow.cur { border-color: var(--accent); }
 .wsrow .wpath { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
@@ -1189,8 +1196,9 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
   overflow: hidden;
 }
 #wslist .wprog span { display: block; height: 100%; background: var(--accent); }
-#wslist .wsrow .star { visibility: hidden; font-size: 13px; }
-#wslist .wsrow:hover .star, #wslist .kbd .star, #wslist .wsrow .star.on { visibility: visible; }
+#wslist .wsitem > .star { visibility: hidden; font-size: 13px; }
+#wslist .wsitem:hover > .star, #wslist .wsitem:has(> .kbd) > .star,
+#wslist .wsitem > .star.on, #wslist .wsitem > .star:focus-visible { visibility: visible; }
 #wslist .wsgroup { cursor: pointer; color: var(--ink); }
 #wslist .wsgroup .caret { flex: none; width: 8px; font-size: 10px; color: var(--muted); transition: transform 0.12s; }
 #wslist .wsgroup.open .caret { transform: rotate(90deg); }
@@ -1248,7 +1256,7 @@ body.offline #ws, body.offline #buildid { border-color: rgba(255, 255, 255, 0.45
 }
 #bpick[hidden] { display: none; }
 #bpick .wsadd { display: flex; margin-top: 12px; }
-.wsrow .del {
+.wsitem > .del {
   background: none;
   box-shadow: none;
   border: none;
@@ -1257,8 +1265,8 @@ body.offline #ws, body.offline #buildid { border-color: rgba(255, 255, 255, 0.45
   color: var(--baseline);
   cursor: pointer;
 }
-.wsrow .del:hover { color: var(--critical); }
-.wsrow .del.sure { color: #fff; background: var(--critical); border-radius: 5px; padding: 0 6px; }
+.wsitem > .del:hover { color: var(--critical); }
+.wsitem > .del.sure { color: #fff; background: var(--critical); border-radius: 5px; padding: 0 6px; }
 .wsrow .tag {
   font-size: 10px;
   padding: 0 6px;

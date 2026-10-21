@@ -69,9 +69,18 @@ function wsRow(w, inGroup) {
     `<span class="wname">${esc(shown.slice(cut))}</span>` +
     // rtl cuts a long directory from the left; the marks keep "/" in place
     `<span class="wdir">${inGroup ? '' : `&lrm;${esc(shown.slice(0, cut))}&lrm;`}</span>` +
-    right +
-    `<button class="star${w.fav ? ' on' : ''}" title="${w.fav ? 'unstar' : 'star'}">★</button>`;
-  a.querySelector('.star').onclick = async ev => {
+    right;
+  // the star sits next to the link, not inside it: a button inside a link
+  // is invalid HTML, and screen readers read the row as one link
+  const item = document.createElement('div');
+  item.className = 'wsitem';
+  const star = document.createElement('button');
+  star.className = 'star' + (w.fav ? ' on' : '');
+  star.title = w.fav ? 'unstar' : 'star';
+  star.setAttribute('aria-label', `${w.fav ? 'unstar' : 'star'} ${shown}`);
+  star.textContent = '★';
+  item.append(a, star);
+  star.onclick = async ev => {
     ev.preventDefault();
     ev.stopPropagation();
     try {
@@ -80,7 +89,7 @@ function wsRow(w, inGroup) {
     } catch (e) { /* server gone */ }
     openWsPicker();
   };
-  return a;
+  return item;
 }
 
 function wsSection(list, title, extra) {
@@ -450,9 +459,15 @@ export async function openBuildPicker(retry) {
       (b.id === latest ? '<span class="tag">latest</span>' : '') +
       outcomeHtml(b) +
       durHtml +
-      `<span class="wmeta">${fmtBytes(b.size)}</span>` +
-      `<button class="del" title="delete this build's logs">🗑</button>`;
-    const del = a.querySelector('.del');
+      `<span class="wmeta">${fmtBytes(b.size)}</span>`;
+    const item = document.createElement('div');
+    item.className = 'wsitem';
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.title = "delete this build's logs";
+    del.setAttribute('aria-label', `delete the logs of ${b.id}`);
+    del.textContent = '🗑';
+    item.append(a, del);
     del.onclick = async ev => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -472,7 +487,7 @@ export async function openBuildPicker(retry) {
                  : `Not deleted: ${r.error}`, r.ok ? 'info' : '');
       openBuildPicker();
     };
-    list.appendChild(a);
+    list.appendChild(item);
   });
 }
 
