@@ -344,7 +344,7 @@ export function draw3d(now) {
                    (w - 3 * s) * p.pct / 100, 2.5 * s);
     }
     const fontPx = 11 * s;
-    if (fontPx > 3.2) {
+    if (fontPx > 1.5) {  // only a label that is a mere smudge goes, as in 2D
       ctx.font = `${stKey === 'building' || stKey === 'failed' ? '600 ' : ''}` +
                  `${fontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`;
       ctx.fillStyle = pal.text;

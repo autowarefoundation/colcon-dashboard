@@ -40,7 +40,7 @@ Edges take color from their endpoints:
 - The **state chips** (failed, building, waiting, done) filter the same way by state instead of by name, and combine with the find box. One click on **failed** shows the whole blast radius of a broken build.
 - Double-click a log tab in the dock to center the view on that package.
 - Drag to pan, scroll to zoom. **Fit** frames the whole graph.
-- When you zoom far out, the labels hide and each node becomes a plain colored box. A graph of hundreds of packages then stays readable at Fit.
+- When you zoom out so far that a label would be a mere smudge (under 1.5 pixels high), the labels hide and each node becomes a plain colored box. Until then, the labels stay, even when they are small.
 - **⌖ follow build** keeps the camera on the packages that build now, so the action stays framed as the build moves. If you pan or zoom by hand, the camera is yours again.
 - The **show** switch picks what the graph draws: only the packages of this build, or the whole workspace.
 - When most package names share a prefix such as `autoware_`, the labels hide it. Tooltips keep the full name. To pick other prefixes, or to show the full names, click the prefix menu at the right end of the view bar. The menu suggests the common prefixes of the workspace, and you can hide more than one. The page saves the choice per workspace in this browser.
