@@ -122,6 +122,21 @@ export function estimateEta(s) {
   return Math.max(critical, work / workers);
 }
 
+function summaryLine(s, c) {
+  const done = c.done || 0;
+  const dur = fmtDur(s.elapsed);
+  const lead = done === s.total
+    ? `${s.total} package${s.total === 1 ? '' : 's'} built in ${dur}`
+    : `${done} of ${s.total} packages built in ${dur}`;
+  const parts = [['failed', c.failed], ['aborted', c.aborted],
+                 ['skipped', c.skipped], ['waiting', (c.waiting || 0)
+                   + (c.ready || 0) + (c.blocked || 0), 'not built']]
+    .filter(([, n]) => n)
+    .map(([cls, n, word]) => `<span class="part"><span class="dot c-${cls}"></span>`
+                             + `<b>${n}</b> ${word || cls}</span>`);
+  return `<span class="lead">${lead}</span>${parts.join('')}`;
+}
+
 export function applyState(s) {
   const c = s.counts || {};
   const done = c.done || 0, failed = c.failed || 0, aborted = c.aborted || 0;
@@ -149,6 +164,12 @@ export function applyState(s) {
   $('#t-rate').innerHTML = (rate ? rate.toFixed(1) : '–') + '<small> pkg/min</small>';
   const eta = estimateEta(s);
   $('#t-eta').textContent = eta != null ? `~${fmtDur(eta)}` : '–';
+
+  // a build that ended gets one summary line instead of a row of zeros
+  const ended = !s.active && !!s.build_id;
+  $('#tiles').hidden = ended;
+  $('#tsum').hidden = !ended;
+  if (ended) $('#tsum').innerHTML = summaryLine(s, c);
 
   const seg = (cls, n) =>
     $(`#meter .seg.${cls}`).style.flexBasis = (s.total ? (100 * n / s.total) : 0) + '%';

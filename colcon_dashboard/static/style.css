@@ -263,6 +263,12 @@ body.offline #sysmeters { display: none; }
 .tile .value { font-size: 21px; font-weight: 600; line-height: 1.2; }
 .tile .value small { font-size: 12px; font-weight: 400; color: var(--muted); }
 .tile.hero .value { font-size: 30px; }
+#tiles[hidden], #tsum[hidden] { display: none; }
+#tsum { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; font-size: 13px; color: var(--ink2); }
+#tsum .lead { font-size: 21px; font-weight: 600; color: var(--ink); }
+#tsum .part { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+#tsum .part .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+#tsum b { color: var(--ink); font-weight: 600; }
 .dot.c-done { background: var(--good); }
 .dot.c-building { background: var(--accent); }
 .dot.c-ready { background: color-mix(in srgb, var(--accent) 45%, var(--surface)); border: 1px solid var(--accent); }
