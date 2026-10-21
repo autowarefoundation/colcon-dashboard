@@ -39,7 +39,8 @@ export function fmtDur(sec) {
 // why a package failed: its exit code, or "tests failed" for a colcon
 // test run, which keeps the exit code at 0 (p.tf)
 export function failNote(p) {
-  return p?.tf ? 'tests failed' : `rc ${p?.rc ?? '?'}`;
+  const why = p?.tf ? 'tests failed' : `rc ${p?.rc ?? '?'}`;
+  return p?.ph && !p?.tf ? `${why} in ${p.ph}` : why;  // the step that failed
 }
 
 // the exact time in words, for tooltips: "44 minutes 12.4 seconds"

@@ -521,13 +521,26 @@ export function showNodeTooltip(name, ev) {
       let row = `time <b>${fmtDur(dur)}</b>`;
       const prevDur = App.prev?.durations?.[name];
       if (prevDur != null) {
-        row += ` · last build ${fmtDur(prevDur)}`;
+        // the median of the last runs, or the last run when there is one
+        row += App.prev.runs > 1 ? ` · usually ${fmtDur(prevDur)}` : ` · last build ${fmtDur(prevDur)}`;
         if (dur > prevDur * 1.5 && dur - prevDur > 10)
           row += ' <span class="treg">slower</span>';
       }
       rows.push(row);
     }
     if (p.err) rows.push(`stderr lines <b>${p.err}</b>`);
+    if (p.warn) rows.push(`warnings <b>${p.warn}</b>`);
+    if (p.tr) {
+      const bad = p.tr.f + p.tr.e;
+      rows.push(`tests <b>${p.tr.t}</b>` + (bad ? ` · <b>${bad} failed</b>` : '')
+                + (p.tr.s ? ` · ${p.tr.s} skipped` : ''));
+    }
+    if (App.prev?.failed) {
+      const was = App.prev.failed.includes(name);
+      if (p.s === 'failed' && !was) rows.push('<b>new failure</b> since the last run');
+      else if (p.s === 'done' && was) rows.push('<b>fixed</b>: it failed in the last run');
+    }
+    if (p.s === 'failed' && p.cmd) rows.push(`failed command <span class="mono">${esc(p.cmd)}</span>`);
   } else {
     rows.push(meta.in_build ? 'state <b>pending</b>' : 'not part of this build');
   }

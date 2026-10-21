@@ -353,6 +353,15 @@ body.offline #sysmeters { display: none; }
 .dot.c-aborted { background: var(--serious); }
 .dot.c-skipped { background: var(--baseline); }
 .dot.c-none { background: transparent; }
+.dot.c-warn { background: var(--warning); }
+/* the build's options, shortened; the tooltip has all of them */
+#bargs { color: var(--muted); max-width: clamp(80px, 14vw, 260px); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+#bargs[hidden] { display: none; }
+.fitem .ftests { margin: 2px 0 4px; padding-left: 18px; font-size: 11.5px; color: var(--ink2); }
+.fitem .ftests li { margin: 1px 0; overflow-wrap: anywhere; }
+.chip.newfail { color: var(--critical); border-color: var(--critical); font-weight: 650; }
+.fitem .fcmd { font-size: 11px; color: var(--ink2); margin: 2px 0 4px; overflow-wrap: anywhere; }
+.wsrow .wpath .bargs { display: block; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
 
 /* ---- view tabs & controls ---- */
 #viewbar {

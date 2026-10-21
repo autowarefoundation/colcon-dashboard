@@ -96,6 +96,41 @@ class PackageIndex:
         return name, deps, build_type
 
 
+# colcon options worth showing, in the order they are shown, with their
+# defaults: a build differs from the last one in these
+SHOWN_ARGS = (
+    ("packages_select", None), ("packages_up_to", None), ("packages_above", None),
+    ("packages_skip", None), ("packages_select_regex", None),
+    ("packages_skip_regex", None), ("packages_up_to_regex", None),
+    ("packages_select_build_failed", False), ("packages_skip_build_finished", False),
+    ("packages_select_test_failures", False), ("packages_skip_test_passed", False),
+    ("mixin", None), ("symlink_install", False), ("merge_install", False),
+    ("continue_on_error", False), ("cmake_clean_cache", False),
+    ("cmake_clean_first", False), ("cmake_force_configure", False),
+    ("cmake_args", None),
+)
+
+
+def summarize_args(ns):
+    """The command line options that differ from colcon's defaults, as one
+    short string: "--packages-up-to foo --mixin release ccache"."""
+    if not ns:
+        return ""
+    out = []
+    for key, default in SHOWN_ARGS:
+        value = ns.get(key, default)
+        if value == default or value in (None, [], ()):
+            continue
+        flag = "--" + key.replace("_", "-")
+        if value is True:
+            out.append(flag)
+        elif isinstance(value, (list, tuple)):
+            out.append(flag + " " + " ".join(str(v) for v in value))
+        else:
+            out.append(f"{flag} {value}")
+    return " ".join(out)
+
+
 def parse_namespace(logger_path):
     """Extract simple fields of colcon's 'Parsed command line arguments' line."""
     try:
@@ -115,3 +150,47 @@ def parse_namespace(logger_path):
                 pass
         return fields
     return None
+
+
+def _xml_files(paths):
+    for path in paths:
+        if os.path.isfile(path):
+            yield path
+        for dirpath, _dirnames, filenames in os.walk(path):
+            for fn in sorted(filenames):
+                if fn.endswith(".xml"):
+                    yield os.path.join(dirpath, fn)
+
+
+def read_test_results(paths, max_failures=20):
+    """Counts and failing cases from the JUnit XML files in paths (folders
+    to walk, or single files), the files that `colcon test-result` reads.
+    None when there are none."""
+    total = failures = errors = skipped = 0
+    failing = []
+    found = False
+    for path in _xml_files(paths):
+        try:
+            root = ET.parse(path).getroot()
+        except (ET.ParseError, OSError):
+            continue
+        found = True
+        for case in root.iter("testcase"):
+            total += 1
+            bad = case.find("failure")
+            if bad is None:
+                bad = case.find("error")
+                if bad is not None:
+                    errors += 1
+            else:
+                failures += 1
+            if case.find("skipped") is not None:
+                skipped += 1
+            if bad is not None and len(failing) < max_failures:
+                name = ".".join(x for x in (case.get("classname"), case.get("name")) if x)
+                msg = (bad.get("message") or bad.text or "").strip().splitlines()
+                failing.append({"n": name, "m": (msg[0] if msg else "")[:200]})
+    if not found:
+        return None
+    return {"t": total, "f": failures, "e": errors, "s": skipped, "fail": failing}
+

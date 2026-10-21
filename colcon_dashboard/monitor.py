@@ -13,9 +13,9 @@ import time
 from .ai import AIAnalysis, CLAUDE_BIN
 from .config import CONFIG
 from .events import (
-    BUILD_DIR_RE, EVENT_RE, EventLog, RC_RE, parse_build_id_time,
+    BUILD_DIR_RE, EVENT_RE, EventLog, RC_RE, WARNING_RE, parse_build_id_time,
 )
-from .packages import PackageIndex, parse_namespace
+from .packages import PackageIndex, parse_namespace, read_test_results, summarize_args
 
 LOG_FILES = {
     "combined": "stdout_stderr.log",
@@ -96,6 +96,7 @@ class BuildMonitor:
         self._builds_cache = None
         self._outcome_mem = {}  # build_dir -> (events.log mtime, outcome)
         self._pkg_key = self._graph_key = None  # the inputs of the cached tables
+        self._test_cache = {}  # package -> (job end time, JUnit results)
         self._pkg_cached = None
         self.analyses = {}  # (build_dir, pkg) -> AIAnalysis
         self.active_flag = False
@@ -154,9 +155,14 @@ class BuildMonitor:
         if self.pin_build:  # a fixed historical build
             p = os.path.join(self.log_base, self.pin_build)
             return p if os.path.isdir(p) else None
-        latest = os.path.join(self.log_base, "latest_build")
-        if os.path.isdir(latest):
-            return os.path.realpath(latest)
+        # follow the newer of the last build and the last test run, so a
+        # running `colcon test` shows live like a build
+        runs = [os.path.realpath(os.path.join(self.log_base, link))
+                for link in ("latest_build", "latest_test")
+                if os.path.isdir(os.path.join(self.log_base, link))]
+        if runs:
+            return max(runs, key=lambda d: (parse_build_id_time(os.path.basename(d)) or 0,
+                                            os.path.basename(d)))
         try:
             candidates = sorted(
                 d for d in os.listdir(self.log_base) if d.startswith("build_")
@@ -166,7 +172,7 @@ class BuildMonitor:
         return os.path.join(self.log_base, candidates[-1]) if candidates else None
 
     OUTCOME_FILE = ".colcon-dashboard.json"
-    OUTCOME_V = 3  # bump when _compute_outcome grows new fields
+    OUTCOME_V = 4  # bump when _compute_outcome grows new fields
 
     def _read_outcome(self, build_dir):
         try:
@@ -183,6 +189,8 @@ class BuildMonitor:
         path = os.path.join(build_dir, "events.log")
         total = done = failed = aborted = skipped = 0
         test_failed = set()  # names: colcon test keeps their rc at 0
+        failed_names = []    # for "newly failing since the last build"
+        warnings = {}        # per-package warning lines
         shutdown = False
         starts = {}     # name bytes -> start t
         durations = {}  # per-package seconds, successful jobs only
@@ -216,12 +224,20 @@ class BuildMonitor:
                                     - starts[em.group(2)], 1)
                         else:
                             failed += 1
+                            em = EVENT_RE.match(line)
+                            if em and em.group(3) == b"JobEnded":
+                                failed_names.append(em.group(2).decode("utf-8", "replace"))
                     elif b"TestFailure" in line:
                         m = EVENT_RE.match(line)
                         if m and m.group(3) == b"TestFailure":
                             test_failed.add(m.group(2))
                     elif b"JobSkipped" in line:
                         skipped += 1
+                    elif WARNING_RE.search(line):
+                        m = EVENT_RE.match(line)
+                        if m and m.group(3) in (b"StdoutLine", b"StderrLine"):
+                            name = m.group(2).decode("utf-8", "replace")
+                            warnings[name] = warnings.get(name, 0) + 1
                     elif b"EventReactorShutdown" in line:
                         shutdown = True
         except OSError:
@@ -246,6 +262,11 @@ class BuildMonitor:
         info = {"v": self.OUTCOME_V, "outcome": outcome, "done": done,
                 "total": total, "failed": failed, "aborted": aborted,
                 "skipped": skipped, "test_failed": len(test_failed),
+                "failed_names": sorted(set(failed_names) | {
+                    n.decode("utf-8", "replace") for n in test_failed}),
+                "warnings": sum(warnings.values()), "pkg_warnings": warnings,
+                "args": summarize_args(parse_namespace(
+                    os.path.join(build_dir, "logger_all.log"))),
                 "duration": duration,
                 "pkg_durations": durations}
         try:
@@ -256,6 +277,21 @@ class BuildMonitor:
             # or every listing reads the whole events.log again
             self._outcome_mem[build_dir] = (mtime, info)
         return info
+
+    def _test_results(self, name, ended):
+        """A package's JUnit results, read once when its test job ends."""
+        hit = self._test_cache.get(name)
+        if hit and hit[0] == ended:
+            return hit[1]
+        ns = self.namespace or {}
+        if ns.get("test_result_base"):  # everything goes there, per package
+            paths = [os.path.join(self.workspace, ns["test_result_base"], name)]
+        else:  # ament_cmake: test_results/; pytest: pytest.xml
+            root = os.path.join(self.workspace, ns.get("build_base") or "build", name)
+            paths = [os.path.join(root, "test_results"), os.path.join(root, "pytest.xml")]
+        result = read_test_results(paths)
+        self._test_cache[name] = (ended, result)
+        return result
 
     def _outcome_from_memory(self, build_dir):
         hit = self._outcome_mem.get(build_dir)
@@ -292,7 +328,7 @@ class BuildMonitor:
             info = self._read_outcome(bdir)
             if info:
                 entry.update({k: v for k, v in info.items()
-                              if k not in ("v", "pkg_durations")})
+                              if k not in ("v", "pkg_durations", "pkg_warnings")})
             elif not (name == self.build_id
                       and getattr(self, "active_flag", False)):
                 pending.append(name)
@@ -322,7 +358,10 @@ class BuildMonitor:
             self.prev_info = info
 
     def _find_prev_outcome(self, build_id):
-        """The nearest earlier run of the same kind, with its outcome."""
+        """The nearest earlier run of the same kind, with its outcome. Its
+        "median_durations" are the median of each package over up to 5
+        earlier runs, so that one --packages-select run or one quick
+        incremental build does not become the reference."""
         kind = build_id.split("_", 1)[0] + "_"
         try:
             names = sorted((d for d in os.listdir(self.log_base)
@@ -330,14 +369,29 @@ class BuildMonitor:
                            reverse=True)
         except OSError:
             return None
-        for name in names[:5]:
+        found = []
+        for name in names[:8]:
             bdir = os.path.join(self.log_base, name)
             info = self._read_outcome(bdir) or self._compute_outcome(bdir)
             if info and info.get("outcome") != "empty":
                 info = dict(info)
                 info["id"] = name
-                return info
-        return None
+                found.append(info)
+                if len(found) == 5:
+                    break
+        if not found:
+            return None
+        samples = {}
+        for info in found:
+            for pkg, sec in (info.get("pkg_durations") or {}).items():
+                samples.setdefault(pkg, []).append(sec)
+        nearest = found[0]
+        nearest["median_durations"] = {
+            pkg: sorted(v)[len(v) // 2] if len(v) % 2 else
+            round((sorted(v)[len(v) // 2 - 1] + sorted(v)[len(v) // 2]) / 2, 1)
+            for pkg, v in samples.items()}
+        nearest["runs"] = len(found)
+        return nearest
 
     def _auto_prune(self):
         """After a build ends: prune old runs, when the config asks for it."""
@@ -447,6 +501,7 @@ class BuildMonitor:
         else:
             done = {n for n, j in jobs.items() if j["ended"] is not None and j["rc"] == 0}
             job_names = set(jobs)
+            is_test = (self.namespace or {}).get("verb_name") == "test"
             packages = {}
             for name, job in jobs.items():
                 entry = {}
@@ -461,6 +516,11 @@ class BuildMonitor:
                     else:
                         st = "failed"
                         entry["rc"] = job["rc"]
+                    if st == "failed":  # the step and the command that failed
+                        if job["phase"]:
+                            entry["ph"] = job["phase"]
+                        if job["fail_cmd"]:
+                            entry["cmd"] = job["fail_cmd"][:400]
                 elif job["started"] is not None:
                     st = "building" if active else "aborted"
                     entry["ph"] = job["phase"]
@@ -485,6 +545,12 @@ class BuildMonitor:
                     entry["t1"] = round(epoch0 + job["ended"], 2)
                 if job["stderr_lines"]:
                     entry["err"] = job["stderr_lines"]
+                if job["warnings"]:
+                    entry["warn"] = job["warnings"]
+                if is_test and job["ended"] is not None:
+                    tr = self._test_results(name, job["ended"])
+                    if tr:
+                        entry["tr"] = tr
                 if job["started"] is not None:
                     try:
                         entry["log"] = os.path.getsize(
@@ -504,6 +570,8 @@ class BuildMonitor:
             "build_id": build_id,
             "active": bool(active),
             "workers": (self.namespace or {}).get("parallel_workers"),
+            "verb": (self.namespace or {}).get("verb_name"),
+            "args": summarize_args(self.namespace),
             "build_started": epoch0,
             "elapsed": round((now - epoch0) if active else ev.last_t, 1),
             "now": round(now, 2),
@@ -536,7 +604,10 @@ class BuildMonitor:
             if self.prev_info:
                 prev = {"id": self.prev_info.get("id"),
                         "duration": self.prev_info.get("duration"),
-                        "durations": self.prev_info.get("pkg_durations") or {}}
+                        "durations": (self.prev_info.get("median_durations")
+                                  or self.prev_info.get("pkg_durations") or {}),
+                    "runs": self.prev_info.get("runs", 1),
+                    "failed": self.prev_info.get("failed_names") or []}
             graph = {"build_id": build_id, "packages": graph_pkgs, "prev": prev}
             self._graph_key = graph_key
 

@@ -596,13 +596,21 @@ export function buildFailItem(name, st) {
       <button class="fjump mono" title="find this package in the graph">${esc(label(name))}</button>
       <span class="chip failed">${esc(failNote(st))}</span>
       ${dur ? `<span class="fmeta">failed after ${dur}</span>` : ''}
+      ${st.warn ? `<span class="fmeta">${st.warn} warning${st.warn === 1 ? '' : 's'}</span>` : ''}
+      ${App.prev?.failed && !App.prev.failed.includes(name)
+        ? '<span class="chip newfail" title="it did not fail in the last run">new</span>' : ''}
       <span class="grow"></span>
       <button class="fcopy" title="copy the name, the reason, and the log tail as text">⧉ copy</button>
       <button class="askai" ${App.ai ? '' : 'hidden'} title="explain this failure with the claude CLI">✦ ask claude</button>
       <button class="fopen" title="open the full log pane">open log</button>
     </div>
+    ${st.cmd ? `<div class="fcmd mono" title="the command that failed">$ ${esc(st.cmd)}</div>` : ''}
+    ${(st.tr?.fail || []).length ? `<ul class="ftests">${st.tr.fail.map(f =>
+      `<li><span class="mono">${esc(f.n)}</span>${f.m ? ` - ${esc(f.m)}` : ''}</li>`).join('')}</ul>` : ''}
     <pre class="ftail">loading…</pre>`;
-  el.dataset.head = `${name}: ${failNote(st)}` + (dur ? `, failed after ${dur}` : '');
+  el.dataset.head = `${name}: ${failNote(st)}` + (dur ? `, failed after ${dur}` : '')
+    + (st.cmd ? `\n$ ${st.cmd}` : '')
+    + (st.tr?.fail || []).map(f => `\nFAILED ${f.n}${f.m ? `: ${f.m}` : ''}`).join('');
   el.querySelector('.fcopy').onclick = () => copyFailures([el], name);
   el.querySelector('.fjump').onclick = () => {
     emit('open-pkg', name);

@@ -8,7 +8,8 @@ from colcon_dashboard.events import (
     BuildLogBuffer, EventLog, parse_build_id_time, payload_line,
 )
 from tests.helpers import (
-    ended, event_line, queued, started, stderr_line, stdout_line,
+    command, command_ended, ended, event_line, queued, started, stderr_line,
+    stdout_line,
 )
 
 
@@ -51,6 +52,19 @@ class EventLogParsing(unittest.TestCase):
             ev = self.ev = EventLog(self.path)
         ev.poll()
         return ev
+
+    def test_failed_command_and_warnings(self):
+        ev = self.feed([
+            queued(0.1, "a"), started(0.2, "a"),
+            command(0.3, "a", ["/usr/bin/cmake", "/ws/src/a"]), command_ended(0.4, "a"),
+            stderr_line(0.5, "a", "a.cpp:3:1: warning: unused x\n"),
+            stdout_line(0.6, "a", "CMake Warning at CMakeLists.txt:4\n"),
+            command(0.7, "a", ["/usr/bin/cmake", "--build", "/ws/build/a"]),
+            command_ended(0.9, "a", 2), ended(1.0, "a", rc=2),
+        ])
+        job = ev.jobs["a"]
+        self.assertEqual(job["fail_cmd"], "/usr/bin/cmake --build /ws/build/a")
+        self.assertEqual(job["warnings"], 2)
 
     def test_job_lifecycle_and_buildlog(self):
         ev = self.feed([

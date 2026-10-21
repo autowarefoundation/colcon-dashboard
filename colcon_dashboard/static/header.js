@@ -125,10 +125,24 @@ export function estimateEta(s) {
 function summaryLine(s, c) {
   const done = c.done || 0;
   const dur = fmtDur(s.elapsed);
+  const did = s.verb === 'test' ? 'tested' : 'built';
   const lead = done === s.total
-    ? `${s.total} package${s.total === 1 ? '' : 's'} built in ${dur}`
-    : `${done} of ${s.total} packages built in ${dur}`;
-  const parts = [['failed', c.failed], ['aborted', c.aborted],
+    ? `${s.total} package${s.total === 1 ? '' : 's'} ${did} in ${dur}`
+    : `${done} of ${s.total} packages ${did} in ${dur}`;
+  const pkgs = Object.entries(s.packages || {});
+  const warned = pkgs.reduce((n, [, p]) => n + (p.warn || 0), 0);
+  // a test run: the test cases, from the JUnit files
+  const tests = pkgs.reduce((n, [, p]) => n + (p.tr?.t || 0), 0);
+  const badTests = pkgs.reduce((n, [, p]) => n + (p.tr ? p.tr.f + p.tr.e : 0), 0);
+  // against the last run of the same kind: what broke, what got fixed
+  const before = new Set(App.prev?.failed || []);
+  const newly = pkgs.filter(([n, p]) => p.s === 'failed' && App.prev && !before.has(n)).length;
+  const fixed = pkgs.filter(([n, p]) => p.s === 'done' && before.has(n)).length;
+  const parts = [['failed', c.failed], ['failed', newly, 'newly failing'],
+                 ['done', fixed, 'fixed since the last run'],
+                 ['done', tests, 'tests'], ['failed', badTests, 'failed tests'],
+                 ['aborted', c.aborted],
+                 ['warn', warned, 'warnings'],
                  ['skipped', c.skipped], ['waiting', (c.waiting || 0)
                    + (c.ready || 0) + (c.blocked || 0), 'not built']]
     .filter(([, n]) => n)
@@ -151,6 +165,12 @@ export function applyState(s) {
   $('#buildid').textContent = s.build_id;
   updateSysMeters(s.sys);
   $('#workers').textContent = s.workers ? `${s.workers} workers` : '';
+  // the options that make this build differ from a plain colcon build
+  const args = $('#bargs');
+  const verb = s.verb && s.verb !== 'build' ? `colcon ${s.verb} ` : '';
+  args.hidden = !(verb || s.args);
+  args.textContent = verb + (s.args || '');
+  args.title = `colcon ${s.verb || 'build'} ${s.args || ''}`.trim();
   if (s.active) setBadge('live', 'LIVE');
   else if (failed) setBadge('failed', 'FAILED');
   else if (done === s.total && s.total > 0) setBadge('complete', 'COMPLETE');

@@ -17,6 +17,12 @@ PROGRESS_RE = re.compile(rb"'progress': '([^']*)'")
 DEP_KEY_RES = (re.compile(rb"'([^']+)': '/"),      # dict repr  {'name': '/path'}
                re.compile(rb"\('([^']+)', '/"))    # legacy     [('name', '/path')]
 PCT_RE = re.compile(rb"\[\s*(\d{1,3})%\]")
+# only the command of a Command event: its payload also holds the whole
+# environment, which can be large
+CMD_RE = re.compile(rb"'cmd': (\[.*?\]), 'cwd'")
+RETURNCODE_RE = re.compile(rb"'returncode': (-?\d+)")
+# compiler and CMake warnings
+WARNING_RE = re.compile(rb"warning:|CMake Warning")
 
 # the log directories colcon writes per run: build_<stamp>, test_<stamp>
 BUILD_DIR_RE = re.compile(r"(?:build|test)_[\w.-]+")
@@ -114,7 +120,8 @@ class EventLog:
             job = self.jobs[name] = {
                 "deps": set(), "queued": None, "started": None, "ended": None,
                 "rc": None, "skipped": False, "phase": "", "pct": None,
-                "stderr_lines": 0, "test_failed": False,
+                "stderr_lines": 0, "test_failed": False, "warnings": 0,
+                "cmd": None, "fail_cmd": None,
             }
         return job
 
@@ -153,6 +160,8 @@ class EventLog:
             job = self._job(name)
             if event == b"StderrLine":
                 job["stderr_lines"] += 1
+            if WARNING_RE.search(payload):
+                job["warnings"] += 1
             if b"%]" in payload:
                 pm = PCT_RE.search(payload)
                 if pm:
@@ -193,6 +202,19 @@ class EventLog:
             pm = PROGRESS_RE.search(payload)
             if pm:
                 self._job(name)["phase"] = pm.group(1).decode("utf-8", "replace")
+        elif event == b"Command":
+            cm = CMD_RE.search(payload)
+            if cm:
+                try:
+                    self._job(name)["cmd"] = " ".join(
+                        str(a) for a in ast.literal_eval(cm.group(1).decode("utf-8", "replace")))
+                except (ValueError, SyntaxError):
+                    pass
+        elif event == b"CommandEnded":
+            rm = RETURNCODE_RE.search(payload)
+            job = self._job(name)
+            if rm and int(rm.group(1)) != 0 and job["cmd"]:
+                job["fail_cmd"] = job["cmd"]  # the step that failed
         elif event == b"TestFailure":
             # colcon test keeps the job's rc at 0 when tests fail and sends
             # this event instead

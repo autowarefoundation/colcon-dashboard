@@ -34,6 +34,17 @@ def ended(t, name, rc=0):
                       "{{'identifier': '{}', 'rc': {}}}".format(name, rc_repr))
 
 
+def command(t, name, cmd):
+    """A Command event: the step that colcon runs, with an environment, as colcon logs it."""
+    return event_line(t, name, "Command",
+                      "{{'cmd': {!r}, 'cwd': '/ws/build/{}', 'env': OrderedDict({{'PATH': '/usr/bin'}})}}"
+                      .format(list(cmd), name))
+
+
+def command_ended(t, name, returncode=0):
+    return event_line(t, name, "CommandEnded", "{{'returncode': {}}}".format(returncode))
+
+
 def test_failure(t, name):
     """colcon test sends this when a package's tests fail; its rc stays 0."""
     return event_line(t, name, "TestFailure", "{{'identifier': '{}'}}".format(name))

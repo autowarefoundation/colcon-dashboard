@@ -391,6 +391,7 @@ export function outcomeHtml(b) {
     if (b.test_failed) parts.push(`${b.test_failed} with failing tests`);
     if (b.aborted) parts.push(`${b.aborted} aborted`);
     if (b.skipped) parts.push(`${b.skipped} skipped`);
+    if (b.warnings) parts.push(`${b.warnings} warning${b.warnings === 1 ? '' : 's'}`);
     h += `<span class="wmeta bstats">${parts.join(' · ')}</span>`;
   }
   return h;
@@ -497,7 +498,9 @@ function buildWhen(b) {
   if (!b.time) return esc(b.id);
   const when = new Date(b.time * 1000).toLocaleString([], {
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  return `<span class="bwhen">${esc(when)}</span> <span class="bago">${fmtAgo(b.time)}</span>`;
+  // the options of this run, when they differ from a plain build
+  const args = b.args ? `<span class="bargs" title="${esc(b.args)}">${esc(b.args)}</span>` : '';
+  return `<span class="bwhen">${esc(when)}</span> <span class="bago">${fmtAgo(b.time)}</span>${args}`;
 }
 
 // a POST that answers { ok: false, error } when the server does not answer

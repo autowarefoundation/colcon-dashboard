@@ -61,6 +61,17 @@ class ComputeOutcome(unittest.TestCase):
         self.assertEqual(info["outcome"], "failed")
         self.assertEqual((info["failed"], info["test_failed"]), (0, 1))
 
+    def test_outcome_lists_failed_names_and_warnings(self):
+        _, info = self.outcome([
+            queued(0.1, "a"), queued(0.1, "b"),
+            started(0.2, "a"), stderr_line(0.3, "a", "x.cpp:1: warning: w\n"),
+            ended(1.0, "a"),
+            started(1.1, "b"), ended(2.0, "b", rc=1),
+            SHUTDOWN,
+        ])
+        self.assertEqual(info["failed_names"], ["b"])
+        self.assertEqual((info["warnings"], info["pkg_warnings"]), (1, {"a": 1}))
+
     def test_sigint_aborted(self):
         _, info = self.outcome([
             queued(0.1, "a"), started(0.2, "a"), ended(1.0, "a", rc="SIGINT"),
@@ -212,6 +223,20 @@ class PrevRunInfo(unittest.TestCase):
         self.assertEqual(graph["prev"]["id"], self.OLD_ID)
         self.assertEqual(graph["prev"]["durations"], {"a": 0.8})
         self.assertEqual(graph["prev"]["duration"], 99.0)
+
+    def test_prev_durations_are_medians_and_carry_failures(self):
+        with tempfile.TemporaryDirectory() as ws:
+            for i, (dur, rc) in enumerate(((10.0, 0), (30.0, 0), (20.0, 2))):
+                make_build(ws, f"build_2026-08-0{i + 1}_10-00-00", [
+                    queued(0.1, "a"), queued(0.1, "b"),
+                    started(0.0, "a"), ended(dur, "a"),
+                    started(0.0, "b"), ended(1.0, "b", rc=rc), SHUTDOWN])
+            mon = BuildMonitor(ws)
+            prev = mon._find_prev_outcome("build_2026-08-09_10-00-00")
+        self.assertEqual(prev["id"], "build_2026-08-03_10-00-00")
+        self.assertEqual(prev["median_durations"]["a"], 20.0)
+        self.assertEqual(prev["failed_names"], ["b"])
+        self.assertEqual(prev["runs"], 3)
 
     def test_first_run_has_no_prev(self):
         tmp = tempfile.TemporaryDirectory()
@@ -397,6 +422,28 @@ class ScanOnce(unittest.TestCase):
         mon.scan_once()  # no new events: the same table, a fresh state
         self.assertIs(mon._pkg_cached, cached)
         self.assertEqual(json.loads(mon.state_json)["packages"], state["packages"])
+
+    def test_follows_a_newer_test_run_with_its_results(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        ws = self.tmp.name
+        make_build(ws, "build_2026-08-09_10-00-00", [queued(0.1, "a"), SHUTDOWN])
+        tdir = make_build(ws, "test_2026-08-09_11-00-00", [
+            queued(0.1, "a"), started(0.2, "a"), ended(1.0, "a"), SHUTDOWN])
+        with open(os.path.join(tdir, "logger_all.log"), "w") as f:
+            f.write("[0.1] DEBUG:colcon:Parsed command line arguments: Namespace("
+                    "verb_name='test', build_base='build', test_result_base=None)\n")
+        for link, target in (("latest_build", "build_2026-08-09_10-00-00"),
+                             ("latest_test", "test_2026-08-09_11-00-00")):
+            os.symlink(target, os.path.join(ws, "log", link))
+        os.makedirs(os.path.join(ws, "build", "a"))
+        with open(os.path.join(ws, "build", "a", "pytest.xml"), "w") as f:
+            f.write('<testsuite><testcase name="x"><failure message="boom"/></testcase></testsuite>')
+        mon = BuildMonitor(ws)
+        mon.scan_once()
+        state = json.loads(mon.state_json)
+        self.assertEqual(state["build_id"], "test_2026-08-09_11-00-00")
+        self.assertEqual(state["packages"]["a"]["tr"]["f"], 1)
 
     def test_dead_build_states(self):
         mon, state, _ = self.scan(mtime=time.time() - 600)

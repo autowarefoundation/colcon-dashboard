@@ -4,7 +4,9 @@ import os
 import tempfile
 import unittest
 
-from colcon_dashboard.packages import PackageIndex, parse_namespace
+from colcon_dashboard.packages import (
+    PackageIndex, parse_namespace, read_test_results, summarize_args,
+)
 
 
 def write_pkg(root, rel, name, deps=(), build_type=None, extra=""):
@@ -106,3 +108,42 @@ class Namespace(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SummarizeArgs(unittest.TestCase):
+    def test_only_options_that_differ_from_the_defaults(self):
+        ns = {"verb_name": "build", "packages_up_to": ["foo", "bar"], "symlink_install": True,
+              "merge_install": False, "mixin": ["release"], "cmake_args": None,
+              "parallel_workers": 12}
+        self.assertEqual(summarize_args(ns),
+                         "--packages-up-to foo bar --mixin release --symlink-install")
+
+    def test_nothing_to_show(self):
+        self.assertEqual(summarize_args(None), "")
+        self.assertEqual(summarize_args({"verb_name": "build"}), "")
+
+
+JUNIT = """<?xml version="1.0"?>
+<testsuite name="s" tests="3">
+  <testcase classname="a.Suite" name="ok"/>
+  <testcase classname="a.Suite" name="bad"><failure message="expected 1, got 2">trace</failure></testcase>
+  <testcase classname="a.Suite" name="later"><skipped/></testcase>
+</testsuite>"""
+
+
+class TestResults(unittest.TestCase):
+    def test_counts_and_failing_cases(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "test_results", "a"))
+            with open(os.path.join(tmp, "test_results", "a", "gtest.xml"), "w") as f:
+                f.write(JUNIT)
+            with open(os.path.join(tmp, "pytest.xml"), "w") as f:
+                f.write('<testsuites><testsuite><testcase name="t1"/></testsuite></testsuites>')
+            r = read_test_results([os.path.join(tmp, "test_results"), os.path.join(tmp, "pytest.xml")])
+        self.assertEqual((r["t"], r["f"], r["e"], r["s"]), (4, 1, 0, 1))
+        self.assertEqual(r["fail"], [{"n": "a.Suite.bad", "m": "expected 1, got 2"}])
+
+    def test_no_results(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(read_test_results([os.path.join(tmp, "nope")]))
+
