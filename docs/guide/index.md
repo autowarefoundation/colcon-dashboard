@@ -48,7 +48,7 @@ The meter fills as the build advances: green for done, animated blue stripes for
 
 While a build runs, the tiles count each state: done out of the total, building, ready, waiting (plus a blocked count after a failure), failed, aborted, and skipped. Elapsed time, the rate in packages per minute, and an ETA sit at the end. The ETA is an estimate: the longest remaining dependency chain, or the remaining work spread over the workers, whichever is larger. The duration of each package comes from the previous build.
 
-After the build ends, one summary line replaces the tiles, for example "502 packages built in 0:44". The line also gives the failed, aborted, skipped, and unbuilt counts.
+After the build ends, one summary line replaces the tiles, for example "502 packages built in 0:44". The line also gives the failed, aborted, skipped, and unbuilt counts. If packages printed compiler or CMake warnings, the line shows the warning count. Hover over the count to see the packages. Click it to open a package log at its first warning.
 
 ## Theme
 

@@ -1,6 +1,6 @@
-import { on } from './bus.js';
+import { emit, on } from './bus.js';
 import { App } from './state.js';
-import { $, fmtDur, fmtDurLong, fmtGB } from './util.js';
+import { $, esc, fmtDur, fmtDurLong, fmtGB } from './util.js';
 
 /* ---------------- header + tiles ---------------- */
 
@@ -122,6 +122,18 @@ export function estimateEta(s) {
   return Math.max(critical, work / workers);
 }
 
+// the packages that printed compiler or CMake warnings, most first
+let warnPkgs = [];
+let warnNext = 0;
+
+function warnTip() {
+  const top = warnPkgs.slice(0, 12).map(([n, p]) => `${n}: ${p.warn}`);
+  if (warnPkgs.length > 12) top.push(`and ${warnPkgs.length - 12} more packages`);
+  return top.concat(['', warnPkgs.length > 1
+    ? 'Click to open the logs at the warnings, one package per click.'
+    : 'Click to open the log at the warnings.']).join('\n');
+}
+
 function summaryLine(s, c) {
   const done = c.done || 0;
   const dur = fmtDur(s.elapsed);
@@ -130,7 +142,9 @@ function summaryLine(s, c) {
     ? `${s.total} package${s.total === 1 ? '' : 's'} ${did} in ${dur}`
     : `${done} of ${s.total} packages ${did} in ${dur}`;
   const pkgs = Object.entries(s.packages || {});
-  const warned = pkgs.reduce((n, [, p]) => n + (p.warn || 0), 0);
+  warnPkgs = pkgs.filter(([, p]) => p.warn)
+    .sort((a, b) => b[1].warn - a[1].warn || a[0].localeCompare(b[0]));
+  const warned = warnPkgs.reduce((n, [, p]) => n + p.warn, 0);
   // a test run: the test cases, from the JUnit files
   const tests = pkgs.reduce((n, [, p]) => n + (p.tr?.t || 0), 0);
   const badTests = pkgs.reduce((n, [, p]) => n + (p.tr ? p.tr.f + p.tr.e : 0), 0);
@@ -146,8 +160,10 @@ function summaryLine(s, c) {
                  ['skipped', c.skipped], ['waiting', (c.waiting || 0)
                    + (c.ready || 0) + (c.blocked || 0), 'not built']]
     .filter(([, n]) => n)
-    .map(([cls, n, word]) => `<span class="part"><span class="dot c-${cls}"></span>`
-                             + `<b>${n}</b> ${word || cls}</span>`);
+    .map(([cls, n, word]) => cls === 'warn'
+      ? `<button type="button" class="part link" id="warnPart" title="${esc(warnTip())}">`
+        + `<span class="dot c-warn"></span><b>${n}</b> ${warned === 1 ? 'warning' : 'warnings'}</button>`
+      : `<span class="part"><span class="dot c-${cls}"></span><b>${n}</b> ${word || cls}</span>`);
   // hover: the exact time, and when the build started and finished
   const at = t => new Date(t * 1000).toLocaleString();
   const tip = [`Took ${fmtDurLong(s.elapsed)}`].concat(s.build_started
@@ -201,3 +217,11 @@ export function applyState(s) {
 }
 
 on('state', applyState);
+on('build-changed', () => { warnNext = 0; });
+
+$('#tsum').addEventListener('click', ev => {
+  if (!ev.target.closest('#warnPart') || !warnPkgs.length) return;
+  const [name] = warnPkgs[warnNext++ % warnPkgs.length];
+  // the lines that events.WARNING_RE counts on the server
+  emit('find-in-log', name, 'warning', /warning:|CMake Warning/);
+});

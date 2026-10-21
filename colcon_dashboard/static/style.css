@@ -316,6 +316,9 @@ body.offline #sysmeters { display: none; }
 #tsum .part { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 #tsum .part .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 #tsum b { color: var(--ink); font-weight: 600; }
+#tsum button.part { font: inherit; color: inherit; background: none; border: 0; border-radius: 3px; padding: 0; box-shadow: none; cursor: pointer; }
+#tsum button.part:hover { text-decoration: underline; }
+#tsum button.part:focus-visible { outline-offset: 2px; }
 .dot.c-done { background: var(--good); }
 .dot.c-building { background: var(--accent); }
 .dot.c-ready { background: color-mix(in srgb, var(--accent) 45%, var(--surface)); border: 1px solid var(--accent); }

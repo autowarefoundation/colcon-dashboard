@@ -261,7 +261,7 @@ export function initSearch(p) {
   input.oninput = () => {
     sync();
     clearTimeout(timer);
-    timer = setTimeout(() => runSearch(p), 250);
+    timer = setTimeout(() => runSearch(p, null), 250);
   };
   input.onkeydown = ev => {
     if (ev.key === 'Enter') {
@@ -270,14 +270,14 @@ export function initSearch(p) {
     } else if (ev.key === 'Escape') {
       input.value = '';
       sync();
-      runSearch(p);
+      runSearch(p, null);
       input.blur();
     }
   };
   clear.onclick = () => {
     input.value = '';
     sync();
-    runSearch(p);
+    runSearch(p, null);
   };
   p.el.querySelector('.sprev').onclick = () => stepHit(p, -1);
   p.el.querySelector('.snext').onclick = () => stepHit(p, 1);
@@ -295,8 +295,12 @@ export function markHit(p, node) {
   return node;
 }
 
-export function runSearch(p) {
+// re, when given, picks the lines in place of the typed text: a search
+// opened for the user (the warnings) matches what the server counted
+export function runSearch(p, re = p.queryRe) {
   const q = p.el.querySelector('.search').value.toLowerCase();
+  p.seekFirst = false;
+  p.queryRe = re;
   for (const el of p.hits || []) el.classList.remove('hit', 'hit-cur');
   p.query = q || null;
   p.hits = [];
@@ -304,7 +308,7 @@ export function runSearch(p) {
   if (q) {
     for (const node of [...p.pre.childNodes]) {
       if (node.classList?.contains('ts')) continue;
-      if (node.textContent.toLowerCase().includes(q)) markHit(p, node);
+      if (matchesQuery(p, node.textContent)) markHit(p, node);
     }
     if (p.hits.length) {
       p.hitIdx = p.hits.length - 1;  // start at the most recent match
@@ -312,6 +316,10 @@ export function runSearch(p) {
     }
   }
   updateSearchCount(p);
+}
+
+function matchesQuery(p, text) {
+  return p.queryRe ? p.queryRe.test(text) : text.toLowerCase().includes(p.query);
 }
 
 export function focusHit(p) {
@@ -528,10 +536,11 @@ export function appendLog(p, data) {
         linkifyLine(node);
         node = nodes[i];  // linkify may wrap a bare text node
       }
-      if (p.query && node.textContent.toLowerCase().includes(p.query))
+      if (p.query && matchesQuery(p, node.textContent))
         markHit(p, node);
     }
     if (p.query) updateSearchCount(p);
+    seekFirstHit(p);
   }
   let trimmed = false;
   while (!p.noTrim && p.lines > 6000 && p.pre.firstChild) {
@@ -713,6 +722,27 @@ on('state', () => {
 });
 
 on('open-pkg', openPane);
+
+// Open a package log searched for q (or the lines that match re), at its
+// first match. The log can still be loading: then the first match that
+// streams in takes the focus.
+on('find-in-log', (name, q, re = null) => {
+  openPane(name);
+  const p = App.panes.get(name);
+  p.el.querySelector('.search').value = q;
+  p.el.querySelector('.sclear').hidden = false;
+  runSearch(p, re);
+  p.seekFirst = true;
+  seekFirstHit(p);
+});
+
+function seekFirstHit(p) {
+  if (!p.seekFirst || !p.hits?.length) return;
+  p.seekFirst = false;
+  p.hitIdx = 0;
+  focusHit(p);
+  updateSearchCount(p);
+}
 
 on('labels-changed', () => {
   for (const p of App.panes.values()) {
