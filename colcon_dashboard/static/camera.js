@@ -1,7 +1,8 @@
 import { emit } from './bus.js';
 import { Force, forceTick, stopForce } from './force.js';
-import { buildGraphView, clearFocus, clearSelection, cullEdges, hideTooltip, hoverFocus,
-         selectPkg, showNodeTooltip, uncullEdges } from './graph.js';
+import { requestDraw, View } from './draw.js';
+import { buildGraphView, clearFocus, clearSelection, hideTooltip, hoverFocus,
+         selectPkg, showNodeTooltip } from './graph.js';
 import { mode, registerMode } from './modes.js';
 import { App } from './state.js';
 import { $ } from './util.js';
@@ -10,11 +11,23 @@ export function svgCoords(ev) {
   return clientToWorld(ev.clientX, ev.clientY);
 }
 
-/* pan / zoom */
+/* pan / zoom. App.vb is the world rect in view. It fits the canvas like
+   an SVG viewBox with preserveAspectRatio "meet": one uniform scale, and
+   the spare room split evenly on both sides. */
 
 export function viewScale(vb, r) {
-  // the uniform scale SVG really renders with (preserveAspectRatio meet)
   return Math.min(r.width / vb.w, r.height / vb.h);
+}
+
+// the package under a client point, or null
+export function nodeAt(clientX, clientY) {
+  if (!App.lay || !App.vb) return null;
+  const [x, y] = clientToWorld(clientX, clientY);
+  const h = App.lay.H / 2;
+  let hit = null;
+  for (const [name, n] of App.lay.nodes)  // the last drawn is on top
+    if (x >= n.x && x <= n.x + n.w && y >= n.y - h && y <= n.y + h) hit = name;
+  return hit;
 }
 
 export function clientToWorld(clientX, clientY) {
@@ -29,14 +42,14 @@ export function clientToWorld(clientX, clientY) {
 
 export function setViewBox(vb) {
   App.vb = vb;
-  const svg = $('#graph');
-  svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  const cv = $('#graph');
   // zoomed very far out, the 11px labels shrink below 1.5px and are only
   // smudges: then draw the nodes as plain colored boxes and fade the
   // finished edges. Small but still readable labels stay.
-  const s = Math.min(svg.clientWidth / vb.w, svg.clientHeight / vb.h);
-  svg.classList.toggle('far', s > 0 && s * 11 < 1.5);
+  const s = Math.min(cv.clientWidth / vb.w, cv.clientHeight / vb.h);
+  View.far = s > 0 && s * 11 < 1.5;
   mode().onViewBox?.(vb);
+  requestDraw();
 }
 export function bboxOf(names) {
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
@@ -89,75 +102,36 @@ export function zoomToPkg(name) {
   const w = 700;
   const h = w * (r.height && r.width ? r.height / r.width : 0.66);
   setViewBox({ x: nd.x + nd.w / 2 - w / 2, y: nd.y - h / 2, w, h });
-  const el = App.nodeEls.get(name);
-  if (el) {
-    el.classList.add('flash');
-    setTimeout(() => el.classList.remove('flash'), 2000);
-  }
+  nd.flashUntil = performance.now() + 2000;  // draw.js flashes its outline
+  requestDraw();
 }
 
 export function initPanZoom() {
-  const svg = $('#graph');
+  const cv = $('#graph');
   let moved = 0;
   let downNode = null;  // pointer capture retargets `click`, so remember the node
-  svg.addEventListener('click', ev => {
+  const setHover = name => {
+    if (View.hover === name) return;
+    View.hover = name;
+    cv.style.cursor = name ? 'pointer' : '';
+    requestDraw();
+  };
+  cv.addEventListener('click', ev => {
     if (moved > 4) return;  // the end of a drag, not a click
     if (!downNode) return clearSelection();  // a click on empty space
     if (ev.ctrlKey || ev.metaKey || ev.shiftKey) return selectPkg(downNode, true);
     selectPkg(downNode);
     emit('open-pkg', downNode);
   });
-  svg.addEventListener('pointerleave', () => { hideTooltip(); clearFocus(); });
-  // Pan and zoom do not change the view box on each step: that redraws
-  // every edge at screen scale, which lags when zoomed in. They draw a
-  // picture three views wide once, show the moving view over it with a
-  // CSS transform, and set the real view box once when the gesture ends.
-  let pic = null;  // { big: the drawn view box, vb: the view shown now }
-  const wrapRect = () => svg.parentElement.getBoundingClientRect();
-  const picStart = vb => {
-    const big = { x: vb.x - vb.w, y: vb.y - vb.h, w: 3 * vb.w, h: 3 * vb.h };
-    svg.classList.add('bigpan');
-    svg.setAttribute('viewBox', `${big.x} ${big.y} ${big.w} ${big.h}`);
-    mode().onViewBox?.(big);
-    pic = { big, vb };
-  };
-  const picShow = vb => {
-    if (!pic) picStart(vb);
-    const b = pic.big;
-    // a view that leaves the drawn picture: draw it again around this view
-    if (vb.x < b.x || vb.y < b.y || vb.x + vb.w > b.x + b.w || vb.y + vb.h > b.y + b.h) {
-      picEnd();
-      picStart(vb);
-    }
-    pic.vb = vb;
-    // the transform that makes the drawn picture (3x the wrapper, at -1x,
-    // -1x) look like the view vb in the wrapper
-    const r = wrapRect();
-    const W = r.width, H = r.height, D = pic.big;
-    const sD = Math.min(3 * W / D.w, 3 * H / D.h);
-    const s = Math.min(W / vb.w, H / vb.h);
-    const S = s / sD;
-    const tx = (W - vb.w * s) / 2 + W - S * (3 * W - D.w * sD) / 2 + s * (D.x - vb.x);
-    const ty = (H - vb.h * s) / 2 + H - S * (3 * H - D.h * sD) / 2 + s * (D.y - vb.y);
-    svg.style.transform = `translate(${tx}px, ${ty}px) scale(${S})`;
-  };
-  const picEnd = () => {
-    if (!pic) return;
-    const vb = pic.vb;
-    pic = null;
-    svg.classList.remove('bigpan');
-    svg.style.transform = '';
-    setViewBox(vb);
-  };
-  const shownVb = () => pic?.vb || App.vb;
+  cv.addEventListener('pointerleave', () => { setHover(null); hideTooltip(); clearFocus(); });
+  const wrapRect = () => cv.getBoundingClientRect();
 
-  let wheelTimer = null;
-  svg.addEventListener('wheel', ev => {
+  cv.addEventListener('wheel', ev => {
     ev.preventDefault();
-    if (!App.vb || drag) return;  // no zoom while a pan moves the picture
+    if (!App.vb || drag) return;  // no zoom while a pan moves the view
     breakFollow();
     Force.autoFit = false;
-    const vb = shownVb();
+    const vb = App.vb;
     const r = wrapRect();
     const s = viewScale(vb, r);
     const wx = vb.x + (ev.clientX - r.left - (r.width - vb.w * s) / 2) / s;
@@ -167,19 +141,14 @@ export function initPanZoom() {
     const px = ev.deltaY * (ev.deltaMode === 1 ? 33 : ev.deltaMode === 2 ? 400 : 1);
     const f = Math.min(Math.max(Math.exp(px * 0.0022), 0.5, 120 / vb.w), 2, 200000 / vb.w);
     // keep the world point under the cursor fixed while scaling
-    picShow({ x: wx + (vb.x - wx) * f, y: wy + (vb.y - wy) * f, w: vb.w * f, h: vb.h * f });
-    clearTimeout(wheelTimer);
-    wheelTimer = setTimeout(picEnd, 160);  // the gesture rests: draw it sharp
+    setViewBox({ x: wx + (vb.x - wx) * f, y: wy + (vb.y - wy) * f, w: vb.w * f, h: vb.h * f });
   }, { passive: false });
   let drag = null;
-  // A drag captures the pointer, and the browser then moves :hover to the
-  // svg itself. The grabbed node keeps its glow through the .hot class.
-  let hotNode = null;
-  svg.addEventListener('pointerdown', ev => {
+  cv.addEventListener('pointerdown', ev => {
     if (!App.vb) return;
-    hotNode = ev.target.closest('.node');
-    hotNode?.classList.add('hot');
-    downNode = hotNode?.dataset.name || null;
+    downNode = nodeAt(ev.clientX, ev.clientY);
+    // a drag captures the pointer: the grabbed node stays lit as View.hot
+    View.hot = downNode;
     moved = 0;
     Force.autoFit = false;
     if (App.layoutMode === 'force' && downNode) {
@@ -189,19 +158,17 @@ export function initPanZoom() {
         [n.fx, n.fy] = svgCoords(ev);
         Force.alpha = Math.max(Force.alpha, 0.3);
         if (!Force.raf) Force.raf = requestAnimationFrame(forceTick);
-        svg.setPointerCapture(ev.pointerId);
+        cv.setPointerCapture(ev.pointerId);
         return;
       }
     }
     breakFollow();  // a manual pan releases the build-follow camera
-    clearTimeout(wheelTimer);
-    picEnd();  // a zoom still on the picture: settle it first
     drag = { x: ev.clientX, y: ev.clientY, vb: { ...App.vb },
              s: viewScale(App.vb, wrapRect()) };
-    svg.classList.add('panning');
-    svg.setPointerCapture(ev.pointerId);
+    cv.classList.add('panning');
+    cv.setPointerCapture(ev.pointerId);
   });
-  svg.addEventListener('pointermove', ev => {
+  cv.addEventListener('pointermove', ev => {
     if (Force.dragging) {
       const n = Force.dragging;
       const [cx, cy] = svgCoords(ev);
@@ -214,31 +181,28 @@ export function initPanZoom() {
     if (drag && App.vb) {
       moved = Math.max(moved,
         Math.abs(ev.clientX - drag.x) + Math.abs(ev.clientY - drag.y));
-      picShow({ ...drag.vb,
-                x: drag.vb.x - (ev.clientX - drag.x) / drag.s,
-                y: drag.vb.y - (ev.clientY - drag.y) / drag.s });
+      setViewBox({ ...drag.vb,
+                   x: drag.vb.x - (ev.clientX - drag.x) / drag.s,
+                   y: drag.vb.y - (ev.clientY - drag.y) / drag.s });
       return;
     }
-    const g = ev.target.closest('.node');
-    if (g) { showNodeTooltip(g.dataset.name, ev); hoverFocus(g.dataset.name); }
+    const name = nodeAt(ev.clientX, ev.clientY);
+    setHover(name);
+    if (name) { showNodeTooltip(name, ev); hoverFocus(name); }
     else { hideTooltip(); clearFocus(); }
   });
   const end = () => {
-    hotNode?.classList.remove('hot');
-    hotNode = null;
+    if (View.hot) { View.hot = null; requestDraw(); }
     if (Force.dragging) { Force.dragging.fx = Force.dragging.fy = null; Force.dragging = null; }
-    if (drag) picEnd();
     drag = null;
-    svg.classList.remove('panning');
+    cv.classList.remove('panning');
   };
-  svg.addEventListener('pointerup', end);
-  svg.addEventListener('pointercancel', end);
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointercancel', end);
 }
 
 registerMode('layered', {
   activate: () => { stopForce(); App.vb = null; buildGraphView(); },
-  deactivate: uncullEdges,  // force mode moves every edge, so it shows them all
-  onViewBox: cullEdges,
   fit: fitGraph,
   followFrontier: frontierView,
 });

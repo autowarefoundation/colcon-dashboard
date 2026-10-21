@@ -19,7 +19,6 @@ export const App = {
   prefixCands: [],
   prefixTotal: 0,
   lay: null,
-  nodeEls: new Map(),
   edgeList: [],
   adjIn: new Map(),
   adjOut: new Map(),

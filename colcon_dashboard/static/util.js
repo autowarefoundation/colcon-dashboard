@@ -16,6 +16,21 @@ export function wsParam(joiner = '?') {
 export const esc = s => String(s).replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// "#1e7fd9", "#fff", or "rgb(30, 127, 217)" as [r, g, b]
+export function hexRgb(h) {
+  if (h.startsWith('rgb')) return h.match(/[\d.]+/g).slice(0, 3).map(Number);
+  h = h.replace('#', '').trim();
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16),
+          parseInt(h.slice(4, 6), 16)];
+}
+
+// the canvas version of the CSS color-mix(in srgb, b t, a)
+export function mixColor(a, b, t) {
+  const A = hexRgb(a), B = hexRgb(b);
+  return `rgb(${A.map((x, i) => Math.round(x + (B[i] - x) * t)).join(',')})`;
+}
+
 export const SVGNS = 'http://www.w3.org/2000/svg';
 
 export function svgEl(tag, attrs, parent) {

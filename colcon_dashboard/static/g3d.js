@@ -6,7 +6,7 @@ import { chainOf, clearSelection, FLOW_SPACING, FLOW_SPEED, hideTooltip, label, 
 import { GS } from './gsearch.js';
 import { registerMode } from './modes.js';
 import { App } from './state.js';
-import { $ } from './util.js';
+import { $, hexRgb, mixColor } from './util.js';
 
 /* ---------------- 3D mode: perspective canvas over the same simulation ---- */
 
@@ -21,18 +21,6 @@ export const G3 = {
   colors: null, pal: null, particles: new Map(), lastT: 0, bound: false,
 };
 
-export function hexRgb(h) {
-  if (h.startsWith('rgb')) return h.match(/[\d.]+/g).slice(0, 3).map(Number);  // mix3d output
-  h = h.replace('#', '').trim();
-  if (h.length === 3) h = h.split('').map(c => c + c).join('');
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16),
-          parseInt(h.slice(4, 6), 16)];
-}
-export function mix3d(a, b, t) {
-  const A = hexRgb(a), B = hexRgb(b);
-  return `rgb(${A.map((x, i) => Math.round(x + (B[i] - x) * t)).join(',')})`;
-}
-
 export function tokens3d() {
   const cs = getComputedStyle(document.documentElement);
   const v = n => cs.getPropertyValue(n).trim();
@@ -42,12 +30,12 @@ export function tokens3d() {
     good: v('--good'), critical: v('--critical'), serious: v('--serious'),
   };
   G3.pal = {
-    done: { fill: mix3d(c.surface, c.good, 0.16), stroke: c.good, text: c.ink },
-    building: { fill: mix3d(c.surface, c.accent, 0.2), stroke: c.accent, text: c.ink },
+    done: { fill: mixColor(c.surface, c.good, 0.16), stroke: c.good, text: c.ink },
+    building: { fill: mixColor(c.surface, c.accent, 0.2), stroke: c.accent, text: c.ink },
     ready: { fill: c.surface, stroke: c.accent, text: c.ink, dash: [4, 3] },
     waiting: { fill: c.surface, stroke: c.grid, text: c.muted },
-    failed: { fill: mix3d(c.surface, c.critical, 0.2), stroke: c.critical, text: c.ink },
-    aborted: { fill: mix3d(c.surface, c.serious, 0.15), stroke: c.serious, text: c.ink },
+    failed: { fill: mixColor(c.surface, c.critical, 0.2), stroke: c.critical, text: c.ink },
+    aborted: { fill: mixColor(c.surface, c.serious, 0.15), stroke: c.serious, text: c.ink },
     skipped: { fill: c.surface, stroke: c.grid, text: c.muted },
     blocked: { fill: c.surface, stroke: c.critical, text: c.muted, dash: [3, 3] },
     excluded: { fill: c.surface, stroke: c.grid, text: c.muted },
@@ -330,8 +318,8 @@ export function draw3d(now) {
     // the package under the pointer, and the selected ones, light up
     const hot = name === G3.hovered || App.selected.has(name);
     ctx.globalAlpha = hot ? Math.max(alpha, 1) : alpha;
-    ctx.fillStyle = doomed ? mix3d(c.surface, c.critical, 0.08) : pal.fill;
-    if (hot) ctx.fillStyle = mix3d(ctx.fillStyle, '#ffffff', 0.28);
+    ctx.fillStyle = doomed ? mixColor(c.surface, c.critical, 0.08) : pal.fill;
+    if (hot) ctx.fillStyle = mixColor(ctx.fillStyle, '#ffffff', 0.28);
     ctx.beginPath();
     ctx.roundRect(sx - w / 2, sy - h / 2, w, h, rad);
     ctx.fill();

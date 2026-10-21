@@ -439,19 +439,12 @@ body.offline #sysmeters { display: none; }
 .panehead .ptitle { display: none; color: var(--ink2); font-weight: 600; margin-right: 6px; }
 #viz.split .panehead .ptitle { display: inline; }
 #graphwrap, #ganttwrap { position: relative; flex: 1; min-height: 0; }
-#graphwrap svg { width: 100%; height: 100%; display: block; cursor: grab; }
-#graphwrap svg.panning { cursor: grabbing; }
-/* a pan moves the drawn picture with a transform and draws it once at the
-   end. The SVG is three views wide during the drag, so the area around
-   the view is ready when it slides in. */
+/* the 2D graph is a canvas (draw.js): its looks live there, not here */
+#graph { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+#graph.panning { cursor: grabbing; }
 #graphwrap { overflow: hidden; }
-#graphwrap svg.bigpan {
-  position: absolute; left: -100%; top: -100%; width: 300%; height: 300%;
-  will-change: transform;
-  transform-origin: 0 0;  /* the zoom math scales about the top left corner */
-}
 #graph3d { position: absolute; inset: 0; width: 100%; height: 100%; display: none; cursor: grab; touch-action: none; }
-#graphwrap.mode3d svg { display: none; }
+#graphwrap.mode3d #graph { display: none; }
 #graphwrap.mode3d #graph3d { display: block; }
 #graph3d.panning { cursor: grabbing; }
 #ganttwrap { overflow: auto; cursor: grab; }
@@ -480,114 +473,6 @@ body.offline #sysmeters { display: none; }
 }
 #gantt .gname { cursor: pointer; }
 #gantt .gname:hover { fill: var(--accent); }
-
-/* graph nodes */
-.edge { fill: none; stroke: var(--grid); stroke-width: 1; }
-.node { transition: opacity 0.4s ease; }
-svg.efocus .edge { stroke-opacity: 0.15; }
-svg.efocus .edge.hl { stroke: var(--accent); stroke-width: 1.6; stroke-opacity: 1; }
-.node { cursor: pointer; }
-/* hover: the package under the pointer lights up at once, with no
-   transition, so the graph feels quick under the mouse */
-.node { --glow: var(--baseline); }
-.node.done { --glow: var(--good); }
-.node.building, .node.ready { --glow: var(--accent); }
-.node.failed, .node.blocked { --glow: var(--critical); }
-.node.aborted { --glow: var(--serious); }
-/* a selected package keeps its glow, with an accent ring */
-#graph .node.sel rect.box {
-  filter: drop-shadow(0 0 4px var(--glow));
-  stroke: var(--accent); stroke-width: 2.6;
-}
-#graph .node:hover rect.box, #graph .node.hot rect.box {
-  filter: drop-shadow(0 0 3px var(--glow)) brightness(1.06);
-  stroke-width: 2.2;
-}
-:root[data-theme="dark"] #graph .node:hover rect.box,
-:root[data-theme="dark"] #graph .node.hot rect.box { filter: drop-shadow(0 0 4px var(--glow)) brightness(1.3); }
-svg.nfocus .node:not(.hl) { opacity: 0.35; }  /* faded, but still readable */
-.node rect.box {
-  fill: var(--surface);
-  stroke: var(--baseline);
-  stroke-width: 1;
-  rx: 5;
-}
-.node text {
-  fill: var(--ink2);
-  font: 11px var(--mono);
-  dominant-baseline: middle;
-  pointer-events: none;
-}
-.node rect.pbar { fill: color-mix(in srgb, var(--accent) 28%, var(--surface)); }
-.node.done rect.box { fill: color-mix(in srgb, var(--good) 14%, var(--surface)); stroke: var(--good); }
-.node.done text { fill: var(--ink); }
-.node.building rect.box {
-  fill: color-mix(in srgb, var(--accent) 8%, var(--surface));  /* the track */
-  stroke: var(--accent);
-  stroke-width: 1.5;
-}
-.node.building .inner {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: breathe 1.5s ease-in-out infinite;
-}
-@keyframes breathe {
-  50% { transform: scale(1.06); stroke-opacity: 0.4; }
-}
-.node.building text { fill: var(--ink); font-weight: 600; }
-.node.ready rect.box { stroke: var(--accent); stroke-dasharray: 4 3; }
-.node.ready text { fill: var(--ink); }
-.node.waiting rect.box { stroke: var(--grid); }
-.node.waiting text { fill: var(--muted); }
-.node.failed rect.box { fill: color-mix(in srgb, var(--critical) 18%, var(--surface)); stroke: var(--critical); stroke-width: 1.5; }
-.node.failed text { fill: var(--ink); font-weight: 600; }
-.node.aborted rect.box { fill: color-mix(in srgb, var(--serious) 14%, var(--surface)); stroke: var(--serious); stroke-dasharray: 5 2; }
-.node.blocked rect.box { stroke: var(--critical); stroke-dasharray: 3 3; }
-.node.blocked text { fill: var(--muted); }
-.node.skipped rect.box { stroke: var(--grid); }
-.node.skipped text { fill: var(--muted); text-decoration: line-through; }
-.node.excluded { opacity: 0.35; }
-.node.next rect.box {
-  stroke: var(--accent);
-  stroke-dasharray: 4 3;
-  animation: waitpulse 2s ease-in-out infinite;
-}
-.node.next text { fill: var(--ink); }
-.edge.feed {
-  stroke: var(--accent);
-  stroke-opacity: 0.55;
-  stroke-width: 1.4;
-  stroke-dasharray: 6 6;
-  animation: flowdash 0.9s linear infinite;
-}
-.edge.active {
-  stroke: var(--accent);
-  stroke-opacity: 0.55;
-  stroke-width: 1.2;
-  animation: edgebreathe 1.6s ease-in-out infinite;
-}
-.edge.edone { stroke: var(--good); stroke-opacity: 0.3; }
-#graph.far .node text { display: none; }
-#graph.far .edge.edone { stroke-opacity: 0.1; }
-#graph.far .node.done rect.box { fill: color-mix(in srgb, var(--good) 45%, var(--surface)); stroke: none; }
-/* zoomed out, the labels hide: the outline tells failed and aborted apart
-   from done without relying on color */
-#graph.far .node.failed rect.box { stroke-width: 4; }
-#graph.far .node.aborted rect.box { stroke-width: 3; stroke-dasharray: 6 3; }
-#graph.far .node.waiting rect.box, #graph.far .node.skipped rect.box { fill: var(--grid); }
-@keyframes edgebreathe { 50% { stroke-opacity: 0.25; } }
-.pkt { fill: var(--accent); opacity: 0.85; }
-svg.efocus .pktg:not(.hl) { opacity: 0.08; }
-@keyframes waitpulse { 50% { stroke-opacity: 0.25; } }
-@keyframes flowdash { to { stroke-dashoffset: -24; } }
-.node.doomed rect.box {
-  fill: color-mix(in srgb, var(--critical) 7%, var(--surface));
-  stroke: var(--critical);
-  stroke-dasharray: 3 3;
-}
-.node.doomed text { fill: var(--ink2); }
-.edge.doomed { stroke: var(--critical); stroke-opacity: 0.45; }
-@keyframes pulse { 50% { stroke-opacity: 0.35; } }
 
 /* gantt */
 .gname { font: 10.5px var(--mono); fill: var(--ink2); }
@@ -929,17 +814,6 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   padding: 1px 5px;
 }
 
-/* ambient halos behind building packages */
-#graph .gs0 { stop-color: var(--accent); stop-opacity: 0.30; }
-#graph .gs1 { stop-color: var(--accent); stop-opacity: 0.10; }
-#graph .gs2 { stop-color: var(--accent); stop-opacity: 0; }
-#graph .glow { animation: glowbreath 2.6s ease-in-out infinite; }
-@keyframes glowbreath {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
-}
-#graph.searching #glowlayer { opacity: 0.15; }
-
 /* graph search: matches keep their color, the rest fades */
 #gsearch {
   font: 11px var(--mono);
@@ -974,14 +848,12 @@ svg.efocus .pktg:not(.hl) { opacity: 0.08; }
   cursor: pointer;
 }
 .searchwrap .sclear:hover { color: var(--critical); }
-#graph.searching .node:not(.smatch) { opacity: 0.15; }
-#graph.searching .edge { opacity: 0.12; }
-.node.smatch .box { stroke: var(--accent); stroke-width: 2.5; }
 #gantt.searching .gbar:not(.smatch) { opacity: 0.18; }
 #gantt .gbar.smatch { stroke: var(--accent); stroke-width: 2; }
 
-/* a double-clicked tab flashes its package in the graph or timeline */
-.node.flash .box, .gbar.flash { animation: pkgflash 0.5s ease-in-out 4; }
+/* a double-clicked tab flashes its package in the timeline (the graph
+   flashes it in draw.js) */
+.gbar.flash { animation: pkgflash 0.5s ease-in-out 4; }
 @keyframes pkgflash {
   50% { stroke: var(--accent); stroke-width: 3.5; }
 }
@@ -1413,5 +1285,4 @@ body.offline #topbar .switcher svg { fill: #fff; }
     animation: none !important;
     transition: none !important;
   }
-  #pktlayer { display: none; }  /* the SVG flow droplets, which CSS cannot pause */
 }

@@ -1,9 +1,10 @@
 import { emit, on } from './bus.js';
 import { fitGraph, setViewBox } from './camera.js';
+import { requestDraw } from './draw.js';
 import { GS, runGraphSearch } from './gsearch.js';
 import { mode } from './modes.js';
 import { App } from './state.js';
-import { $, esc, failNote, fmtDur, svgEl, WS } from './util.js';
+import { $, esc, failNote, fmtDur, WS } from './util.js';
 
 /* ---------------- graph ---------------- */
 
@@ -214,93 +215,23 @@ export function buildGraphView() {
   renderGraph();
 }
 
-export function edgePathD(na, nb) {
-  const x1 = na.x + na.w, y1 = na.y, x2 = nb.x, y2 = nb.y;
-  const dx = Math.max(24, Math.min(60, (x2 - x1) / 2));
-  return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
-}
-
-// the box that holds the curve of edgePathD: both ends and both handles
-function edgeBox(na, nb) {
-  const x1 = na.x + na.w, y1 = na.y, x2 = nb.x, y2 = nb.y;
-  const dx = Math.max(24, Math.min(60, (x2 - x1) / 2));
-  return { x0: Math.min(x1, x2 - dx), x1: Math.max(x2, x1 + dx),
-           y0: Math.min(y1, y2), y1: Math.max(y1, y2) };
-}
-
-/* Zoomed in, most edges lie off screen, but the browser still flattens
-   and strokes every whole curve at screen scale on each frame of a pan.
-   Hiding the edges outside the view keeps panning smooth. */
-export function cullEdges(vb) {
-  const pad = 4;  // the widest edge stroke, in world units
-  for (const e of App.edgeList) {
-    if (!e.bb) continue;
-    const out = e.bb.x1 < vb.x - pad || e.bb.x0 > vb.x + vb.w + pad
-             || e.bb.y1 < vb.y - pad || e.bb.y0 > vb.y + vb.h + pad;
-    if (out !== !!e.culled) {
-      e.culled = out;
-      e.el.style.display = out ? 'none' : '';
-    }
-  }
-}
-
-export function uncullEdges() {
-  for (const e of App.edgeList) {
-    if (e.culled) { e.culled = false; e.el.style.display = ''; }
-  }
-}
-
+// The graph draws on a canvas (draw.js), from the layout and from the
+// flags set here: per node st (its state), doomed, next, pct, and hl (in
+// the focus chain); per edge kind and hl.
 export function renderGraph() {
-  const svg = $('#graph');
-  svg.innerHTML = '';
-  App.nodeEls.clear();
   App.edgeList = [];
-  if (!App.lay || App.lay.nodes.size === 0) return;
-  const { nodes, edges, H } = App.lay;
-
-  const defs = svgEl('defs', {}, svg);
-  defs.innerHTML = `<radialGradient id="glowGrad">
-    <stop offset="0" class="gs0"/>
-    <stop offset="0.55" class="gs1"/>
-    <stop offset="1" class="gs2"/>
-  </radialGradient>`;
-  App.glowLayer = svgEl('g', { id: 'glowlayer' }, svg);  // halos, backmost
-  App.glowEls = new Map();
-  const gE = svgEl('g', {}, svg);
-  const gP = svgEl('g', { id: 'pktlayer' }, svg);  // flow particles, above edges
-  const gN = svgEl('g', {}, svg);
-
-  edges.forEach(([a, b], i) => {
-    const p = svgEl('path', {
-      class: 'edge', id: 'ge' + i,
-      d: edgePathD(nodes.get(a), nodes.get(b)),
-    }, gE);
-    App.edgeList.push({ a, b, el: p, id: 'ge' + i, idx: i, flow: null,
-                        bb: edgeBox(nodes.get(a), nodes.get(b)) });
-  });
-
-  for (const [name, n] of nodes) {
-    const g = svgEl('g', {
-      class: 'node', transform: `translate(${n.x},${n.y - H / 2})`,
-    }, gN);
-    g.dataset.name = name;
-    const inner = svgEl('g', { class: 'inner' }, g);
-    svgEl('rect', { class: 'box', width: n.w, height: H, rx: 5 }, inner);
-    svgEl('rect', { class: 'pbar', width: 0, height: H, rx: 5 }, inner);
-    const t = svgEl('text', { x: 9, y: H / 2 + 0.5 }, inner);
-    t.textContent = label(name);
-    App.nodeEls.set(name, g);
-  }
-
+  if (!App.lay || App.lay.nodes.size === 0) { requestDraw(); return; }
+  App.edgeList = App.lay.edges.map(([a, b], i) =>
+    ({ a, b, idx: i, kind: '', cls: 'edge', hl: false }));
   updateNodes();
   if (GS.q) runGraphSearch();  // recompute matches for the new node set
-  // the new elements carry no focus yet: show the selection on them again
+  // the new nodes carry no focus yet: show the selection on them again
   edgeFocus = nodeFocus = null;
-  markSelected();
   focusSelection();
   if (App.vb) setViewBox(App.vb);
   else fitGraph();
   mode().onLayout?.();
+  requestDraw();
 }
 
 export function computeDoomed() {
@@ -334,74 +265,33 @@ export function computeNext() {
   return next;
 }
 
-export function syncGlow() {
-  // a faint accent halo behind every building package, on the backmost layer
-  if (!App.glowLayer || !App.lay) return;
-  const want = new Set();
-  for (const [name, p] of Object.entries(App.pkgs)) {
-    if (p.s !== 'building') continue;
-    const n = App.lay.nodes.get(name);
-    if (!n) continue;
-    want.add(name);
-    let el = App.glowEls.get(name);
-    if (!el) {
-      el = svgEl('ellipse', { class: 'glow', fill: 'url(#glowGrad)' },
-                 App.glowLayer);
-      el.style.animationDelay = `-${(Math.random() * 2.6).toFixed(2)}s`;
-      App.glowEls.set(name, el);
-    }
-    el.setAttribute('cx', n.x + n.w / 2);
-    el.setAttribute('cy', n.y);
-    el.setAttribute('rx', n.w / 2 + 70);
-    el.setAttribute('ry', 62);
-  }
-  for (const [name, el] of App.glowEls)
-    if (!want.has(name)) { el.remove(); App.glowEls.delete(name); }
-}
-
 export function updateNodes() {
-  if (!App.nodeEls.size) return;
+  if (!App.lay) return;
   if (GS.states.size) runGraphSearch(true);  // states move: refresh chips
   const { failed, doomed } = computeDoomed();
   const next = computeNext();
   App.doomedSet = doomed;
   App.nextSet = next;
-  for (const [name, g] of App.nodeEls) {
+  for (const [name, n] of App.lay.nodes) {
     const p = App.pkgs[name];
-    const inBuild = App.graph?.[name]?.in_build;
-    let cls = 'node ';
-    if (!p) cls += inBuild ? 'waiting' : 'excluded';
-    else cls += p.s;
-    if (doomed.has(name)) cls += ' doomed';
-    if (next.has(name)) cls += ' next';
-    if (g.classList.contains('hl')) cls += ' hl';  // keep the hover highlight
-    if (g.classList.contains('hot')) cls += ' hot';  // keep the grabbed node lit
-    if (App.selected.has(name)) cls += ' sel';      // keep the selection
-    if (GS.set?.has(name)) cls += ' smatch';       // keep the search highlight
-    if (g.getAttribute('class') !== cls) g.setAttribute('class', cls);
-    const inner = g.firstChild;
-    if (p?.s === 'building' && !inner.style.animationDelay) {
-      // desync the breathing so the frontier shimmers instead of blinking
-      inner.style.animationDelay = `-${(Math.random() * 1.5).toFixed(2)}s`;
-    }
-    const bar = inner.children[1];
-    const w = App.lay.nodes.get(name)?.w || 40;
-    const pct = p && p.s === 'building' && p.pct != null ? p.pct : 0;
-    bar.setAttribute('width', pct ? Math.max(6, w * pct / 100).toFixed(1) : 0);
+    n.st = p ? p.s : App.graph?.[name]?.in_build ? 'waiting' : 'excluded';
+    n.doomed = doomed.has(name);
+    n.next = next.has(name);
+    n.pct = p && p.s === 'building' && p.pct != null ? p.pct : 0;
+    // desync the breathing, so the frontier shimmers instead of blinking
+    if (n.st === 'building' && n.ph == null) n.ph = Math.random();
   }
   for (const e of App.edgeList) {
     const sa = App.pkgs[e.a]?.s, sb = App.pkgs[e.b]?.s;
-    let ec = 'edge';
-    if (doomed.has(e.b) && (doomed.has(e.a) || failed.has(e.a))) ec += ' doomed';
-    else if (next.has(e.b) && sa === 'building') ec += ' feed';
-    else if (sb === 'building') ec += ' active';       // feeds a live build
-    else if (sa === 'done' && sb === 'done') ec += ' edone';
-    if (e.el.classList.contains('hl')) ec += ' hl';
-    e.cls = ec;
-    if (e.el.getAttribute('class') !== ec) e.el.setAttribute('class', ec);
-    setEdgeFlow(e, ec.includes(' active') && App.layoutMode !== '3d');
+    let kind = '';
+    if (doomed.has(e.b) && (doomed.has(e.a) || failed.has(e.a))) kind = 'doomed';
+    else if (next.has(e.b) && sa === 'building') kind = 'feed';
+    else if (sb === 'building') kind = 'active';       // feeds a live build
+    else if (sa === 'done' && sb === 'done') kind = 'edone';
+    e.kind = kind;
+    e.cls = kind ? 'edge ' + kind : 'edge';  // g3d.js reads the class words
   }
-  syncGlow();
+  requestDraw();
 }
 
 /* ---------------- force layout mode ----------------
@@ -423,35 +313,8 @@ export function chainOf(name) {
   walk(name, App.adjOut);
   return seen;
 }
-export const XLINK = 'http://www.w3.org/1999/xlink';
-
-export const FLOW_SPEED = 110;    // svg units per second: constant velocity on every edge
-export const FLOW_SPACING = 130;  // svg units between droplets: constant density
-
-export function setEdgeFlow(e, on) {
-  // droplets that travel the edge curve into a building package
-  if (on && !e.flow) {
-    if (e.len == null) e.len = e.el.getTotalLength();
-    const dur = e.len / FLOW_SPEED;
-    const n = Math.min(12, Math.max(1, Math.round(e.len / FLOW_SPACING)));
-    const g = svgEl('g', { class: 'pktg' }, $('#pktlayer'));
-    if (e.el.classList.contains('hl')) g.classList.add('hl');
-    const jitter = (e.idx % 7) * 0.23;
-    for (let i = 0; i < n; i++) {
-      const c = svgEl('circle', { class: 'pkt', r: 2.2 }, g);
-      const am = svgEl('animateMotion', {
-        dur: dur.toFixed(2) + 's', repeatCount: 'indefinite',
-        begin: `${(-(i * dur / n + jitter)).toFixed(2)}s`,
-      }, c);
-      const mp = svgEl('mpath', { href: '#' + e.id }, am);
-      mp.setAttributeNS(XLINK, 'xlink:href', '#' + e.id);
-    }
-    e.flow = g;
-  } else if (!on && e.flow) {
-    e.flow.remove();
-    e.flow = null;
-  }
-}
+export const FLOW_SPEED = 110;    // world units per second: constant velocity on every edge
+export const FLOW_SPACING = 130;  // world units between droplets: constant density
 
 /* Hover focus, split in two: the edge chain reacts instantly, like the
    tooltip, while the node dim engages only after the pointer rests and
@@ -482,18 +345,14 @@ function chainOfAll(names) {
 function focusEdges(key, chain) {
   if (edgeFocus === key) return;
   edgeFocus = key;
-  $('#graph').classList.add('efocus');
-  for (const e of App.edgeList) {
-    const on = chain.has(e.a) && chain.has(e.b);
-    e.el.classList.toggle('hl', on);
-    if (e.flow) e.flow.classList.toggle('hl', on);
-  }
+  for (const e of App.edgeList) e.hl = chain.has(e.a) && chain.has(e.b);
+  requestDraw();
 }
 
 function focusNodes(key, chain) {
   nodeFocus = key;
-  $('#graph').classList.add('nfocus');
-  for (const [n, g] of App.nodeEls) g.classList.toggle('hl', chain.has(n));
+  for (const [name, n] of App.lay.nodes) n.hl = chain.has(name);
+  requestDraw();
 }
 
 export function hoverFocus(name) {
@@ -513,7 +372,7 @@ export function hoverFocus(name) {
 
 // the selection's focus, at once: a click is a deliberate choice
 function focusSelection() {
-  const names = [...App.selected].filter(n => App.nodeEls.has(n));
+  const names = [...App.selected].filter(n => App.lay?.nodes.has(n));
   if (!names.length) return false;
   const key = 's:' + names.sort().join(',');
   const chain = chainOfAll(names);
@@ -528,21 +387,13 @@ export function clearFocus() {
   if (focusSelection()) return;  // back to the selection, not to nothing
   if (edgeFocus !== null) {
     edgeFocus = null;
-    $('#graph').classList.remove('efocus');
-    for (const e of App.edgeList) {
-      e.el.classList.remove('hl');
-      if (e.flow) e.flow.classList.remove('hl');
-    }
+    for (const e of App.edgeList) e.hl = false;
   }
   if (nodeFocus !== null) {
     nodeFocus = null;
-    $('#graph').classList.remove('nfocus');
-    for (const [, g] of App.nodeEls) g.classList.remove('hl');
+    for (const n of App.lay?.nodes.values() || []) n.hl = false;
   }
-}
-
-function markSelected() {
-  for (const [n, g] of App.nodeEls) g.classList.toggle('sel', App.selected.has(n));
+  requestDraw();
 }
 
 // click: select only this package; additive (Ctrl/Cmd/Shift+click): add
@@ -551,7 +402,6 @@ export function selectPkg(name, additive = false) {
   if (!additive) App.selected = new Set([name]);
   else if (App.selected.has(name)) App.selected.delete(name);
   else App.selected.add(name);
-  markSelected();
   clearFocus();  // shows the selection, or clears the focus when it is empty
   emit('selection-changed');
 }
@@ -559,7 +409,6 @@ export function selectPkg(name, additive = false) {
 export function clearSelection() {
   if (!App.selected.size) return;
   App.selected = new Set();
-  markSelected();
   clearFocus();
   emit('selection-changed');
 }
@@ -604,7 +453,7 @@ export function showNodeTooltip(name, ev) {
   } else {
     rows.push(meta.in_build ? 'state <b>pending</b>' : 'not part of this build');
   }
-  if (App.nodeEls.get(name)?.classList.contains('doomed'))
+  if (App.doomedSet?.has(name))
     rows.push('<b>blocked</b>: a failed package is upstream');
   if (meta.build_type) rows.push(`type <b>${meta.build_type}</b>`);
   if (meta.path) rows.push(`<span class="mono">${meta.path}</span>`);

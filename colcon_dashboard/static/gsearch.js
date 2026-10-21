@@ -1,5 +1,6 @@
 import { emit } from './bus.js';
 import { zoomToPkg } from './camera.js';
+import { requestDraw } from './draw.js';
 import { App } from './state.js';
 import { $ } from './util.js';
 
@@ -39,10 +40,8 @@ export function runGraphSearch(refresh = false) {
   GS.matches = matches;
   GS.idx = -1;
   GS.set = filtering ? new Set(GS.matches) : null;
-  $('#graph').classList.toggle('searching', filtering);
+  requestDraw();  // the graph reads GS.set
   $('#gantt').classList.toggle('searching', filtering);
-  for (const [name, g] of App.nodeEls)
-    g.classList.toggle('smatch', !!GS.set?.has(name));
   for (const bar of $('#gantt').querySelectorAll('.gbar'))
     bar.classList.toggle('smatch', !!GS.set?.has(bar.dataset.name));
   $('#gscount').textContent = filtering ? `${GS.matches.length} found` : '';

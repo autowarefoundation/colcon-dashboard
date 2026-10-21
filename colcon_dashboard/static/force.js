@@ -1,5 +1,5 @@
 import { fitGraph, frontierView } from './camera.js';
-import { edgePathD, syncGlow } from './graph.js';
+import { requestDraw } from './draw.js';
 import { registerMode } from './modes.js';
 import { App } from './state.js';
 
@@ -90,7 +90,6 @@ export function stopForce() {
   if (Force.raf) cancelAnimationFrame(Force.raf);
   Force.raf = null;
   Force.alpha = 0;
-  for (const e of App.edgeList) e.len = null;  // flows use settled lengths
 }
 
 export function buildQuad(nodes) {
@@ -237,16 +236,7 @@ export function forceTick() {
   if (App.layoutMode !== 'force' || !App.lay) return;
   forcePhysics();
   for (const n of Force.nodes) { n.x = n.cx - n.w / 2; n.y = n.cy; }
-  const H = App.lay.H;
-  for (const [name, n] of App.lay.nodes) {
-    const g = App.nodeEls.get(name);
-    if (g) g.setAttribute('transform', `translate(${n.x},${n.y - H / 2})`);
-  }
-  for (const e of App.edgeList) {
-    const na = App.lay.nodes.get(e.a), nb = App.lay.nodes.get(e.b);
-    if (na && nb) e.el.setAttribute('d', edgePathD(na, nb));
-  }
-  syncGlow();  // halos ride along with the moving nodes
+  requestDraw();
   if (Force.autoFit) (App.followBuild ? frontierView : fitGraph)();
   Force.alpha *= Force.DECAY;
   if (Force.alpha < 0.004 && !Force.dragging) { stopForce(); return; }

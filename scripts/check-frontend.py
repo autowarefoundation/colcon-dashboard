@@ -24,17 +24,18 @@ ALLOWED = {
             'header', 'help', 'modes', 'notify', 'pickers', 'poller',
             'settings', 'state', 'theme', 'util', 'views'],
     'bus': [],
-    # camera/force/graph/g3d/gsearch are one subsystem (the graph views)
+    # camera/draw/force/graph/g3d/gsearch are one subsystem (the graph views)
     # and may import each other; only hoisted functions cross at load time
-    'camera': ['bus', 'force', 'graph', 'modes', 'state', 'util'],
+    'camera': ['bus', 'draw', 'force', 'graph', 'modes', 'state', 'util'],
     'dock': ['ansi', 'bus', 'camera', 'graph', 'modes', 'state', 'toasts',
              'util'],
-    'force': ['camera', 'graph', 'modes', 'state'],
+    'draw': ['bus', 'graph', 'gsearch', 'state', 'util'],
+    'force': ['camera', 'draw', 'modes', 'state'],
     'g3d': ['bus', 'camera', 'force', 'graph', 'gsearch', 'modes', 'state',
             'util'],
     'gantt': ['bus', 'graph', 'gsearch', 'state', 'util'],
-    'graph': ['bus', 'camera', 'gsearch', 'modes', 'state', 'util'],
-    'gsearch': ['bus', 'camera', 'state', 'util'],
+    'graph': ['bus', 'camera', 'draw', 'gsearch', 'modes', 'state', 'util'],
+    'gsearch': ['bus', 'camera', 'draw', 'state', 'util'],
     'header': ['bus', 'state', 'util'],
     'help': ['util'],
     # logo.js is a copy of the logo generator; it imports nothing
