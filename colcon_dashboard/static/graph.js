@@ -220,6 +220,36 @@ export function edgePathD(na, nb) {
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 }
 
+// the box that holds the curve of edgePathD: both ends and both handles
+function edgeBox(na, nb) {
+  const x1 = na.x + na.w, y1 = na.y, x2 = nb.x, y2 = nb.y;
+  const dx = Math.max(24, Math.min(60, (x2 - x1) / 2));
+  return { x0: Math.min(x1, x2 - dx), x1: Math.max(x2, x1 + dx),
+           y0: Math.min(y1, y2), y1: Math.max(y1, y2) };
+}
+
+/* Zoomed in, most edges lie off screen, but the browser still flattens
+   and strokes every whole curve at screen scale on each frame of a pan.
+   Hiding the edges outside the view keeps panning smooth. */
+export function cullEdges(vb) {
+  const pad = 4;  // the widest edge stroke, in world units
+  for (const e of App.edgeList) {
+    if (!e.bb) continue;
+    const out = e.bb.x1 < vb.x - pad || e.bb.x0 > vb.x + vb.w + pad
+             || e.bb.y1 < vb.y - pad || e.bb.y0 > vb.y + vb.h + pad;
+    if (out !== !!e.culled) {
+      e.culled = out;
+      e.el.style.display = out ? 'none' : '';
+    }
+  }
+}
+
+export function uncullEdges() {
+  for (const e of App.edgeList) {
+    if (e.culled) { e.culled = false; e.el.style.display = ''; }
+  }
+}
+
 export function renderGraph() {
   const svg = $('#graph');
   svg.innerHTML = '';
@@ -245,7 +275,8 @@ export function renderGraph() {
       class: 'edge', id: 'ge' + i,
       d: edgePathD(nodes.get(a), nodes.get(b)),
     }, gE);
-    App.edgeList.push({ a, b, el: p, id: 'ge' + i, idx: i, flow: null });
+    App.edgeList.push({ a, b, el: p, id: 'ge' + i, idx: i, flow: null,
+                        bb: edgeBox(nodes.get(a), nodes.get(b)) });
   });
 
   for (const [name, n] of nodes) {

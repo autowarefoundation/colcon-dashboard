@@ -1,6 +1,7 @@
 import { emit } from './bus.js';
 import { Force, forceTick, stopForce } from './force.js';
-import { buildGraphView, clearFocus, hideTooltip, hoverFocus, showNodeTooltip } from './graph.js';
+import { buildGraphView, clearFocus, cullEdges, hideTooltip, hoverFocus, showNodeTooltip,
+         uncullEdges } from './graph.js';
 import { mode, registerMode } from './modes.js';
 import { App } from './state.js';
 import { $ } from './util.js';
@@ -34,6 +35,7 @@ export function setViewBox(vb) {
   // draw the nodes as plain colored boxes and fade the finished edges
   const s = Math.min(svg.clientWidth / vb.w, svg.clientHeight / vb.h);
   svg.classList.toggle('far', s > 0 && s * 11 < 4.3);
+  mode().onViewBox?.(vb);
 }
 export function bboxOf(names) {
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
@@ -103,7 +105,7 @@ export function initPanZoom() {
   svg.addEventListener('pointerleave', () => { hideTooltip(); clearFocus(); });
   svg.addEventListener('wheel', ev => {
     ev.preventDefault();
-    if (!App.vb) return;
+    if (!App.vb || drag) return;  // no zoom while a pan moves the picture
     breakFollow();
     Force.autoFit = false;
     const [wx, wy] = clientToWorld(ev.clientX, ev.clientY);
@@ -119,6 +121,24 @@ export function initPanZoom() {
     });
   }, { passive: false });
   let drag = null;
+  // The pan does not change the view box on each move: that redraws every
+  // edge at screen scale, which lags when zoomed in. It shows a picture
+  // three views wide, slides it with a transform, and sets the view box
+  // once when the drag ends.
+  const bigStart = () => {
+    const vb = drag.vb;
+    const big = { x: vb.x - vb.w, y: vb.y - vb.h, w: 3 * vb.w, h: 3 * vb.h };
+    svg.classList.add('bigpan');
+    svg.setAttribute('viewBox', `${big.x} ${big.y} ${big.w} ${big.h}`);
+    mode().onViewBox?.(big);
+    drag.big = true;
+  };
+  const bigEnd = () => {
+    svg.classList.remove('bigpan');
+    svg.style.transform = '';
+    drag.big = false;
+    setViewBox({ ...drag.vb, x: drag.vb.x - drag.dx / drag.s, y: drag.vb.y - drag.dy / drag.s });
+  };
   svg.addEventListener('pointerdown', ev => {
     if (!App.vb) return;
     downNode = ev.target.closest('.node')?.dataset.name || null;
@@ -136,7 +156,8 @@ export function initPanZoom() {
       }
     }
     breakFollow();  // a manual pan releases the build-follow camera
-    drag = { x: ev.clientX, y: ev.clientY, vb: { ...App.vb } };
+    drag = { x: ev.clientX, y: ev.clientY, vb: { ...App.vb }, dx: 0, dy: 0, big: false,
+             s: viewScale(App.vb, svg.getBoundingClientRect()) };
     svg.classList.add('panning');
     svg.setPointerCapture(ev.pointerId);
   });
@@ -153,12 +174,17 @@ export function initPanZoom() {
     if (drag && App.vb) {
       moved = Math.max(moved,
         Math.abs(ev.clientX - drag.x) + Math.abs(ev.clientY - drag.y));
-      const s = viewScale(drag.vb, svg.getBoundingClientRect());
-      setViewBox({
-        ...drag.vb,
-        x: drag.vb.x - (ev.clientX - drag.x) / s,
-        y: drag.vb.y - (ev.clientY - drag.y) / s,
-      });
+      if (!drag.big) bigStart();
+      drag.dx = ev.clientX - drag.x;
+      drag.dy = ev.clientY - drag.y;
+      const r = svg.parentElement.getBoundingClientRect();
+      if (Math.abs(drag.dx) > 0.9 * r.width || Math.abs(drag.dy) > 0.9 * r.height) {
+        // past the drawn margin: settle here and slide on from this point
+        bigEnd();
+        drag = { ...drag, x: ev.clientX, y: ev.clientY, vb: { ...App.vb }, dx: 0, dy: 0 };
+        bigStart();
+      }
+      svg.style.transform = `translate(${drag.dx}px, ${drag.dy}px)`;
       return;
     }
     const g = ev.target.closest('.node');
@@ -167,6 +193,7 @@ export function initPanZoom() {
   });
   const end = () => {
     if (Force.dragging) { Force.dragging.fx = Force.dragging.fy = null; Force.dragging = null; }
+    if (drag?.big) bigEnd();
     drag = null;
     svg.classList.remove('panning');
   };
@@ -176,6 +203,8 @@ export function initPanZoom() {
 
 registerMode('layered', {
   activate: () => { stopForce(); App.vb = null; buildGraphView(); },
+  deactivate: uncullEdges,  // force mode moves every edge, so it shows them all
+  onViewBox: cullEdges,
   fit: fitGraph,
   followFrontier: frontierView,
 });
