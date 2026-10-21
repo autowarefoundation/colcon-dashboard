@@ -1,6 +1,6 @@
 import { on } from './bus.js';
 import { App } from './state.js';
-import { $, fmtDur, fmtGB } from './util.js';
+import { $, fmtDur, fmtDurLong, fmtGB } from './util.js';
 
 /* ---------------- header + tiles ---------------- */
 
@@ -134,7 +134,11 @@ function summaryLine(s, c) {
     .filter(([, n]) => n)
     .map(([cls, n, word]) => `<span class="part"><span class="dot c-${cls}"></span>`
                              + `<b>${n}</b> ${word || cls}</span>`);
-  return `<span class="lead">${lead}</span>${parts.join('')}`;
+  // hover: the exact time, and when the build started and finished
+  const at = t => new Date(t * 1000).toLocaleString();
+  const tip = [`Took ${fmtDurLong(s.elapsed)}`].concat(s.build_started
+    ? [`Started ${at(s.build_started)}`, `Finished ${at(s.build_started + s.elapsed)}`] : []);
+  return `<span class="lead" title="${tip.join('\n')}">${lead}</span>${parts.join('')}`;
 }
 
 export function applyState(s) {

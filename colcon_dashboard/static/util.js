@@ -25,12 +25,29 @@ export function svgEl(tag, attrs, parent) {
   return e;
 }
 
+// 44s, 12m 5s, 1h 0m 5s: units always, so "0:44" never leaves the
+// reader guessing minutes or seconds. Trailing zero units drop: 12m, 1h.
 export function fmtDur(sec) {
   if (sec == null || !isFinite(sec)) return '–';
   sec = Math.max(0, Math.round(sec));
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
-  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-           : `${m}:${String(s).padStart(2, '0')}`;
+  const parts = h ? [[h, 'h'], [m, 'm'], [s, 's']] : m ? [[m, 'm'], [s, 's']] : [[s, 's']];
+  while (parts.length > 1 && parts[parts.length - 1][0] === 0) parts.pop();
+  return parts.map(([v, unit]) => v + unit).join(' ');
+}
+
+// the exact time in words, for tooltips: "44 minutes 12.4 seconds"
+export function fmtDurLong(sec) {
+  if (sec == null || !isFinite(sec)) return '–';
+  sec = Math.max(0, sec);
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+  const s = Math.round((sec - h * 3600 - m * 60) * 10) / 10;
+  const word = (v, w) => `${v} ${w}${v === 1 ? '' : 's'}`;
+  const out = [];
+  if (h) out.push(word(h, 'hour'));
+  if (h || m) out.push(word(m, 'minute'));
+  out.push(word(s, 'second'));
+  return out.join(' ');
 }
 
 export async function copyText(text) {
