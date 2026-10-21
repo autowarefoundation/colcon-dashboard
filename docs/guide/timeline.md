@@ -7,7 +7,7 @@ description: >-
 
 # Timeline
 
-A Gantt chart of every started package, with a time axis and a dashed now line. Bar colors match the graph states.
+A Gantt chart of every started package, with a dashed now line. The time axis stays at the top while you scroll the rows. A long package name ends in "…", and its tooltip shows the full name. Bar colors match the graph states.
 
 <!-- TODO(images): timeline of a parallel build, longest bars sorted on top. -->
 

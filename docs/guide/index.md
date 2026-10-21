@@ -17,6 +17,8 @@ The browser tab mirrors the build even in the background. The title shows `[42%]
 
 ## Workspace picker
 
+If you open the page without a workspace, the picker fills the page as a start page.
+
 The workspace picker has three sections: "Starred", "Recent", and "Found on disk". Each row shows the workspace name, its parent directory, and the time since the last build. A dot shows the result of the last build: green for passed, red for failed, orange for aborted, and gray when the result is not known yet. A workspace that builds now shows a progress bar. Hover a row to see the build count and the log size. A star moves a workspace to "Starred", and a sort menu reorders each section by last build, build count, or log size.
 
 The box at the top filters the list as you type. The arrow keys move through the rows, and Enter opens the highlighted row. If you paste a path and press Enter, the page opens that path. Escape clears the box, and a second Escape closes the picker.
@@ -44,7 +46,9 @@ The right side is the system strip. A colcon build can exhaust the machine, so p
 
 The meter fills as the build advances: green for done, animated blue stripes for building, red for failed, orange for aborted.
 
-The tiles count each state: done out of the total, building, ready, waiting (plus a blocked count after a failure), failed, aborted, and skipped. Elapsed time, the rate in packages per minute, and an ETA sit at the end. The ETA is an estimate: the longest remaining dependency chain, or the remaining work spread over the workers, whichever is larger. The duration of each package comes from the previous build.
+While a build runs, the tiles count each state: done out of the total, building, ready, waiting (plus a blocked count after a failure), failed, aborted, and skipped. Elapsed time, the rate in packages per minute, and an ETA sit at the end. The ETA is an estimate: the longest remaining dependency chain, or the remaining work spread over the workers, whichever is larger. The duration of each package comes from the previous build.
+
+After the build ends, one summary line replaces the tiles, for example "502 packages built in 0:44". The line also gives the failed, aborted, skipped, and unbuilt counts.
 
 ## Theme
 

@@ -17,6 +17,7 @@ The dock opens with a pinned **build log** tab: the whole build, as a terminal s
 - The **↩ wrap** button soft-wraps long lines. The choice sticks for future panes. AI panes start wrapped, because prose reads badly on one line.
 - The **search** box filters as you type, and matching lines highlight. ++enter++ and ++shift+enter++ step through the matches. The search stays live while the log streams.
 - A selector switches a package pane between the timestamped output, `stdout+stderr`, `stderr`, `stdout`, and the command log.
+- If a finished package has no timestamped output, the pane switches to `stdout+stderr` and says so. An empty pane always shows a note that tells why it is empty.
 - The panes show ANSI colors as a terminal does: the 16 classic colors, 256-color, and truecolor, with palettes tuned per theme. Uncolored lines that match error or warning patterns still get color.
 - If a package fails, its pane opens by itself and a toast points to it. A page that opens on an already failed build also opens the panes of the failed packages, earliest failure first.
 - A **✗ failures** tab appears with the first failure, and it aggregates every failed package. It shows the last stderr lines of each, in failure order, with a jump link, an open-log button, and the ask-claude button. When a failed build ends, this pane comes to the front.
