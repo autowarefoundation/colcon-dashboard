@@ -2,9 +2,9 @@ import { getNotifyMode, notifyBlocked, serverNotifies, setNotifyMode, testNotify
 import { loadScanRoots, mountScanRoots } from './pickers.js';
 import { App } from './state.js';
 import { savedTheme, setTheme } from './theme.js';
-import { $, copyText, esc } from './util.js';
+import { $, copyText, esc, initPanel } from './util.js';
 
-/* ---------------- settings dialog ----------------
+/* ---------------- settings side panel ----------------
    One place for the choices this browser keeps (theme, notifications,
    log panes, layout), the scan roots (saved in config.ini at once), and
    a read-only view of the rest of the server configuration. The header buttons stay as shortcuts; the
@@ -130,8 +130,8 @@ export function initSettings() {
     overlay.hidden = !overlay.hidden;
   };
   overlay.querySelector('.sclose').onclick = close;
+  initPanel(overlay, $('#settingsBtn'), { side: true });
   overlay.addEventListener('click', ev => {
-    if (ev.target === overlay) close();
     const copy = ev.target.closest('button.copy');
     if (copy) copyText(copy.dataset.copy);
   });

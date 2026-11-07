@@ -750,30 +750,44 @@ body.offline #sysmeters { display: none; }
 }
 #updnote .dismiss:hover { color: var(--critical); }
 
-/* keyboard help overlay */
-#help {
-  position: fixed;
-  inset: 0;
-  z-index: 46;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
+/* anchored panels (util.js initPanel): the pickers and the help drop down
+   under their buttons, the settings slide in at the right. No backdrop:
+   the wrapper covers the window but lets every click through, and only
+   the box takes clicks. */
+#wspick, #bpick, #help, #settings { position: fixed; inset: 0; z-index: 47; pointer-events: none; }
+#settings { z-index: 46; }  /* a dropdown opens over the side panel */
+#wspick[hidden], #bpick[hidden], #help[hidden], #settings[hidden] { display: none; }
+#wspick .wsbox, #bpick .wsbox, #help .wsbox, #settings .wsbox {
+  position: absolute;
+  pointer-events: auto;
+  overflow: auto;
+  box-sizing: border-box;
 }
-#help[hidden] { display: none; }
-
-/* settings dialog: the overlay and the box of the help overlay */
-#settings {
-  position: fixed;
-  inset: 0;
-  z-index: 46;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
+#wspick .wsbox { width: min(560px, calc(100vw - 16px)); }
+#bpick .wsbox { width: min(640px, calc(100vw - 16px)); }
+#wspick .wsbox, #bpick .wsbox, #help .wsbox { animation: drop-in 120ms ease-out; }
+@keyframes drop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
+/* the settings: a side panel below the top bar that stays open while you work */
+#settings .wsbox.setbox {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 100vw);
+  border-radius: 0;
+  border-width: 0 0 0 1px;
+  box-shadow: -10px 0 30px rgba(10, 31, 61, 0.14);
+  animation: slide-in 160ms ease-out;
 }
-#settings[hidden] { display: none; }
-#settings .wsbox.setbox { width: min(560px, 92vw); max-height: 88vh; overflow: auto; }
+@keyframes slide-in { from { opacity: 0; transform: translateX(24px); } }
+@media (prefers-reduced-motion: reduce) {
+  #wspick .wsbox, #bpick .wsbox, #help .wsbox, #settings .wsbox { animation: none; }
+}
+/* the button of an open panel looks pressed */
+#topbar .switcher[aria-expanded="true"], #topbar .hbtns button[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+#topbar .switcher[aria-expanded="true"] .sw-chev { fill: var(--accent); }
 .setbox .sclose { padding: 1px 7px; font-weight: 400; }
 .setbox section + section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--grid); }
 .setbox h3 { margin: 0 0 8px; font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
@@ -798,7 +812,7 @@ body.offline #sysmeters { display: none; }
   .setbox .snote { margin-left: 0; }
   .setbox dl { grid-template-columns: 1fr; }
 }
-#help .wsbox.helpbox { width: min(480px, 92vw); }  /* outspecify .wsbox */
+#help .wsbox.helpbox { width: min(440px, calc(100vw - 16px)); }  /* outspecify .wsbox */
 .helpbox table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .helpbox td { padding: 5px 8px; border-top: 1px solid var(--grid); color: var(--ink2); }
 .helpbox td:first-child { white-space: nowrap; color: var(--ink); }
@@ -916,22 +930,12 @@ body.offline #sysmeters { display: none; }
 .ab14 { background: var(--t14); } .ab15 { background: var(--t15); }
 
 /* workspace picker */
-#wspick {
-  position: fixed;
-  inset: 0;
-  z-index: 45;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
-}
-#wspick[hidden] { display: none; }
 #wspick .wshero { display: none; }
 /* the start page: no workspace yet, so the picker is the whole page */
 body.nows #stats, body.nows #viewbar, body.nows #viz, body.nows #dockbar,
 body.nows #dock, body.nows #topbar .meta { display: none; }
-body.nows #wspick { position: static; flex: 1; flex-direction: column; align-items: center; justify-content: flex-start; background: none; padding-top: 8vh; overflow: auto; }
-body.nows #wspick .wsbox { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); }
+body.nows #wspick { position: static; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 8vh; overflow: auto; pointer-events: auto; }
+body.nows #wspick .wsbox { position: static; overflow: visible; animation: none; width: min(620px, 92vw); box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); }
 body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 22px; max-width: min(620px, 92vw); }
 .wshero .logo { width: 64px; height: 64px; }
 .wshero h1 { margin: 8px 0 4px; font-size: 26px; font-weight: 650; letter-spacing: -0.01em; }
@@ -943,9 +947,8 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 12px 32px rgba(10, 31, 61, 0.18), 0 2px 6px rgba(10, 31, 61, 0.08);
   padding: 16px 18px;
-  width: min(620px, 92vw);
   color: var(--ink);
 }
 #wspick .wshead,
@@ -1034,8 +1037,6 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 #wspick #wsinput { display: block; width: 100%; box-sizing: border-box; padding: 7px 10px; font-size: 13px; margin-bottom: 4px; }
 #wspick #wsinput:focus { outline: none; border-color: var(--accent); }
 #wslist { max-height: 60vh; gap: 2px; overflow-x: hidden; }
-/* a fixed top: the dialog must not jump while a search resizes the list */
-#wspick { align-items: flex-start; padding-top: 12vh; box-sizing: border-box; }
 /* section headers: Starred, Recent, Found on disk */
 .wssec {
   display: flex;
@@ -1163,16 +1164,6 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 body.offline .switcher .sw-cap, body.offline .switcher .sw-val { color: #fff; }
 body.offline #topbar .switcher svg { fill: #fff; }
 
-#bpick {
-  position: fixed;
-  inset: 0;
-  z-index: 45;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
-}
-#bpick[hidden] { display: none; }
 #bpick .wsadd { display: flex; margin-top: 12px; }
 .wsitem > .del {
   background: none;
@@ -1203,6 +1194,9 @@ body.offline #topbar .switcher svg { fill: #fff; }
 .wsrow .btag.failed { border-color: var(--critical); color: var(--critical); }
 .wsrow .btag.aborted { border-color: var(--serious); color: var(--serious); }
 .wsrow .bstats { flex: 1; text-align: right; }
+/* a long build row wraps onto a second line, never sideways */
+#blist .wsrow { flex-wrap: wrap; row-gap: 2px; }
+#blist .wsrow .bstats { white-space: normal; min-width: 12em; }
 
 /* confirmation overlay */
 #confirm {

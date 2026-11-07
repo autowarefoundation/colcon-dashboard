@@ -73,7 +73,7 @@ The tray also needs a tray host. KDE, waybar, and swaybar have one. On Ubuntu, t
 
 ## The server
 
-The settings dialog controls the server:
+The settings panel (the gear button) controls the server:
 
 - **start the server when you log in** turns the systemd user service on or off.
 - **Restart the server** restarts it, for example after a change to `config.ini`.

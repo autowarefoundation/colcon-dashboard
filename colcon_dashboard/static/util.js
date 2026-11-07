@@ -137,3 +137,58 @@ export function mirrorPressed(root = document.body) {
   }).observe(root, { subtree: true, childList: true, attributes: true,
                      attributeFilter: ['class'] });
 }
+
+/* ---------------- anchored panels ----------------
+   The workspace picker, the build picker, and the help open as dropdowns
+   under the button that opens them. The settings open as a side panel
+   below the top bar. No backdrop: the dashboard stays visible and live.
+   A click outside a dropdown closes it and still reaches the page. The
+   side panel stays open until its button, ✕, or Esc closes it. Modules
+   keep opening and closing a panel through its hidden attribute. */
+
+const PANELS = new Map();  // panel -> { trigger, align, side, inPlace }
+
+// inPlace: true while the panel is page content, not a dropdown (the
+// workspace picker on the start page)
+export function initPanel(panel, trigger,
+                          { align = 'left', side = false, inPlace = () => false } = {}) {
+  PANELS.set(panel, { trigger, align, side, inPlace });
+  new MutationObserver(() => syncPanel(panel))
+    .observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+  syncPanel(panel);
+}
+
+function syncPanel(panel) {
+  PANELS.get(panel).trigger.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+  placePanel(panel);
+}
+
+function placePanel(panel) {
+  const cfg = PANELS.get(panel);
+  if (panel.hidden || cfg.inPlace()) return;
+  const box = panel.querySelector('.wsbox');
+  if (cfg.side) {
+    box.style.top = `${$('#topbar').getBoundingClientRect().bottom}px`;
+    return;
+  }
+  const r = cfg.trigger.getBoundingClientRect();
+  const width = box.offsetWidth;
+  const top = r.bottom + 6;
+  let left = cfg.align === 'right' ? r.right - width : r.left;
+  left = Math.max(8, Math.min(left, document.documentElement.clientWidth - width - 8));
+  box.style.left = `${left}px`;
+  box.style.top = `${top}px`;
+  box.style.maxHeight = `${innerHeight - top - 12}px`;
+  // the panel grows out of its button
+  box.style.transformOrigin = `${Math.round(r.left + r.width / 2 - left)}px 0`;
+}
+
+addEventListener('pointerdown', ev => {
+  if (ev.target.closest?.('#confirm')) return;
+  for (const [panel, cfg] of PANELS) {
+    if (panel.hidden || cfg.side || cfg.inPlace()) continue;
+    if (panel.querySelector('.wsbox').contains(ev.target) || cfg.trigger.contains(ev.target)) continue;
+    panel.hidden = true;
+  }
+}, true);
+addEventListener('resize', () => { for (const panel of PANELS.keys()) placePanel(panel); });

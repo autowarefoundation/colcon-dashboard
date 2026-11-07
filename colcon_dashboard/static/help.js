@@ -1,7 +1,7 @@
-import { $ } from './util.js';
+import { $, initPanel } from './util.js';
 
-/* ---------------- keyboard help overlay ----------------
-   Every shortcut already exists; this overlay makes them findable.
+/* ---------------- keyboard help dropdown ----------------
+   Every shortcut already exists; this dropdown makes them findable.
    It also owns the two global keys: ? opens it, / finds a package. */
 
 const ROWS = [
@@ -9,7 +9,7 @@ const ROWS = [
   ['/', 'jump to the find-package box'],
   ['Enter / Shift+Enter', 'next / previous match, in every search box'],
   ['Ctrl+Enter', 'in the find-package box: open the log of the current match'],
-  ['Esc', 'clear the search, or close an overlay'],
+  ['Esc', 'clear the search, or close a dropdown or the settings'],
   ['Tab / ← / →', 'move between the log tabs; Enter opens one, Delete closes it'],
   ['click a package', 'open its log pane, and select it: its chain stays in focus'],
   ['Ctrl+click / Shift+click', 'add a package to the selection, or take it out'],
@@ -32,9 +32,7 @@ export function initHelp() {
   }
   const toggle = () => { overlay.hidden = !overlay.hidden; };
   $('#helpBtn').onclick = toggle;
-  overlay.addEventListener('click', ev => {
-    if (ev.target === overlay) overlay.hidden = true;
-  });
+  initPanel(overlay, $('#helpBtn'), { align: 'right' });
   document.addEventListener('keydown', ev => {
     if (ev.key === 'Escape' && !overlay.hidden) {
       overlay.hidden = true;

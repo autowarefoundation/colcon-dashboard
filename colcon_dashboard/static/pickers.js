@@ -2,7 +2,7 @@ import { label } from './graph.js';
 import { setBadge } from './header.js';
 import { App } from './state.js';
 import { toast } from './toasts.js';
-import { $, esc, fmtAgo, fmtBytes, fmtDur, PINNED_BUILD, WS, wsParam } from './util.js';
+import { $, esc, fmtAgo, fmtBytes, fmtDur, initPanel, PINNED_BUILD, WS, wsParam } from './util.js';
 
 export const WS_SORTS = {
   // a workspace building now has the newest build, so "last built"
@@ -349,7 +349,10 @@ function moveWsHighlight(step) {
 }
 
 export function initWsPicker() {
-  $('#ws').onclick = openWsPicker;
+  // a second click on the switcher closes the dropdown
+  $('#ws').onclick = () => { if ($('#wspick').hidden) openWsPicker(); else $('#wspick').hidden = true; };
+  // the start page shows the picker as its content, in place
+  initPanel($('#wspick'), $('#ws'), { inPlace: () => document.body.classList.contains('nows') });
   const sortSel = $('#wssort');
   const savedSort = localStorage.getItem('cmc-wssort');
   sortSel.value = WS_SORTS[savedSort] ? savedSort : 'built';
@@ -358,9 +361,6 @@ export function initWsPicker() {
     renderWsList();
   };
   const overlay = $('#wspick');
-  overlay.addEventListener('click', ev => {
-    if (ev.target === overlay && WS) overlay.hidden = true;
-  });
   const input = $('#wsinput');
   input.addEventListener('input', () => {
     wsQuery = input.value.trim();
@@ -535,12 +535,10 @@ async function postJson(url) {
 }
 
 export function initBuildPicker() {
-  $('#buildid').onclick = openBuildPicker;
+  $('#buildid').onclick = () => { if ($('#bpick').hidden) openBuildPicker(); else $('#bpick').hidden = true; };
   if (PINNED_BUILD) $('#buildid').classList.add('pinned');
   const overlay = $('#bpick');
-  overlay.addEventListener('click', ev => {
-    if (ev.target === overlay) overlay.hidden = true;
-  });
+  initPanel(overlay, $('#buildid'));
   // Esc closes it, as the help table says for every overlay
   document.addEventListener('keydown', ev => {
     if (ev.key === 'Escape' && !overlay.hidden) overlay.hidden = true;
