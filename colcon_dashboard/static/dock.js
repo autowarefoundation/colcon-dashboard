@@ -1,4 +1,4 @@
-import { newSgr, renderLogLine } from './ansi.js';
+import { newSgr, renderLogLine, updateGroup } from './ansi.js';
 import { emit, on } from './bus.js';
 import { zoomToPkg } from './camera.js';
 import { label } from './graph.js';
@@ -50,9 +50,10 @@ export function openPane(name) {
 export const FILE_LINE_RE =
   /(\/?[\w.+~-]+(?:\/[\w.+~-]+)+\.[A-Za-z]\w{0,3}):(\d+)/;
 
+// node: the text part of a log line (.lc)
 export function linkifyLine(node) {
   const tmpl = App.cfg?.editor_url;
-  if (!tmpl || node.classList?.contains('ts')) return;
+  if (!tmpl || !node) return;
   if (node.nodeType !== 3 && node.querySelector?.('.elink')) return;
   const m = FILE_LINE_RE.exec(node.textContent);
   if (!m) return;
@@ -150,7 +151,7 @@ export function createPane(name) {
       ${fixed ? '' : `<button class="close" title="close pane" aria-label="close pane">${icon('close')}</button>`}
     </div>
     <div class="lognote" hidden></div>
-    <pre tabindex="0" class="showts"></pre>`;
+    <div class="logwrap"><pre tabindex="0" class="showts"></pre><div class="lmarks" aria-hidden="true"></div></div>`;
   $('#panes').appendChild(pane);
 
   const p = {
@@ -171,6 +172,7 @@ export function createPane(name) {
     const on = p.pre.classList.toggle('showts');
     tsBtn.classList.toggle('on', on);
     localStorage.setItem('cmc-ts', on ? '1' : '0');
+    scheduleMarks(p);
     if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
   };
   const wrapBtn = pane.querySelector('.wrapbtn');
@@ -182,9 +184,31 @@ export function createPane(name) {
     const on = p.pre.classList.toggle('wrap');
     wrapBtn.classList.toggle('on', on);
     if (!ai) localStorage.setItem('cmc-wrap', on ? '1' : '0');
+    scheduleMarks(p);
     if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
   };
   initSearch(p);
+  // clicks inside the log: a package tag opens its pane, a group line
+  // opens or closes its lines, an environment chip shows the variables
+  p.pre.addEventListener('click', ev => {
+    if (getSelection().type === 'Range') return;  // the user selects text
+    const pk = ev.target.closest('.pk');
+    if (pk) { emit('open-pkg', pk.textContent); return; }
+    const head = ev.target.closest('.lgrp-head');
+    if (head) {
+      const g = head.parentElement;
+      g.classList.toggle('folded');
+      g.dataset.user = '1';
+      scheduleMarks(p);
+      return;
+    }
+    const env = ev.target.closest('.envfold');
+    if (env) {
+      const open = env.classList.toggle('open');
+      env.textContent = open ? env.dataset.full : env.dataset.lbl;
+    }
+  });
+  new ResizeObserver(() => scheduleMarks(p)).observe(p.pre);
   pane.querySelector('.askai')?.addEventListener('click',
     () => emit('analyze-pkg', name));
   pane.querySelector('.locate')?.addEventListener('click', () => zoomToPkg(pkg));
@@ -242,9 +266,13 @@ export function resetPane(p) {
   p.buf = '';
   p.lines = 0;
   p.sgr = newSgr();
+  p.lint = null;
+  p.lintBy = null;
+  p.grp = null;
   p.start = null;
   p.noTrim = false;
   p.pre.textContent = '';
+  updateMarks(p);
 }
 
 export function updateEarlierBtn(p) {
@@ -283,17 +311,14 @@ export function initSearch(p) {
   p.el.querySelector('.snext').onclick = () => stepHit(p, 1);
 }
 
-export function markHit(p, node) {
-  if (node.nodeType === 3) {  // bare text line: wrap it so it can carry a class
-    const s = document.createElement('span');
-    node.replaceWith(s);
-    s.appendChild(node);
-    node = s;
-  }
-  node.classList.add('hit');
-  p.hits.push(node);
-  return node;
+export function markHit(p, ln) {
+  ln.classList.add('hit');
+  p.hits.push(ln);
+  return ln;
 }
+
+// the text of a log line, without its timestamp
+const lineText = ln => ln.lastElementChild?.textContent || '';
 
 // re, when given, picks the lines in place of the typed text: a search
 // opened for the user (the warnings) matches what the server counted
@@ -306,10 +331,8 @@ export function runSearch(p, re = p.queryRe) {
   p.hits = [];
   p.hitIdx = -1;
   if (q) {
-    for (const node of [...p.pre.childNodes]) {
-      if (node.classList?.contains('ts')) continue;
-      if (matchesQuery(p, node.textContent)) markHit(p, node);
-    }
+    for (const ln of p.pre.querySelectorAll('.ln'))
+      if (matchesQuery(p, lineText(ln))) markHit(p, ln);
     if (p.hits.length) {
       p.hitIdx = p.hits.length - 1;  // start at the most recent match
       focusHit(p);
@@ -326,6 +349,7 @@ export function focusHit(p) {
   p.hits.forEach((h, i) => h.classList.toggle('hit-cur', i === p.hitIdx));
   const cur = p.hits[p.hitIdx];
   if (cur) {
+    openGroupOf(cur);
     if (p.follow) {
       p.follow = false;
       p.el.querySelector('.follow').classList.remove('on');
@@ -366,6 +390,7 @@ export async function loadEarlier(p) {
     p.pre.textContent = '';
     p.lines = 0;
     p.hits = [];
+    p.grp = null;
     p.start = p.offset - new TextEncoder().encode(p.buf).length;
     p.trimmed = false;
   }
@@ -389,12 +414,13 @@ export async function loadEarlier(p) {
     const all = parts.join('');
     if (all) {
       const frag = document.createDocumentFragment();
-      const ctx = { sgr: newSgr() };  // ANSI state starts fresh at line zero
+      // the ANSI and lint states start fresh at line zero
+      const ctx = { sgr: newSgr(), fixed: p.fixed, ai: p.ai };
       const lines = all.split('\n');
       if (lines[lines.length - 1] === '') lines.pop();
       for (const line of lines) renderLogLine(ctx, line, frag);
       if (App.cfg?.editor_url)
-        for (const node of [...frag.childNodes]) linkifyLine(node);
+        for (const ln of frag.querySelectorAll('.ln')) linkifyLine(ln.lastElementChild);
       const before = p.pre.scrollHeight;
       p.pre.insertBefore(frag, p.pre.firstChild);
       p.pre.scrollTop += p.pre.scrollHeight - before;
@@ -404,6 +430,7 @@ export async function loadEarlier(p) {
     p.start = start;
     updateEarlierBtn(p);
     if (p.query) runSearch(p);
+    updateMarks(p);
   } catch (e) { /* transient */ }
   p.earlierBtn.innerHTML = `${icon('top')}Load all`;
   p.loadingEarlier = false;
@@ -502,6 +529,9 @@ export async function pollPane(p) {
       p.buf = '';
       p.lines = 0;
       p.sgr = newSgr();
+      p.lint = null;
+      p.lintBy = null;
+      p.grp = null;
       p.noTrim = false;
       p.start = r.start ?? 0;
       updateEarlierBtn(p);
@@ -522,32 +552,28 @@ export function appendLog(p, data) {
   p.buf = lines.pop();
   if (!lines.length) return;
   const frag = document.createDocumentFragment();
-  for (const line of lines) renderLogLine(p, line, frag);
+  const added = lines.map(line => renderLogLine(p, line, frag));
   p.lines += lines.length;
-  const firstNew = p.pre.childNodes.length;
   p.pre.appendChild(frag);
   const doLink = !!App.cfg?.editor_url;
   if (p.query || doLink) {  // keep the search live as the log streams
-    const nodes = p.pre.childNodes;
-    for (let i = firstNew; i < nodes.length; i++) {
-      let node = nodes[i];
-      if (node.classList?.contains('ts')) continue;
-      if (doLink) {
-        linkifyLine(node);
-        node = nodes[i];  // linkify may wrap a bare text node
-      }
-      if (p.query && matchesQuery(p, node.textContent))
-        markHit(p, node);
+    for (const ln of added) {
+      if (doLink) linkifyLine(ln.lastElementChild);
+      if (p.query && matchesQuery(p, lineText(ln))) markHit(p, ln);
     }
     if (p.query) updateSearchCount(p);
     seekFirstHit(p);
   }
   let trimmed = false;
-  while (!p.noTrim && p.lines > 6000 && p.pre.firstChild) {
-    // one log line is its text node, after its timestamp span when it has one
-    const ts = p.pre.firstChild.classList?.contains('ts');
-    p.pre.removeChild(p.pre.firstChild);
-    if (ts && p.pre.firstChild) p.pre.removeChild(p.pre.firstChild);
+  while (!p.noTrim && p.lines > 6000) {
+    const first = p.pre.querySelector('.ln');
+    if (!first) break;
+    const body = first.parentElement.classList.contains('lgrp-body') ? first.parentElement : null;
+    first.remove();
+    if (body) {
+      if (!body.firstChild) body.parentElement.remove();
+      else updateGroup(body.parentElement, body.childElementCount);
+    }
     p.lines--;
     trimmed = true;
   }
@@ -556,6 +582,56 @@ export function appendLog(p, data) {
     updateEarlierBtn(p);
   }
   if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
+  scheduleMarks(p);
+}
+
+/* ---- the error and warning marks beside the scrollbar: where the
+   problems sit in a long log, and a click jumps to one ---- */
+
+const MAX_MARKS = 400;
+
+export function scheduleMarks(p) {
+  if (p.marksTimer) return;
+  p.marksTimer = setTimeout(() => { p.marksTimer = null; updateMarks(p); }, 400);
+}
+
+export function updateMarks(p) {
+  const box = p.el?.querySelector('.lmarks');
+  if (!box || !p.pre) return;
+  box.textContent = '';
+  const h = p.pre.scrollHeight;
+  if (!h || h <= p.pre.clientHeight) return;  // no scrollbar: nothing to find
+  const lines = p.pre.querySelectorAll('.ln.l-err, .ln.l-warn');
+  const step = Math.max(1, Math.ceil(lines.length / MAX_MARKS));
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < lines.length; i += step) {
+    const ln = lines[i];
+    if (!ln.offsetParent) continue;  // inside a closed group
+    const m = document.createElement('span');
+    m.className = ln.classList.contains('l-err') ? 'mk err' : 'mk warn';
+    m.style.top = `${(100 * ln.offsetTop / h).toFixed(2)}%`;
+    m.title = lineText(ln).trim().slice(0, 160);
+    m.onclick = () => {
+      ln.scrollIntoView({ block: 'center' });
+      if (p.follow) {
+        p.follow = false;
+        p.el.querySelector('.follow').classList.remove('on');
+      }
+      ln.classList.remove('flash');
+      void ln.offsetWidth;  // restart the animation
+      ln.classList.add('flash');
+    };
+    frag.appendChild(m);
+  }
+  box.appendChild(frag);
+}
+
+function openGroupOf(ln) {
+  const g = ln.closest('.lgrp');
+  if (g?.classList.contains('folded')) {
+    g.classList.remove('folded');
+    g.dataset.user = '1';
+  }
 }
 
 /* ---- failure summary: every failed package's stderr tail, in one
@@ -656,7 +732,7 @@ export async function fillFailTail(item, name) {
     const frag = document.createDocumentFragment();
     for (const line of lines) renderLogLine(ctx, line, frag);
     if (App.cfg?.editor_url)
-      for (const node of [...frag.childNodes]) linkifyLine(node);
+      for (const ln of frag.querySelectorAll('.ln')) linkifyLine(ln.lastElementChild);
     pre.appendChild(frag);
   } catch (e) {
     pre.textContent = '(log unavailable)';
@@ -717,7 +793,7 @@ on('state', () => {
   for (const p of App.panes.values()) {
     const pres = p.pre ? [p.pre] : [...p.el.querySelectorAll('.ftail')];
     for (const pre of pres)
-      for (const node of [...pre.childNodes]) linkifyLine(node);
+      for (const ln of pre.querySelectorAll('.ln')) linkifyLine(ln.lastElementChild);
   }
 });
 

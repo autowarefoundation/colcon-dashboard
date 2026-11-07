@@ -47,6 +47,8 @@
   --shadow-panel: -10px 0 30px rgba(10, 31, 61, 0.14);
   --shadow-modal: 0 20px 50px rgba(10, 31, 61, 0.28);
   --shadow-card: 0 4px 24px rgba(10, 31, 61, 0.08);
+  --zebra: rgba(10, 31, 61, 0.028);
+  --line-hover: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -74,6 +76,7 @@
   --shadow-panel: -10px 0 30px rgba(0, 0, 0, 0.45);
   --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.6);
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3);
+  --zebra: rgba(255, 255, 255, 0.03);
 }
 
 * { box-sizing: border-box; }
@@ -647,6 +650,10 @@ body.offline #sysmeters { display: none; }
 .pane .phead .count .dot { width: 8px; height: 8px; border-radius: 50%; }
 .pane .phead .grow { flex: 1; }
 .pane .phead select, .pane .phead button { padding: 1px 7px; font-size: var(--fs-xs); }
+/* the log: one row per line (ansi.js), so that the rows can stripe, light
+   up under the mouse, and indent when they wrap; the lint colors the
+   parts of each line (lint.js) */
+.logwrap { position: relative; flex: 1; min-height: 0; display: flex; }
 .pane pre {
   flex: 1;
   margin: 0;
@@ -656,12 +663,121 @@ body.offline #sysmeters { display: none; }
   color: var(--ink2);
   background: var(--surface);
   white-space: pre;
+  position: relative;  /* the lines' offsetTop, for the marks */
+  display: grid;
+  /* every row as wide as the longest line: the stripes reach across */
+  grid-template-columns: minmax(100%, max-content);
+  align-content: start;
 }
-.pane pre.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
-.pane pre .l-err { color: var(--critical); font-weight: 600; }
-.pane pre .l-warn { color: color-mix(in srgb, var(--warning) 70%, var(--ink)); }
+.pane pre.wrap { white-space: pre-wrap; overflow-wrap: anywhere; grid-template-columns: 100%; }
+.pane pre .ln, .pane pre .lgrp, .pane pre .lgrp-head, .pane pre .lgrp-body { display: block; }
+.pane pre .ln { padding: 0 6px; border-radius: var(--r-xs); }
+/* a wrapped line indents past its timestamp, so it reads as one line */
+.pane pre.wrap .ln { padding-left: calc(var(--tsw, 0ch) + 2ch + 6px); text-indent: calc(-1 * (var(--tsw, 0ch) + 2ch)); }
+.pane pre.wrap:not(.showts) .ln { padding-left: calc(2ch + 6px); text-indent: -2ch; }
+.pane pre .ln:nth-child(even) { background: var(--zebra); }
 .pane pre .ts { color: var(--muted); }
 .pane pre:not(.showts) .ts { display: none; }
+
+/* line kinds: a tint and a bar at the left edge for what needs a look */
+.pane pre .ln.l-err { color: var(--critical); background: color-mix(in srgb, var(--critical) 7%, transparent); box-shadow: inset 3px 0 var(--critical); }
+.pane pre .ln.l-warn { color: color-mix(in srgb, var(--warning) 70%, var(--ink)); background: color-mix(in srgb, var(--warning) 8%, transparent); box-shadow: inset 3px 0 var(--warning); }
+.pane pre .ln.l-note { color: color-mix(in srgb, var(--accent) 75%, var(--ink2)); box-shadow: inset 3px 0 color-mix(in srgb, var(--accent) 50%, transparent); }
+.pane pre .ln.l-blk-warn { color: color-mix(in srgb, var(--warning) 45%, var(--ink2)); background: color-mix(in srgb, var(--warning) 4%, transparent); box-shadow: inset 3px 0 color-mix(in srgb, var(--warning) 45%, transparent); }
+.pane pre .ln.l-blk-err { color: color-mix(in srgb, var(--critical) 60%, var(--ink2)); background: color-mix(in srgb, var(--critical) 4%, transparent); box-shadow: inset 3px 0 color-mix(in srgb, var(--critical) 45%, transparent); }
+.pane pre .ln.l-err .lc, .pane pre .ln.l-diag .sev { font-weight: 600; }
+.pane pre .ln.l-start { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.pane pre .ln.l-fin { background: color-mix(in srgb, var(--good) 6%, transparent); }
+.pane pre .ln.l-abort { color: var(--serious); background: color-mix(in srgb, var(--serious) 7%, transparent); box-shadow: inset 3px 0 var(--serious); }
+.pane pre .ln.l-job { font-weight: 600; color: var(--ink); }
+.pane pre .ln.l-noise, .pane pre .ln.l-py, .pane pre .ln.l-make, .pane pre .ln.l-ctx, .pane pre .ln.l-sep { color: var(--muted); }
+.pane pre .ln.l-cmake { color: var(--muted); }
+.pane pre .ln.l-done { color: var(--good); }
+.pane pre .ln.l-sum { font-weight: 600; color: var(--ink); }
+.pane pre .ln:hover { background: var(--line-hover); }
+@keyframes lflash { from { background: color-mix(in srgb, var(--accent) 35%, transparent); } }
+.pane pre .ln.flash { animation: lflash 1.2s ease-out; }
+
+/* the parts of a line */
+.pane pre .mut, .pane pre .pdir, .pane pre .wflag { color: var(--muted); }
+.pane pre .ln.l-err .pdir, .pane pre .ln.l-warn .pdir { color: inherit; opacity: 0.7; }
+.pane pre .fl { text-decoration: underline dotted color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+.pane pre .sev.err { color: var(--critical); }
+.pane pre .sev.warn { color: color-mix(in srgb, var(--warning) 80%, var(--ink)); }
+.pane pre .sev.note { color: var(--accent); }
+.pane pre .qt { color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, transparent); border-radius: var(--r-xs); }
+.pane pre .tgt { color: var(--ink2); }
+.pane pre .ver { color: var(--accent); }
+.pane pre .verb { color: var(--ink2); }
+.pane pre .l-cmake .verb, .pane pre .l-py .verb { color: var(--muted); }
+.pane pre .l-built .verb { color: var(--good); }
+.pane pre .l-built .tgt { color: var(--muted); }
+.pane pre .l-link .verb { color: var(--accent); }
+.pane pre .l-link .tgt { color: var(--ink); }
+.pane pre .lno { color: var(--muted); }
+.pane pre .gut { color: var(--baseline); }
+.pane pre .src { color: var(--ink); }
+.pane pre .l-caret .car { font-weight: 700; color: var(--accent); }
+.pane pre .l-caret-warn .car { color: var(--warning); }
+.pane pre .l-caret-err .car { color: var(--critical); }
+/* a CMake progress percent: a small bar behind the number */
+.pane pre .pct {
+  display: inline-block;
+  min-width: 5ch;
+  text-align: right;
+  padding: 0 3px;
+  border-radius: var(--r-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink2);
+  background: linear-gradient(to right, color-mix(in srgb, var(--accent) 22%, transparent) var(--p, 0%), color-mix(in srgb, var(--accent) 6%, transparent) var(--p, 0%));
+  text-indent: 0;
+}
+.pane pre .dur { padding: 0 4px; border-radius: var(--r-xs); background: color-mix(in srgb, var(--ink) 7%, transparent); font-variant-numeric: tabular-nums; }
+.pane pre .dur.slow1 { color: var(--serious); background: color-mix(in srgb, var(--serious) 12%, transparent); }
+.pane pre .dur.slow2 { color: var(--critical); background: color-mix(in srgb, var(--critical) 12%, transparent); }
+.pane pre .jobv::before { display: inline-block; width: 1.4em; text-indent: 0; }  /* inline-blocks take the wrap indent otherwise */
+.pane pre .l-start .jobv::before { content: "▶"; color: var(--accent); }
+.pane pre .l-fin .jobv::before { content: "✓"; color: var(--good); }
+.pane pre .l-err .jobv::before { content: "✗"; color: var(--critical); }
+.pane pre .l-abort .jobv::before { content: "◌"; color: var(--serious); }
+/* a package tag in the build log: one color per package, a click opens its log */
+.pane pre .pk {
+  color: hsl(var(--h) 55% 36%);
+  background: hsl(var(--h) 70% 50% / 0.1);
+  border-radius: var(--r-xs);
+  padding: 0 4px;
+  cursor: pointer;
+  text-indent: 0;
+}
+.pane pre .pk:hover { background: hsl(var(--h) 70% 50% / 0.22); }
+:root[data-theme="dark"] .pane pre .pk { color: hsl(var(--h) 70% 72%); background: hsl(var(--h) 70% 60% / 0.14); }
+.pane pre .cmd { color: var(--ink); font-weight: 600; }
+.pane pre .flag { color: color-mix(in srgb, var(--accent) 70%, var(--ink2)); }
+.pane pre .envfold { color: var(--muted); border: 1px dashed var(--baseline); border-radius: var(--r-s); padding: 0 5px; cursor: pointer; }
+.pane pre .envfold.open { border-style: solid; color: var(--muted); }
+.pane pre .rc.ok { color: var(--good); }
+.pane pre .rc.bad { color: var(--critical); font-weight: 600; }
+/* a folded run of install lines: one line with the count */
+.pane pre .lgrp-head {
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0 6px;
+  border-radius: var(--r-xs);
+  background: color-mix(in srgb, var(--muted) 9%, transparent);
+  user-select: none;
+}
+.pane pre .lgrp-head::before { content: "▾"; display: inline-block; width: 1.4em; text-indent: 0; transition: transform 0.12s; }
+.pane pre .lgrp.folded .lgrp-head::before { transform: rotate(-90deg); }
+.pane pre .lgrp-head:hover { color: var(--ink2); background: var(--line-hover); }
+.pane pre .lgrp.short .lgrp-head { display: none; }
+.pane pre .lgrp.folded .lgrp-body { display: none; }
+/* where the errors and warnings sit: a strip beside the scrollbar */
+.lmarks { position: relative; flex: none; width: 8px; background: var(--surface); border-left: 1px solid var(--grid); }
+.lmarks:empty { display: none; }
+.lmarks .mk { position: absolute; left: 1px; right: 1px; height: 3px; border-radius: 1px; cursor: pointer; }
+.lmarks .mk.err { background: var(--critical); }
+.lmarks .mk.warn { background: var(--warning); }
+.lmarks .mk:hover { transform: scaleY(2); }
 .pane .phead .search {
   font: var(--fs-xs) var(--mono);
   color: var(--ink);
@@ -675,8 +791,8 @@ body.offline #sysmeters { display: none; }
 .pane .phead .search:focus { outline: none; border-color: var(--accent); }
 .pane .phead .scount { font-size: var(--fs-xs); color: var(--muted); min-width: 34px; text-align: center; }
 .pane .phead .scount:empty { display: none; }  /* no search: no gap before the arrows */
-.pane pre .hit { background: color-mix(in srgb, var(--warning) 20%, transparent); }
-.pane pre .hit-cur {
+.pane pre .ln.hit { background: color-mix(in srgb, var(--warning) 20%, transparent); }
+.pane pre .ln.hit-cur {
   background: color-mix(in srgb, var(--warning) 45%, transparent);
   outline: 1px solid var(--warning);
 }

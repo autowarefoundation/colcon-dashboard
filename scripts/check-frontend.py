@@ -19,7 +19,7 @@ STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # module -> modules it may import from (kept sorted)
 ALLOWED = {
     'ai': ['bus', 'dock', 'state', 'util'],
-    'ansi': [],
+    'ansi': ['lint'],
     'app': ['ai', 'bus', 'camera', 'dock', 'g3d', 'gantt', 'gsearch',
             'header', 'help', 'modes', 'notify', 'pickers', 'poller',
             'settings', 'state', 'theme', 'util', 'views'],
@@ -39,6 +39,8 @@ ALLOWED = {
     'header': ['bus', 'state', 'util'],
     'help': ['util'],
     # logo.js is a copy of the logo generator; it imports nothing
+    # lint.js colors the recurring parts of colcon logs; it imports nothing
+    'lint': [],
     'logo': [],
     'modes': ['state'],
     'notify': ['bus', 'logo', 'state', 'util'],
