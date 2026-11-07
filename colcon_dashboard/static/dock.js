@@ -148,6 +148,7 @@ export function createPane(name) {
       ${ai ? '' : `<button class="earlier" style="display:none" title="load the whole log from the start">${icon('top')}Load all</button>
       <button class="tsbtn on" title="show or hide timestamps">${icon('clock')}Time</button>`}
       <button class="wrapbtn" title="soft-wrap long lines">${icon('wrap')}Wrap</button>
+      ${ai ? '' : `<button class="rawbtn" title="show the exact log text: no highlighting, no folded lines">${icon('raw')}Raw</button>`}
       <button class="follow on" title="auto-scroll to the end">${icon('follow')}Follow</button>
     </div>
     <div class="lognote" hidden></div>
@@ -235,6 +236,18 @@ export function createPane(name) {
     row.querySelector('button').onclick = send;
     input.onkeydown = ev => { if (ev.key === 'Enter') send(); };
     pane.appendChild(row);
+  }
+  // raw: the exact text, for when the highlighting or a fold hides something
+  const rawBtn = pane.querySelector('.rawbtn');
+  if (rawBtn) {
+    p.raw = localStorage.getItem('cmc-raw') === '1';
+    rawBtn.classList.toggle('on', p.raw);
+    rawBtn.onclick = () => {
+      p.raw = !p.raw;
+      rawBtn.classList.toggle('on', p.raw);
+      localStorage.setItem('cmc-raw', p.raw ? '1' : '0');
+      resetPane(p);  // the next poll renders the log again
+    };
   }
   pane.querySelector('.fsel')?.addEventListener('change', ev => {
     p.file = ev.target.value;

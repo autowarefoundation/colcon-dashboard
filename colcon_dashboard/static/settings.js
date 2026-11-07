@@ -29,6 +29,7 @@ function render() {
   $('#setNotifyTest').disabled = mode === 'off';
   $('#setTs').checked = localStorage.getItem('cmc-ts') !== '0';
   $('#setWrap').checked = localStorage.getItem('cmc-wrap') === '1';
+  $('#setRaw').checked = localStorage.getItem('cmc-raw') === '1';
   loadScanRoots();
   renderServer();
   loadServerInfo();
@@ -158,11 +159,13 @@ export function initSettings() {
         if (!b.closest('.pane').querySelector('.tsbtn')) continue;  // prose panes keep their wrap
         if (b.classList.contains('on') !== ev.target.checked) b.click();
       }
-      localStorage.setItem(btn === '.tsbtn' ? 'cmc-ts' : 'cmc-wrap', ev.target.checked ? '1' : '0');
+      const key = { '.tsbtn': 'cmc-ts', '.wrapbtn': 'cmc-wrap', '.rawbtn': 'cmc-raw' }[btn];
+      localStorage.setItem(key, ev.target.checked ? '1' : '0');
     };
   };
   logChoice('#setTs', '.tsbtn');
   logChoice('#setWrap', '.wrapbtn');
+  logChoice('#setRaw', '.rawbtn');
   $('#setReset').onclick = () => {
     for (const k of LAYOUT_KEYS) localStorage.removeItem(k);
     location.reload();

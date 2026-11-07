@@ -69,8 +69,8 @@ const FOLD_LABEL = { install: 'install lines' };
 /* One log line becomes one <span class="ln">: the timestamp, then the
    text in <span class="lc">. ctx is the pane (or a pane-like object):
    sgr (the ANSI state), lint (lint.js state), fixed (the build log),
-   ai (prose: no lint), pre, and grps (the open fold groups). Returns
-   the line element. */
+   ai (prose: no lint), raw (the exact text: no lint, no folds), pre,
+   and grps (the open fold groups). Returns the line element. */
 export function renderLogLine(ctx, line, frag) {
   const ln = document.createElement('span');
   ln.className = 'ln';
@@ -109,7 +109,7 @@ export function renderLogLine(ctx, line, frag) {
         lc.appendChild(document.createTextNode(text));
       }
     }
-  } else if (ctx.ai) {
+  } else if (ctx.ai || ctx.raw) {
     lc.textContent = line;
   } else {
     let lst = ctx.lint || (ctx.lint = newLintState());
