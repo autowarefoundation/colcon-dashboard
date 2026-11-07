@@ -73,6 +73,9 @@ class Menu(unittest.TestCase):
 
 
 class FakeTray:
+    def set_svg(self, svg):
+        self.svg = svg
+
     def set_state(self, tip, gray):
         self.tip, self.gray = tip, gray
 
@@ -87,6 +90,7 @@ class AppMenu(unittest.TestCase):
         app = tray.TrayApp.__new__(tray.TrayApp)  # no bus, no poll
         app.desktop, app.tray = desktop, FakeTray()
         app.alive, app.builds, app.busy = alive, builds, busy
+        app.scheme, app.saved_light = 0, False
         app.update()
         return app.tray
 
@@ -115,6 +119,19 @@ class AppMenu(unittest.TestCase):
         self.assertTrue(labels["Start the Server"])
         self.assertFalse(labels["Restart the Server"])
         self.assertTrue(labels["Open Dashboard"])  # it starts the server first
+
+    def test_the_logo_follows_the_panel(self):
+        from colcon_dashboard import desktop
+        app = tray.TrayApp.__new__(tray.TrayApp)
+        app.desktop = desktop
+        for scheme, saved, light in ((0, False, False), (0, True, True),
+                                     (1, True, False), (2, False, True)):
+            app.scheme, app.saved_light = scheme, saved
+            self.assertEqual(app.light_panel(), light, (scheme, saved))
+            self.assertEqual(os.path.basename(app.logo()),
+                             "logo.svg" if light else "logo-dark.svg")
+        # the menu choice works only while the desktop tells no scheme
+        self.assertTrue(self.labels(self.make(True, []))["Icon for a Light Panel"])
 
     def test_busy_disables_the_actions(self):
         labels = self.labels(self.make(True, [], busy="restarting"))

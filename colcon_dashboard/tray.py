@@ -210,6 +210,14 @@ class Tray:
 
     # -- updates from the app ---------------------------------------------
 
+    def set_svg(self, svg):
+        """Show another logo file, for example the one for a light panel."""
+        if svg == self.svg:
+            return
+        self.svg = svg
+        self.icons = {False: pixmaps(svg), True: pixmaps(svg, gray=True)}
+        self.emit(ITEM_PATH, "org.kde.StatusNotifierItem", "NewIcon")
+
     def set_state(self, tip, gray):
         if tip != self.tip:
             self.tip = tip
@@ -332,6 +340,8 @@ class Tray:
 
 POLL_SECONDS = 3
 BUS_NAME = "io.github.autowarefoundation.ColconDashboard.Tray"
+PORTAL = ("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+          "org.freedesktop.portal.Settings")
 # loopback requests must not go through an http_proxy from the environment
 OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
@@ -346,11 +356,38 @@ class TrayApp:
         self.alive = False
         self.busy = None  # "starting", "stopping", "restarting", or None
         self.builds = []
-        logo = os.path.join(desktop.PKG_DIR, "static", "logo-dark.svg")  # panels are mostly dark
-        self.tray = Tray(conn, desktop.APP_ID, logo, self.open, self.on_available)
+        # the panel color: the desktop's color scheme when it tells one
+        # (0: no preference, 1: dark, 2: light), else the user's choice
+        self.scheme = read_scheme(conn)
+        self.saved_light = load_state().get("light_panel", False)
+        conn.signal_subscribe(PORTAL[0], PORTAL[2], "SettingChanged", PORTAL[1], None,
+                              Gio.DBusSignalFlags.NONE, self.on_setting)
+        self.tray = Tray(conn, desktop.APP_ID, self.logo(), self.open, self.on_available)
         self.update()
         self.poll()
         GLib.timeout_add_seconds(POLL_SECONDS, self.poll)
+
+    # -- the panel color --------------------------------------------------
+
+    def light_panel(self):
+        return self.scheme == 2 or (self.scheme == 0 and self.saved_light)
+
+    def logo(self):
+        # the light logo has a dark top arm, for a light panel, and the
+        # dark logo a light one; panels are mostly dark
+        name = "logo.svg" if self.light_panel() else "logo-dark.svg"
+        return os.path.join(self.desktop.PKG_DIR, "static", name)
+
+    def on_setting(self, _conn, _sender, _path, _iface, _signal, params):
+        namespace, key, value = params.unpack()
+        if namespace == "org.freedesktop.appearance" and key == "color-scheme":
+            self.scheme = value if isinstance(value, int) else 0
+            self.update()
+
+    def toggle_light_panel(self):
+        self.saved_light = not self.saved_light
+        save_state({"light_panel": self.saved_light})
+        self.update()
 
     # -- the server -------------------------------------------------------
 
@@ -404,13 +441,13 @@ class TrayApp:
 
     def open(self, workspace=None):
         def work():
-            from .cli import read_server, server_url
+            from .cli import open_url, read_server
             if not self.alive:
                 ok, msg = self.desktop.start_server()
                 if not ok:
                     return ok, msg
             from . import browser
-            browser.open_dashboard(server_url(read_server(), workspace))
+            browser.open_dashboard(open_url(read_server(), workspace))
             return True, ""
         if self.alive:
             work()
@@ -434,6 +471,7 @@ class TrayApp:
                             for b in running)
         else:
             tip = "No build runs."
+        self.tray.set_svg(self.logo())
         self.tray.set_state(tip, gray=not self.alive and not self.busy)
         idle = self.busy is None
         items = [{"label": "Open Dashboard", "enabled": idle, "action": self.open},
@@ -460,12 +498,53 @@ class TrayApp:
                   {"label": "Stop the Server", "enabled": idle and self.alive,
                    "action": lambda: self.run_job("stopping", d.stop_server)},
                   None,
+                  # the desktop's color scheme decides when it tells one
+                  {"label": "Icon for a Light Panel", "checked": self.light_panel(),
+                   "enabled": self.scheme == 0, "action": self.toggle_light_panel},
                   {"label": "Quit the Tray Icon", "action": self.quit}]
         self.tray.set_menu(items)
 
     def quit(self):
         self.tray.close()
         self.loop.quit()
+
+
+def state_path():
+    from .registry import CACHE_DIR
+    return os.path.join(CACHE_DIR, "tray.json")
+
+
+def load_state():
+    try:
+        with open(state_path()) as f:
+            state = json.load(f)
+        return state if isinstance(state, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_state(state):
+    try:
+        os.makedirs(os.path.dirname(state_path()), exist_ok=True)
+        with open(state_path(), "w") as f:
+            json.dump(state, f)
+    except OSError:
+        pass
+
+
+def read_scheme(conn):
+    """The color-scheme setting of the desktop portal: 0, 1, or 2."""
+    try:
+        reply = conn.call_sync(PORTAL[0], PORTAL[1], PORTAL[2], "Read",
+                               GLib.Variant("(ss)", ("org.freedesktop.appearance",
+                                                     "color-scheme")),
+                               None, Gio.DBusCallFlags.NONE, 2000, None)
+    except GLib.Error:
+        return 0  # no portal, or a portal without this setting
+    value = reply.unpack()[0]
+    while isinstance(value, GLib.Variant):  # Read wraps the value twice
+        value = value.unpack()
+    return value if value in (0, 1, 2) else 0
 
 
 def run():

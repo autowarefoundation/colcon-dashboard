@@ -136,7 +136,7 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(st, 200)
         self.assertTrue(ctype.startswith("application/manifest+json"), ctype)
         manifest = json.loads(body)
-        self.assertEqual(manifest["start_url"], "/")
+        self.assertEqual(manifest["start_url"], "/last")
         self.assertEqual(manifest["display"], "standalone")
         sizes = set()
         for icon in manifest["icons"]:
@@ -151,6 +151,17 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(st, 200)
         self.assertTrue(ctype.startswith("text/javascript"), ctype)
         self.assertEqual(self.get("/offline.html")[0], 200)
+
+    def test_last_opens_the_last_viewed_workspace(self):
+        self.get("/api/state?ws=" + self.wsq())  # viewing it puts it first
+        with urllib.request.urlopen(self.base + "/last", timeout=5) as r:
+            self.assertEqual(r.geturl(), self.base + "/?ws=" + self.wsq())
+        reg = Handler.registry
+        saved = reg.recents
+        self.addCleanup(setattr, reg, "recents", saved)
+        reg.recents = [{"path": "/gone", "last_used": 1}]  # no workspace left
+        with urllib.request.urlopen(self.base + "/last", timeout=5) as r:
+            self.assertEqual(r.geturl(), self.base + "/")
 
     def test_ping(self):
         st, body, _ = self.get("/api/ping")

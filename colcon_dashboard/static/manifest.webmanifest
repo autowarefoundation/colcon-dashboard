@@ -3,7 +3,7 @@
   "name": "Colcon Dashboard",
   "short_name": "Colcon",
   "description": "Watch colcon builds live: dependency graph, timeline, and logs",
-  "start_url": "/",
+  "start_url": "/last",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f2f6fb",

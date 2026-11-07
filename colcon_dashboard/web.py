@@ -7,7 +7,7 @@ import socket
 import threading
 import time
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import __version__, notify, service
 from .ai import CLAUDE_BIN
@@ -388,6 +388,18 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(400, json.dumps({"error": "bad request"}))
                 return self._send(200, json.dumps(result))
             return self._send(404, json.dumps({"error": "not found"}))
+
+        if path == "/last":
+            # the tray, --app, and the installed app open the workspace that
+            # was viewed last, on its newest build; with none, the start page
+            ws = self.registry.last_workspace()
+            target = "/?ws=" + quote(ws, safe="") if ws else "/"
+            self.send_response(302)
+            self.send_header("Location", target)
+            self.send_header("Content-Length", "0")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
 
         rel = "index.html" if path in ("/", "") else path.lstrip("/")
         full = os.path.realpath(os.path.join(STATIC_DIR, rel))

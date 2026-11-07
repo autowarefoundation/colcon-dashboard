@@ -23,7 +23,7 @@ import sys
 import time
 
 from . import browser
-from .cli import probe_server, read_server, register_workspace, server_url
+from .cli import open_url, probe_server, read_server, register_workspace
 from .registry import CACHE_DIR
 from .service import APP_ID, SYSTEM_PYTHON, TRAY_CHECK, unit_known
 
@@ -94,7 +94,7 @@ def open_app(workspace=None):
         info = read_server()
     if workspace:
         register_workspace(info, workspace)
-    url = server_url(info, workspace)
+    url = open_url(info, workspace)
     browser.open_dashboard(url)
     print(f"opened {url}")
 

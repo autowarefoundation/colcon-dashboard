@@ -57,6 +57,15 @@ class OpenApp(unittest.TestCase):
         register.assert_called_once_with(info, "/ws")
         opened.assert_called_once_with("http://localhost:8642/?ws=%2Fws")
 
+    def test_no_workspace_opens_the_last_one(self):
+        info = {"host": "127.0.0.1", "port": 8642, "pid": 1}
+        with mock.patch.object(desktop, "read_server", return_value=info), \
+                mock.patch.object(desktop, "probe_server", return_value=True), \
+                mock.patch.object(desktop.browser, "open_dashboard") as opened, \
+                mock.patch("builtins.print"):
+            desktop.open_app()
+        opened.assert_called_once_with("http://localhost:8642/last")
+
     def test_a_failed_start_stops(self):
         with mock.patch.object(desktop, "read_server", return_value=None), \
                 mock.patch.object(desktop, "probe_server", return_value=False), \

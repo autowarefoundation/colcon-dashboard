@@ -257,6 +257,16 @@ class Registry:
         out.sort(key=lambda e: (not e["active"], e["path"]))
         return out
 
+    def last_workspace(self):
+        """The most recently viewed workspace that still exists, or None.
+        Every page request with a workspace moves it to the front."""
+        with self.lock:
+            recents = list(self.recents)
+        for entry in recents:
+            if os.path.isdir(entry.get("path", "")):
+                return entry["path"]
+        return None
+
     def overview(self):
         with self.lock:
             recents = [dict(r) for r in self.recents]

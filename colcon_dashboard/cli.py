@@ -99,6 +99,12 @@ def server_url(info, workspace=None):
     return base
 
 
+def open_url(info, workspace=None):
+    """What a launcher opens: the workspace, else the last one viewed.
+    The server answers /last with a redirect (web.py)."""
+    return server_url(info, workspace) if workspace else server_url(info) + "last"
+
+
 def api_url(info, path):
     return f"http://{display_host(info.get('host'))}:{info['port']}{path}"
 
