@@ -610,7 +610,7 @@ export function initStop() {
       App.stopped = true;
       setBadge('offline', 'STOPPED');
       text.innerHTML = '<b>Server stopped.</b> The page is now offline. ' +
-        'Start the server again with <code>colcon-dashboard --start-service</code> ' +
+        'Start the server again from the tray icon, with <code>colcon-dashboard --start-service</code> ' +
         'if it runs as a service, or with <code>colcon-dashboard</code>. ' +
         'Then reload this page.';
       btns.hidden = true;

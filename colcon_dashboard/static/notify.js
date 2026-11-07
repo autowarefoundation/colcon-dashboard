@@ -8,7 +8,10 @@ import { $, fmtDur } from './util.js';
    still tells the story. The favicon is the logo itself: its liquid
    fills with the build, and its knob turns red on a failure. The bell cycles off -> notify -> notify with
    a chime; desktop notifications fire when a build finishes or first
-   fails, and only while the page is not focused. */
+   fails, and only while the page is not focused.
+   A page on the same machine as the server hands the bell to the server
+   (registry.py): the server shows the notifications on this desktop,
+   also with no page open, and the page only plays the chime. */
 
 const MODES = ['off', 'on', 'sound'];
 let notifyMode = localStorage.getItem('cmc-notify') || 'off';
@@ -21,6 +24,31 @@ const BASE_TITLE = document.title;
 // the tab strip follows the browser's scheme, not the page theme
 const darkTabs = matchMedia('(prefers-color-scheme: dark)');
 const KNOB = { failed: '#d3402b', aborted: '#e8741f' };
+const LOCAL = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+  || location.hostname.endsWith('.localhost');
+let synced = false;
+
+// true when the server sends the notifications, not this page
+export function serverNotifies() { return LOCAL && !!App.cfg?.notify?.desktop; }
+
+function postMode(mode) {
+  fetch(`/api/notify?mode=${mode}`, { method: 'POST' }).catch(() => { /* offline */ });
+}
+
+// once App.cfg is there: the server's choice wins, but the first page on
+// this machine hands the server the choice this browser made before
+function syncServer() {
+  if (synced || !serverNotifies()) return;
+  synced = true;
+  const server = App.cfg.notify.mode;
+  if (server == null) {
+    if (notifyMode !== 'off') postMode(notifyMode);
+  } else if (server !== notifyMode) {
+    notifyMode = MODES.includes(server) ? server : 'off';
+    localStorage.setItem('cmc-notify', notifyMode);
+    applyBell();
+  }
+}
 
 // logo: settings for logo.js, e.g. { progress: 0.4, knob: KNOB.failed };
 // {} is the plain logo
@@ -86,7 +114,7 @@ function ding() {
 
 function notify(title, body) {
   if (notifyMode === 'off' || document.hasFocus()) return;
-  if ('Notification' in window && Notification.permission === 'granted') {
+  if (!serverNotifies() && 'Notification' in window && Notification.permission === 'granted') {
     try { new Notification(title, { body }); } catch (e) { /* denied */ }
   }
   if (notifyMode === 'sound') ding();
@@ -116,6 +144,7 @@ export const BELL_ICONS = {
 
 // why desktop notifications cannot show, or null when they can
 export function notifyBlocked() {
+  if (serverNotifies()) return null;
   return !('Notification' in window) ? 'this browser has no desktop notifications'
     : !window.isSecureContext ? 'browsers allow them only on localhost or https; '
                                 + 'open the dashboard through localhost or an SSH tunnel'
@@ -128,7 +157,8 @@ export function getNotifyMode() { return notifyMode; }
 export function setNotifyMode(m) {
   notifyMode = MODES.includes(m) ? m : 'off';
   localStorage.setItem('cmc-notify', notifyMode);
-  if (notifyMode !== 'off' && 'Notification' in window
+  if (serverNotifies()) postMode(notifyMode);
+  else if (notifyMode !== 'off' && 'Notification' in window
       && Notification.permission === 'default') {
     Notification.requestPermission().then(applyBell, applyBell);
   }
@@ -138,7 +168,9 @@ export function setNotifyMode(m) {
 
 // a notification now, even with the page focused: shows that it works
 export function testNotify() {
-  if ('Notification' in window && Notification.permission === 'granted') {
+  if (serverNotifies()) {
+    fetch('/api/notify/test', { method: 'POST' }).catch(() => { /* offline */ });
+  } else if ('Notification' in window && Notification.permission === 'granted') {
     try { new Notification('colcon-dashboard', { body: 'Notifications work.' }); } catch (e) { /* denied */ }
   }
   if (notifyMode === 'sound') ding();
@@ -158,6 +190,9 @@ function applyBell() {
   const blocked = notifyMode === 'off' ? null : notifyBlocked();
   btn.classList.toggle('blocked', !!blocked);
   if (blocked) btn.title += `\n\nDesktop notifications do not work: ${blocked}.`;
+  else if (notifyMode !== 'off' && serverNotifies()) {
+    btn.title += '\n\nThe server shows them on this desktop, also with no dashboard open.';
+  }
 }
 
 export function initNotify() {
@@ -178,6 +213,7 @@ export function initNotify() {
 }
 
 on('state', s => {
+  syncServer();
   applyTab(s);
   const active = !!s.active;
   if (prevActive === true && !active && s.total) {

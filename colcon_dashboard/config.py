@@ -18,6 +18,7 @@ optional, and the command line always wins:
 
     [ui]
     editor_url = vscode://file{path}:{line}
+    browser = auto
 
     [discover]
     extra_roots = /mnt/data, ~/ros
@@ -78,6 +79,13 @@ TEMPLATE = """\
 # JetBrains IDEs need the open project's name and count lines from
 # zero, hence {project} and {line0}:
 #editor_url = jetbrains://clion/navigate/reference?project={project}&path={path}:{line0}
+
+# The browser that the tray, colcon-dashboard --app, and clicks on
+# notifications open. auto follows the default browser of the desktop:
+# for Chrome, Chromium, Brave, or Edge it opens the installed dashboard
+# app or an app window, and for Firefox a new window. chromium and
+# firefox pick that browser. default always opens the default browser.
+#browser = auto
 
 [discover]
 # More directories for the workspace scan, next to your home directory.
@@ -184,6 +192,7 @@ class Config:
         self.auto_prune_keep = self._get_int(cp, "builds", "auto_prune_keep")
         self.claude_bin = self._get(cp, "ai", "claude_bin")
         self.editor_url = self._get(cp, "ui", "editor_url")
+        self.browser = self._get(cp, "ui", "browser")
         self.extra_roots = self._get_list(cp, "discover", "extra_roots")
         self.notify_command = self._get(cp, "notify", "command")
 

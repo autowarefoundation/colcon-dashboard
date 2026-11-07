@@ -253,8 +253,12 @@
     <section>
       <h3>Server <span class="sver"></span></h3>
       <dl id="setServer"></dl>
-      <div class="snote">To change these, edit the configuration file, then restart the server with <code>colcon-dashboard --restart-service</code>.</div>
-      <div class="srow"><button id="stopBtn" class="danger" title="stop the dashboard server">Stop the server…</button></div>
+      <div class="snote">To change these, edit the configuration file, then restart the server.</div>
+      <div class="srow"><label><input type="checkbox" id="setLogin"> start the server when you log in</label></div>
+      <div class="srow"><label><input type="checkbox" id="setTray"> show the tray icon</label></div>
+      <div class="snote" id="setServerNote" hidden></div>
+      <div class="srow"><button id="restartBtn" title="restart the dashboard server">Restart the server</button>
+        <button id="stopBtn" class="danger" title="stop the dashboard server">Stop the server…</button></div>
     </section>
   </div>
 </div>

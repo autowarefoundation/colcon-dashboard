@@ -10,8 +10,9 @@ import re
 import threading
 import time
 import urllib.request
+from urllib.parse import quote
 
-from . import __version__
+from . import __version__, browser, notify
 from .config import CONFIG
 from .events import BUILD_DIR_RE, parse_build_id_time
 from .monitor import BuildMonitor
@@ -21,6 +22,7 @@ CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache",
 SERVER_FILE = os.path.join(CACHE_DIR, "server.json")
 REGISTRY_FILE = os.path.join(CACHE_DIR, "workspaces.json")
 GLOBAL_PORT = 8642
+NOTIFY_MODES = ("off", "on", "sound")
 
 
 class Registry:
@@ -36,6 +38,8 @@ class Registry:
                 self.recents = json.load(f)
         except (OSError, ValueError):
             self.recents = []
+        self.base_url = None  # set in main(): what a click on a notification opens
+        self.notify_mode = self._load_notify()
 
     def _save(self):
         try:
@@ -132,6 +136,8 @@ class Registry:
                 if build is None:
                     mon.on_prune = (lambda deleted, ws=ws:
                                     self._auto_pruned(ws, deleted))
+                    mon.on_event = (lambda kind, data, ws=ws:
+                                    self._build_event(ws, kind, data))
                 self.monitors[key] = mon
                 threading.Thread(target=mon.run, daemon=True).start()
         if touch:
@@ -162,6 +168,94 @@ class Registry:
         if mon is not None:
             mon.stopped = True  # its scan thread ends on the next tick
         return mon is not None
+
+    # -- desktop notifications from the server ----------------------------
+    # A page on this machine hands its bell to the server (notify.js), so
+    # that the notifications come also with no page open. None: no page
+    # chose yet.
+
+    @staticmethod
+    def _notify_file():
+        return os.path.join(CACHE_DIR, "notify.json")
+
+    def _load_notify(self):
+        try:
+            with open(self._notify_file()) as f:
+                mode = json.load(f).get("mode")
+        except (OSError, ValueError, AttributeError):
+            return None
+        return mode if mode in NOTIFY_MODES else None
+
+    def set_notify_mode(self, mode):
+        if mode not in NOTIFY_MODES:
+            return False
+        self.notify_mode = mode
+        try:
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            with open(self._notify_file(), "w") as f:
+                json.dump({"mode": mode}, f)
+        except OSError:
+            pass
+        if self.notifying():
+            self.watch_recents()
+        return True
+
+    def notifying(self):
+        return self.notify_mode in ("on", "sound")
+
+    def watch_recents(self):
+        """Watch every recent workspace, also with no page open: auto-prune,
+        the [notify] command, and the desktop notifications need it."""
+        for entry in list(self.recents):
+            if os.path.isdir(entry.get("path", "")):
+                self.monitor(entry["path"], touch=False)
+
+    def _build_event(self, ws, kind, data):
+        if not self.notifying() or not notify.available():
+            return
+        name = os.path.basename(ws) or "colcon"
+        if kind == "failed":
+            title, body = f"✗ {data['name']} failed", f"the first failure in {name}"
+        else:
+            c, total = data["counts"], data["total"]
+            if not total:
+                return
+            if c.get("failed"):
+                title, body = f"✗ {name}: build failed", f"{c['failed']} of {total} packages failed"
+            elif c.get("done", 0) == total:
+                mins, secs = divmod(int(round(data["elapsed"] or 0)), 60)
+                took = f"{mins}m {secs}s" if mins else f"{secs}s"
+                title, body = f"✓ {name}: build complete", f"{total} packages in {took}"
+            else:
+                title = f"◌ {name}: build stopped"
+                body = f"{c.get('done', 0)}/{total} done, {c.get('aborted', 0)} aborted"
+        url = self.base_url and self.base_url + "?ws=" + quote(ws, safe="")
+        notify.send(title, body, urgent=title.startswith("✗"),
+                    on_click=(lambda: browser.open_dashboard(url)) if url else None)
+
+    def test_notify(self):
+        return notify.send("Colcon Dashboard", "Notifications work.",
+                           on_click=(lambda: browser.open_dashboard(self.base_url))
+                           if self.base_url else None)
+
+    def live(self):
+        """The watched workspaces and their builds, cheap enough for the
+        tray to ask every few seconds (overview() reads the log sizes)."""
+        with self.lock:
+            monitors = [(k[0], m) for k, m in self.monitors.items() if k[1] is None]
+        out = []
+        for ws, mon in monitors:
+            try:
+                with mon.lock:
+                    state = json.loads(mon.state_json)
+            except ValueError:
+                continue
+            counts = state.get("counts") or {}
+            out.append({"path": ws, "build_id": state.get("build_id"),
+                        "active": bool(state.get("active")), "total": state.get("total") or 0,
+                        "done": counts.get("done", 0), "failed": counts.get("failed", 0)})
+        out.sort(key=lambda e: (not e["active"], e["path"]))
+        return out
 
     def overview(self):
         with self.lock:

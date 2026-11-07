@@ -475,6 +475,41 @@ class ScanOnce(unittest.TestCase):
         with open(out) as f:
             self.assertEqual(f.read(), "failed | 0 of 1 packages in 1m 39s, 1 failed\n")
 
+    def test_events_for_the_first_failure_and_the_end(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        ws = self.tmp.name
+        events = [queued(0.1, "a"), queued(0.1, "b"), started(0.2, "a"), started(0.2, "b")]
+        bdir = make_build(ws, BUILD_ID, events, mtime=time.time())
+        seen = []
+        mon = BuildMonitor(ws)
+        mon.on_event = lambda kind, data: seen.append((kind, data))
+        mon.scan_once()  # both build: no news
+        with open(os.path.join(bdir, "events.log"), "ab") as f:
+            f.write(ended(1.0, "b", rc=2))
+        mon.scan_once()  # b failed: news, once
+        mon.scan_once()
+        with open(os.path.join(bdir, "events.log"), "ab") as f:
+            f.write(ended(2.0, "a") + SHUTDOWN)
+        mon.scan_once()  # the build ended
+        self.assertEqual([k for k, _ in seen], ["failed", "end"])
+        self.assertEqual(seen[0][1], {"name": "b"})
+        self.assertEqual(seen[1][1]["counts"], {"done": 1, "failed": 1})
+        self.assertEqual(seen[1][1]["total"], 2)
+
+    def test_failures_from_before_the_monitor_are_no_news(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        events = [queued(0.1, "a"), queued(0.1, "b"), started(0.2, "a"),
+                  ended(0.5, "a", rc=2), started(0.6, "b")]
+        make_build(self.tmp.name, BUILD_ID, events, mtime=time.time())
+        seen = []
+        mon = BuildMonitor(self.tmp.name)
+        mon.on_event = lambda kind, data: seen.append(kind)
+        mon.scan_once()
+        mon.scan_once()
+        self.assertEqual(seen, [])
+
     def test_dead_build_states(self):
         mon, state, _ = self.scan(mtime=time.time() - 600)
         self.assertFalse(state["active"])

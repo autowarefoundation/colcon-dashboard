@@ -1,4 +1,4 @@
-import { getNotifyMode, notifyBlocked, setNotifyMode, testNotify } from './notify.js';
+import { getNotifyMode, notifyBlocked, serverNotifies, setNotifyMode, testNotify } from './notify.js';
 import { loadScanRoots, mountScanRoots } from './pickers.js';
 import { App } from './state.js';
 import { savedTheme, setTheme } from './theme.js';
@@ -23,13 +23,76 @@ function render() {
   pick($('#setNotify'), mode);
   const blocked = notifyBlocked();
   const note = $('#setNotifyNote');
-  note.hidden = !blocked;
-  note.textContent = blocked ? `Desktop notifications do not work: ${blocked}.` : '';
+  note.textContent = blocked ? `Desktop notifications do not work: ${blocked}.`
+    : mode !== 'off' && serverNotifies() ? 'The server shows them on this desktop, also with no dashboard open.' : '';
+  note.hidden = !note.textContent;
   $('#setNotifyTest').disabled = mode === 'off';
   $('#setTs').checked = localStorage.getItem('cmc-ts') !== '0';
   $('#setWrap').checked = localStorage.getItem('cmc-wrap') === '1';
   loadScanRoots();
   renderServer();
+  loadServerInfo();
+}
+
+// how the server runs, and the switches for the service and the tray
+let serverInfo = null;
+async function loadServerInfo() {
+  try {
+    serverInfo = await (await fetch('/api/server', { cache: 'no-store' })).json();
+  } catch (e) {
+    serverInfo = null;
+  }
+  renderServer();
+  renderSwitches();
+}
+
+function renderSwitches(message) {
+  const s = serverInfo;
+  const login = $('#setLogin');
+  const tray = $('#setTray');
+  login.checked = !!s?.login;
+  login.disabled = !s?.systemd;
+  tray.checked = !!s?.tray?.autostart;
+  tray.disabled = !s?.tray?.supported;
+  const notes = [];
+  if (message) notes.push(message);
+  if (s && !s.systemd) notes.push('Start at login needs systemd user services, which this machine does not have.');
+  if (s && !s.tray?.supported) notes.push('The tray icon needs PyGObject: sudo apt install python3-gi');
+  const note = $('#setServerNote');
+  note.textContent = notes.join(' ');
+  note.hidden = !notes.length;
+}
+
+async function setSwitch(kind, on) {
+  try {
+    const r = await (await fetch(`/api/server/${kind}?on=${on ? 1 : 0}`, { method: 'POST' })).json();
+    const { ok, message, ...info } = r;
+    serverInfo = info;
+    renderSwitches(ok ? '' : message);
+  } catch (e) {
+    renderSwitches('The server does not answer.');
+  }
+}
+
+async function restartServer() {
+  const btn = $('#restartBtn');
+  const ping = async () => (await fetch('/api/ping', { cache: 'no-store' })).json();
+  let before = null;
+  try { before = (await ping()).started; } catch (e) { /* offline */ }
+  btn.disabled = true;
+  btn.textContent = 'Restarting…';
+  try { await fetch('/api/server/restart', { method: 'POST' }); } catch (e) { /* going down */ }
+  // a new server process (or the same one, after exec) has a new start time
+  const deadline = Date.now() + 20000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 300));
+    try {
+      if ((await ping()).started !== before) { location.reload(); return; }
+    } catch (e) { /* not back yet */ }
+  }
+  btn.disabled = false;
+  btn.textContent = 'Restart the server';
+  renderSwitches('The server did not come back. Start it from the tray icon or a terminal.');
 }
 
 function renderServer() {
@@ -41,7 +104,11 @@ function renderServer() {
   }
   const unset = s => `<span class="muted">${s}</span>`;
   const keep = cfg.auto_prune_keep;
+  const runs = !serverInfo ? unset('unknown')
+    : serverInfo.service ? 'as the systemd user service'
+      : `as a process that you started (pid ${serverInfo.pid})`;
   const rows = [
+    ['runs', runs],
     ['configuration file', `<code>${esc(cfg.path)}</code> <button class="copy" data-copy="${esc(cfg.path)}" title="copy the path">⧉</button>`
       + (cfg.exists ? '' : ` ${unset('(not created yet: every value is the default)')}`)],
     ['address', esc(location.host)],
@@ -80,6 +147,9 @@ export function initSettings() {
     if (b) { setNotifyMode(b.dataset.v); render(); }
   };
   $('#setNotifyTest').onclick = testNotify;
+  $('#setLogin').onchange = ev => setSwitch('login', ev.target.checked);
+  $('#setTray').onchange = ev => setSwitch('tray', ev.target.checked);
+  $('#restartBtn').onclick = restartServer;
   // a log choice holds for the open panes too: their own buttons flip it,
   // and those buttons keep the choice for the next panes
   const logChoice = (id, btn) => {

@@ -17,10 +17,8 @@ Option defaults resolve as: command line > config.ini > built-in.
 import argparse
 import json
 import os
-import shutil
 import signal
 import socket
-import subprocess
 import sys
 import threading
 import time
@@ -38,6 +36,8 @@ from . import __version__
 from .config import CONFIG, write_template
 from .monitor import prune_builds
 from .registry import CACHE_DIR, GLOBAL_PORT, Registry, SERVER_FILE
+from .service import (SERVICE, systemctl, unit_known, unit_path,
+                      user_systemd_works, write_unit)
 from .web import Handler
 
 
@@ -140,46 +140,6 @@ def resolve_workspace(arg):
 
 # -- systemd user service ----------------------------------------------------
 
-SERVICE = "colcon-dashboard.service"
-
-SERVICE_UNIT = """\
-[Unit]
-Description=Colcon Dashboard
-
-[Service]
-ExecStart={exe} -m colcon_dashboard
-Restart=on-failure
-
-[Install]
-WantedBy=default.target
-"""
-
-
-def unit_path():
-    return os.path.join(os.path.expanduser("~"), ".config", "systemd",
-                        "user", SERVICE)
-
-
-def systemctl(*args):
-    try:
-        return subprocess.run(["systemctl", "--user", *args]).returncode
-    except OSError:  # no systemctl at all
-        return 127
-
-
-def user_systemd_works():
-    """False in most containers and in WSL without systemd: there is no
-    systemctl, or no user session bus to talk to."""
-    if not shutil.which("systemctl"):
-        return False
-    try:
-        return subprocess.run(["systemctl", "--user", "show-environment"],
-                              stdout=subprocess.DEVNULL,
-                              stderr=subprocess.DEVNULL).returncode == 0
-    except OSError:
-        return False
-
-
 def wait_for_server(deadline=6.0):
     """The server info once it answers, or None."""
     end = time.time() + deadline
@@ -199,10 +159,7 @@ def install_service():
             "session bus, as in many containers and in WSL without systemd).\n"
             "Run the server in a terminal instead:  colcon-dashboard\n"
             "or in the background:  nohup colcon-dashboard >/dev/null 2>&1 &")
-    path = unit_path()
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        f.write(SERVICE_UNIT.format(exe=sys.executable))
+    path = write_unit()
     print(f"wrote {path}")
     # the unit names this interpreter: after a reinstall from another
     # place (apt, pipx, a venv), run --install-service again
@@ -241,7 +198,7 @@ def uninstall_service():
 
 
 def require_service():
-    if not os.path.exists(unit_path()):
+    if not unit_known():
         raise SystemExit(
             "the service is not installed; run --install-service first")
 
@@ -261,7 +218,7 @@ def service_verb(verb):
 
 
 def show_service_status():
-    if os.path.exists(unit_path()):
+    if unit_known():
         systemctl("status", "--no-pager", SERVICE)  # rc 3 when inactive
     else:
         print("the service is not installed")
@@ -478,7 +435,7 @@ def main():
         if alive:
             os.kill(info["pid"], signal.SIGTERM)
             print(f"stopped the dashboard server (pid {info['pid']})")
-            if os.path.exists(unit_path()):
+            if unit_known():
                 print("the systemd service stays enabled and starts the"
                       " server again at login; use --stop-service or"
                       " --uninstall-service to manage it")
@@ -581,12 +538,12 @@ def main():
         threading.Thread(target=extra.serve_forever, daemon=True).start()
     if workspace:
         registry.monitor(workspace)
-    if (CONFIG.auto_prune_keep and CONFIG.auto_prune_keep >= 1) or CONFIG.notify_command:
-        # the headless service must watch builds to auto-prune them, and
-        # to run the [notify] command when one ends
-        for entry in list(registry.recents):
-            if os.path.isdir(entry.get("path", "")):
-                registry.monitor(entry["path"], touch=False)
+    registry.base_url = server_url({"host": host, "port": port})
+    if ((CONFIG.auto_prune_keep and CONFIG.auto_prune_keep >= 1) or CONFIG.notify_command
+            or registry.notifying()):
+        # the headless service must watch builds to auto-prune them, to
+        # run the [notify] command, and to send desktop notifications
+        registry.watch_recents()
 
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     info = {"host": host, "port": port}
@@ -612,3 +569,9 @@ def main():
             os.unlink(SERVER_FILE)
         except OSError:
             pass
+    if Handler.restart_requested:  # the settings dialog asked for a restart
+        for s in servers:
+            s.server_close()
+        lock_file.close()
+        argv = [a for a in sys.argv[1:] if a != "--open"]
+        os.execv(sys.executable, [sys.executable, "-m", "colcon_dashboard", *argv])

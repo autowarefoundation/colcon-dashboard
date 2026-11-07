@@ -9,13 +9,14 @@ import time
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import __version__
+from . import __version__, notify, service
 from .ai import CLAUDE_BIN
 from .config import CONFIG, save_extra_roots
 from .events import BUILD_DIR_RE
 from .monitor import prune_builds, remove_build_dir
 from .registry import discover_all, update_status
 
+STARTED = time.time()  # the settings dialog sees a restart by this
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 MIME = {".html": "text/html", ".js": "text/javascript", ".css": "text/css",
@@ -74,6 +75,7 @@ def query_int(q, key, default):
 class Handler(BaseHTTPRequestHandler):
     registry = None  # set in main()
     on_stop = None  # set in main(): ends every listener (IPv4 and IPv6)
+    restart_requested = False  # main() starts the server again after the stop
 
     def log_message(self, *args):
         pass
@@ -117,6 +119,31 @@ class Handler(BaseHTTPRequestHandler):
             stop = Handler.on_stop or self.server.shutdown
             threading.Thread(target=stop, daemon=True).start()
             return
+        if path == "/api/server/restart":
+            if service.under_service():
+                # systemd ends this process and starts a new one
+                self._send(200, json.dumps({"ok": True}))
+                threading.Timer(0.2, service.restart_unit).start()
+                return
+            self._send(200, json.dumps({"ok": True}))
+            Handler.restart_requested = True
+            stop = Handler.on_stop or self.server.shutdown
+            threading.Thread(target=stop, daemon=True).start()
+            return
+        if path in ("/api/server/login", "/api/server/tray"):
+            on = q.get("on", ["1"])[0] not in ("0", "false")
+            if path.endswith("/login"):
+                ok, msg = service.set_login(on)
+            else:
+                ok, msg = service.set_tray_autostart(on)
+            return self._send(200 if ok else 400, json.dumps(
+                {"ok": ok, "message": msg, **self._server_info()}))
+        if path == "/api/notify":
+            if not self.registry.set_notify_mode(q.get("mode", [""])[0]):
+                return self._send(400, json.dumps({"error": "mode: off, on, or sound"}))
+            return self._send(200, json.dumps({"ok": True, "mode": self.registry.notify_mode}))
+        if path == "/api/notify/test":
+            return self._send(200, json.dumps({"ok": self.registry.test_notify()}))
         if path == "/api/register":
             mon = self._monitor(q)
             if mon is None:
@@ -161,6 +188,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps(
                 {"ok": True, "started": started}))
         self._send(404, json.dumps({"error": "not found"}))
+
+    def _server_info(self):
+        """How this server runs, for the settings dialog."""
+        systemd = service.user_systemd_works()
+        return {
+            "pid": os.getpid(),
+            "service": service.under_service(),
+            "systemd": systemd,
+            "login": systemd and service.login_enabled(),
+            "tray": {"supported": service.tray_supported(),
+                     "autostart": service.tray_autostart()},
+        }
 
     def _set_scan_roots(self, q):
         """Replace the extra_roots list in config.ini with q's paths."""
@@ -257,7 +296,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/ping":
             return self._send(200, json.dumps(
                 {"app": "colcon-dashboard", "pid": os.getpid(),
-                 "version": __version__}))
+                 "version": __version__, "started": STARTED}))
         if path == "/api/config":
             return self._send(200, json.dumps({
                 "version": __version__,
@@ -274,8 +313,17 @@ class Handler(BaseHTTPRequestHandler):
                     "claude_bin": CONFIG.claude_bin,
                     "editor_url": CONFIG.editor_url,
                     "extra_roots": CONFIG.extra_roots,
+                    "browser": CONFIG.browser,
                 },
+                "notify": {"desktop": notify.available(),
+                           "mode": self.registry.notify_mode},
             }))
+        if path == "/api/server":
+            return self._send(200, json.dumps(self._server_info()))
+        if path == "/api/live":
+            return self._send(200, json.dumps(
+                {"version": __version__, "pid": os.getpid(),
+                 "workspaces": self.registry.live()}))
         if path == "/api/workspaces":
             overview = self.registry.overview()
             overview["home"] = os.path.expanduser("~")

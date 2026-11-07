@@ -47,3 +47,9 @@ addEventListener('resize', () => {
 // the service worker makes the page installable as an app (sw.js); browsers
 // offer it only on localhost or https, where navigator.serviceWorker exists
 navigator.serviceWorker?.register('sw.js').catch(() => { /* not installable */ });
+// an installed app focuses its open window, not a new one (the manifest's
+// launch_handler): a workspace link that launched it arrives here
+window.launchQueue?.setConsumer(params => {
+  const target = params.targetURL && new URL(params.targetURL);
+  if (target && target.search && target.search !== location.search) location.href = target.href;
+});

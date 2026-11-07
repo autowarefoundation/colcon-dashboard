@@ -107,6 +107,9 @@ class BuildMonitor:
         self.prev_info = None  # the previous run's outcome, for comparisons
         self._pruned_for = None  # the build id auto-prune already ran for
         self.on_prune = None  # the registry's cleanup after an auto-prune
+        self.on_event = None  # the registry's notifications: (kind, data)
+        self._fail_build = None  # the build that the first-failure news is for
+        self._fail_told = False
         self.stopped = False  # a dropped monitor's thread must end
 
     def sample_system(self):
@@ -622,6 +625,19 @@ class BuildMonitor:
         if self._build_ended:
             self._build_ended = False
             self._notify_end(build_id, counts, len(packages), ev.last_t)
+            if self.on_event:
+                self.on_event("end", {"counts": dict(counts), "total": len(packages),
+                                      "elapsed": ev.last_t})
+        failed_now = [n for n, p in packages.items() if p["s"] == "failed"]
+        if self._fail_build != build_id:
+            # failures from before this monitor watched are no news
+            self._fail_build = build_id
+            self._fail_told = bool(failed_now) or not active
+        elif active and failed_now and not self._fail_told:
+            self._fail_told = True
+            if self.on_event and self.pin_build is None:
+                first = min(failed_now, key=lambda n: packages[n].get("t1") or 0)
+                self.on_event("failed", {"name": first})
 
         graph_key = (build_id, ev.offset, self.index.scanned_at,
                      id(self.prev_info))
