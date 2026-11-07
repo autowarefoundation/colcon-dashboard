@@ -69,8 +69,8 @@ const FOLD_LABEL = { install: 'install lines' };
 /* One log line becomes one <span class="ln">: the timestamp, then the
    text in <span class="lc">. ctx is the pane (or a pane-like object):
    sgr (the ANSI state), lint (lint.js state), fixed (the build log),
-   ai (prose: no lint), pre, and grp (the open fold group). Returns the
-   line element. */
+   ai (prose: no lint), pre, and grps (the open fold groups). Returns
+   the line element. */
 export function renderLogLine(ctx, line, frag) {
   const ln = document.createElement('span');
   ln.className = 'ln';
@@ -91,6 +91,7 @@ export function renderLogLine(ctx, line, frag) {
   lc.className = 'lc';
   ln.appendChild(lc);
   let fold = null;
+  let pkg = '';
   if (line.includes('\x1b') || ctx.sgr.bold || ctx.sgr.fg || ctx.sgr.bg) {
     // real terminal colors win over the lint
     if (/\berror\b|\bfatal\b|FAILED/i.test(line)) ln.classList.add('l-err');
@@ -115,7 +116,8 @@ export function renderLogLine(ctx, line, frag) {
     if (ctx.fixed) {
       const pm = PKG_RE.exec(line);
       if (pm) {
-        lc.append(pkgTag(pm[1]), ' ');
+        pkg = pm[1];
+        lc.append(pkgTag(pkg), ' ');
         line = line.slice(pm[0].length);
         // parallel jobs interleave their lines: each package keeps its
         // own lint state (a CMake warning block, the last diagnostic)
@@ -131,9 +133,16 @@ export function renderLogLine(ctx, line, frag) {
   }
   lc.appendChild(document.createTextNode('\n'));
 
-  // a run of install lines folds into one group line
-  let g = ctx.grp;
-  if (g && (!fold || g.kind !== fold || !(g.el.isConnected || frag.contains(g.el)))) g = ctx.grp = null;
+  // install lines fold into one group line. In the build log, each
+  // package keeps one open group: its later install lines join it, also
+  // when other packages print in between, until it prints something else.
+  // In a package pane, a group is one unbroken run.
+  const grps = ctx.grps || (ctx.grps = new Map());
+  let g = grps.get(pkg);
+  if (g && (!fold || g.kind !== fold || !(g.el.isConnected || frag.contains(g.el)))) {
+    grps.delete(pkg);
+    g = null;
+  }
   if (!fold) {
     frag.appendChild(ln);
     return ln;
@@ -144,11 +153,14 @@ export function renderLogLine(ctx, line, frag) {
     const head = document.createElement('span');
     head.className = 'lgrp-head';
     head.title = 'click to show or hide these lines';
+    if (pkg) head.append(pkgTag(pkg), ' ');
+    head.appendChild(Object.assign(document.createElement('span'), { className: 'gcount' }));
     const body = document.createElement('span');
     body.className = 'lgrp-body';
     el.append(head, body);
     frag.appendChild(el);
-    g = ctx.grp = { el, head, body, kind: fold, n: 0 };
+    g = { el, body, kind: fold, n: 0 };
+    grps.set(pkg, g);
   }
   g.body.appendChild(ln);
   g.n++;
@@ -160,8 +172,7 @@ export function renderLogLine(ctx, line, frag) {
 export function updateGroup(el, n, label) {
   if (label) el.dataset.label = label;
   el.dataset.n = n;
-  const head = el.firstChild;
-  head.textContent = `${n} ${el.dataset.label}`;
+  el.querySelector('.gcount').textContent = `${n} ${el.dataset.label}`;
   // a group closes once it is long enough, unless the user opened it
   if (n >= FOLD_MIN && !el.dataset.user) el.classList.add('folded');
   el.classList.toggle('short', n < FOLD_MIN);

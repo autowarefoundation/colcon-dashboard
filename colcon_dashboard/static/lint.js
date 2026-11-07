@@ -93,7 +93,9 @@ const INCL_RE = /^(In file included from|\s+from) ((?:\/|\.)[^\s:]*):(\d+)([,:]?
 const CODE_RE = /^(\s*)(\d+)( \| )(.*)$/;
 const CARET_RE = /^(\s*\| )(.*)$/;
 const CMAKE_MSG_RE = /^CMake (Warning|Error|Deprecation Warning)( \(dev\))?( at (\S+?):(\d+)( \([\w-]+\))?)?:?$/;
-const INSTALL_RE = /^-- (Up-to-date symlink|Up-to-date|Installing|Symlinking|Old export file \S+ will be replaced\.|Removing):? ?(.*)$/;
+// the lines of CMake's install step, all of them: a package's install
+// group must not break on its own step lines
+const INSTALL_RE = /^-- (Up-to-date symlink|Up-to-date|Installing|Symlinking|Old export file \S+ will be replaced\.|Removing|Install configuration|Execute custom install script|Set non-toolchain portion of runtime path of|Set runtime path of):? ?(.*)$/;
 const FOUND_RE = /^-- (Found) ([\w.+-]+)(?:: ([\w.+-]+))?(.*)$/;
 const PROGRESS_RE = /^\[\s*(\d+)%\] (.*)$/;
 const NINJA_RE = /^\[(\d+)\/(\d+)\] (.*)$/;
@@ -267,7 +269,11 @@ export function lintLine(text, st) {
     const bad = m[4] != null && m[4] !== '0';
     return { cls: ['l-invoke', ...(bad ? ['l-err'] : [])], fold: null, nodes: invokeNodes(m) };
   }
-  if ((m = PY_RE.exec(text))) return { cls: ['l-py'], fold: null, nodes: [sp('verb', m[1]), tx(' '), tx(m[2])] };
+  if ((m = PY_RE.exec(text))) {
+    // the byte-compiling of the install step joins the install lines
+    const inst = (m[1] === 'Listing' || m[1] === 'Compiling') && /^'\//.test(m[2]);
+    return { cls: inst ? ['l-noise'] : ['l-py'], fold: inst ? 'install' : null, nodes: [sp('verb', m[1]), tx(' '), tx(m[2])] };
+  }
 
   // anything else: the old word rules
   if (/\berror\b|\bfatal\b|FAILED/i.test(text)) return { cls: ['l-err'], fold: null, nodes: msgNodes(text) };

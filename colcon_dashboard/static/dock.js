@@ -109,7 +109,8 @@ export function createPane(name) {
     `<span class="tlabel">${fixed ? 'Build log' : (ai ? icon('spark') : '') + esc(label(pkg))}</span>` +
     (fixed ? '' : `<button class="x" title="close" aria-label="close">${icon('close')}</button>`);
   tab.onclick = ev => {
-    if (ev.target.classList.contains('x')) closePane(name);
+    // the click lands on the icon inside the button
+    if (ev.target.closest('.x')) closePane(name);
     else activatePane(name);
   };
   tab.ondblclick = () => {
@@ -148,7 +149,6 @@ export function createPane(name) {
       <button class="tsbtn on" title="show or hide timestamps">${icon('clock')}Time</button>`}
       <button class="wrapbtn" title="soft-wrap long lines">${icon('wrap')}Wrap</button>
       <button class="follow on" title="auto-scroll to the end">${icon('follow')}Follow</button>
-      ${fixed ? '' : `<button class="close" title="close pane" aria-label="close pane">${icon('close')}</button>`}
     </div>
     <div class="lognote" hidden></div>
     <div class="logwrap"><pre tabindex="0" class="showts"></pre><div class="lmarks" aria-hidden="true"></div></div>`;
@@ -254,7 +254,6 @@ export function createPane(name) {
       followBtn.classList.toggle('on', atEnd);
     }
   });
-  pane.querySelector('.close')?.addEventListener('click', () => closePane(name));
   App.panes.set(name, p);
   updateCloseAll();
   pollPane(p);
@@ -268,7 +267,7 @@ export function resetPane(p) {
   p.sgr = newSgr();
   p.lint = null;
   p.lintBy = null;
-  p.grp = null;
+  p.grps = null;
   p.start = null;
   p.noTrim = false;
   p.pre.textContent = '';
@@ -390,7 +389,7 @@ export async function loadEarlier(p) {
     p.pre.textContent = '';
     p.lines = 0;
     p.hits = [];
-    p.grp = null;
+    p.grps = null;
     p.start = p.offset - new TextEncoder().encode(p.buf).length;
     p.trimmed = false;
   }
@@ -531,7 +530,7 @@ export async function pollPane(p) {
       p.sgr = newSgr();
       p.lint = null;
       p.lintBy = null;
-      p.grp = null;
+      p.grps = null;
       p.noTrim = false;
       p.start = r.start ?? 0;
       updateEarlierBtn(p);
@@ -645,7 +644,7 @@ export function createFailPane() {
     `<button class="x" title="close" aria-label="close">${icon('close')}</button>`;
   tab.title = 'every failed package, in failure order';
   tab.onclick = ev => {
-    if (ev.target.classList.contains('x')) closePane(FAIL_PANE);
+    if (ev.target.closest('.x')) closePane(FAIL_PANE);
     else activatePane(FAIL_PANE);
   };
   tabKeys(tab, FAIL_PANE, true);
@@ -658,11 +657,9 @@ export function createFailPane() {
       <span class="count"><span class="dot c-failed"></span><b class="fcount">…</b> failed</span>
       <span class="grow"></span>
       <button class="fcopyall" title="copy every failure as text, for an issue or a chat">${icon('copy')}Copy all</button>
-      <button class="close" title="close pane" aria-label="close pane">${icon('close')}</button>
     </div>
     <div class="fsummary"></div>`;
   $('#panes').appendChild(pane);
-  pane.querySelector('.close').onclick = () => closePane(FAIL_PANE);
   pane.querySelector('.fcopyall').onclick = () => copyFailures(
     [...pane.querySelectorAll('.fsummary .fitem')], 'every failure');
   const p = { name: FAIL_PANE, el: pane, tabEl: tab, pre: null, fixed: false,
