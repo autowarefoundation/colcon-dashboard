@@ -14,7 +14,7 @@ import { startStatePolling, tickElapsed } from './poller.js';
 import { initSettings } from './settings.js';
 import { App } from './state.js';
 import { initTheme } from './theme.js';
-import { $, fillIcons, mirrorPressed } from './util.js';
+import { $, fillIcons, initPanel, mirrorPressed } from './util.js';
 import { initViews } from './views.js';
 
 fillIcons();
@@ -34,7 +34,9 @@ $('#closeAll').onclick = () => {
   for (const name of [...App.panes.keys()]) closePane(name);
   activatePane(BUILD_PANE);
 };
-$('#sysBtn').onclick = () => document.body.classList.toggle('showsys');
+// a narrow window folds the meters into a dropdown under this button
+$('#sysBtn').onclick = () => { $('#sysmeters').hidden = !$('#sysmeters').hidden; };
+initPanel($('#sysmeters'), $('#sysBtn'), { align: 'right' });
 await initHeaderMeta();  // App.cfg must land before the first log render
 openPane(BUILD_PANE);  // the pinned whole-build terminal view
 if (deepPkg) emit('open-pkg', deepPkg);

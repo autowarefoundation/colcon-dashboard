@@ -34,7 +34,11 @@ export function setView(v, persist = true) {
     x.classList.toggle('on', x.dataset.view === v));
   const showGraph = v !== 'gantt';
   const showGantt = v !== 'graph';
-  // each pane carries its own controls in its header
+  // side by side, each pane carries its controls in its own header; a
+  // single view moves them up into the view bar, and saves a row
+  const slot = $('#viewslot');
+  if (v === 'graph') slot.append($('#graphhead')); else $('#graphpane').prepend($('#graphhead'));
+  if (v === 'gantt') slot.append($('#gantthead')); else $('#ganttpane').prepend($('#gantthead'));
   $('#graphpane').hidden = !showGraph;
   $('#ganttpane').hidden = !showGantt;
   $('#vsplit').hidden = v !== 'split';

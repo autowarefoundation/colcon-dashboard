@@ -39,9 +39,10 @@ export function setMeter(id, pct, text, warnAt, critAt, title) {
 }
 
 export function updateSysMeters(sys) {
+  // hidden is the dropdown's open state (app.js), nodata the missing /proc
   const box = $('#sysmeters');
-  if (!sys) { box.hidden = true; return; }
-  box.hidden = false;
+  box.classList.toggle('nodata', !sys);
+  if (!sys) return;
   if (sys.cpu != null)
     setMeter('#sm-cpu', sys.cpu, Math.round(sys.cpu) + '%', 85, 96,
              `CPU ${sys.cpu}% · load ${sys.load ?? '?'}`);
@@ -134,13 +135,18 @@ function warnTip() {
     : 'Click to open the log at the warnings.']).join('\n');
 }
 
+// One summary line for every build: a live build counts up in it, and
+// a finished build keeps it. The layout never switches, so the page
+// below it does not jump when a build starts or ends.
 function summaryLine(s, c) {
   const done = c.done || 0;
   const dur = fmtDur(s.elapsed);
   const did = s.verb === 'test' ? 'tested' : 'built';
-  const lead = done === s.total
-    ? `${s.total} package${s.total === 1 ? '' : 's'} ${did} in ${dur}`
-    : `${done} of ${s.total} packages ${did} in ${dur}`;
+  const lead = s.active
+    ? `${done} of ${s.total} packages ${did} · <span id="t-elapsed">${dur}</span>`
+    : done === s.total
+      ? `${s.total} package${s.total === 1 ? '' : 's'} ${did} in ${dur}`
+      : `${done} of ${s.total} packages ${did} in ${dur}`;
   const pkgs = Object.entries(s.packages || {});
   warnPkgs = pkgs.filter(([, p]) => p.warn)
     .sort((a, b) => b[1].warn - a[1].warn || a[0].localeCompare(b[0]));
@@ -152,13 +158,16 @@ function summaryLine(s, c) {
   const before = new Set(App.prev?.failed || []);
   const newly = pkgs.filter(([n, p]) => p.s === 'failed' && App.prev && !before.has(n)).length;
   const fixed = pkgs.filter(([n, p]) => p.s === 'done' && before.has(n)).length;
-  const parts = [['failed', c.failed], ['failed', newly, 'newly failing'],
+  const waiting = (c.waiting || 0) + (c.blocked || 0);
+  const parts = (s.active
+    ? [['building', c.building], ['ready', c.ready], ['waiting', waiting]]
+    : []).concat([['failed', c.failed], ['failed', newly, 'newly failing'],
                  ['done', fixed, 'fixed since the last run'],
                  ['done', tests, 'tests'], ['failed', badTests, 'failed tests'],
                  ['aborted', c.aborted],
                  ['warn', warned, 'warnings'],
-                 ['skipped', c.skipped], ['waiting', (c.waiting || 0)
-                   + (c.ready || 0) + (c.blocked || 0), 'not built']]
+                 ['skipped', c.skipped]],
+                s.active ? [] : [['waiting', waiting + (c.ready || 0), 'not built']])
     .filter(([, n]) => n)
     .map(([cls, n, word]) => cls === 'warn'
       ? `<button type="button" class="part link" id="warnPart" title="${esc(warnTip())}">`
@@ -168,7 +177,17 @@ function summaryLine(s, c) {
   const at = t => new Date(t * 1000).toLocaleString();
   const tip = [`Took ${fmtDurLong(s.elapsed)}`].concat(s.build_started
     ? [`Started ${at(s.build_started)}`, `Finished ${at(s.build_started + s.elapsed)}`] : []);
-  return `<span class="lead" title="${tip.join('\n')}">${lead}</span>${parts.join('')}`;
+  // a live build: how fast it goes, and how long it still takes
+  const meta = [];
+  if (s.active) {
+    if (s.elapsed > 30) meta.push(`${(done / (s.elapsed / 60)).toFixed(1)} pkg/min`);
+    const eta = estimateEta(s);
+    if (eta != null) {
+      meta.push(`<span title="estimated time left, from the previous build’s package durations">~${fmtDur(eta)} left</span>`);
+    }
+  }
+  return `<span class="lead" title="${tip.join('\n')}">${lead}</span>${parts.join('')}`
+    + (meta.length ? `<span class="meta">${meta.join(' · ')}</span>` : '');
 }
 
 // The workspace by its folder name, the build by its start time: the
@@ -192,8 +211,7 @@ function setSwitchers(s) {
 export function applyState(s) {
   const c = s.counts || {};
   const done = c.done || 0, failed = c.failed || 0, aborted = c.aborted || 0;
-  const building = c.building || 0, ready = c.ready || 0, waiting = c.waiting || 0;
-  const skipped = c.skipped || 0, blocked = c.blocked || 0;
+  const building = c.building || 0;
 
   setSwitchers(s);
   updateSysMeters(s.sys);
@@ -209,24 +227,7 @@ export function applyState(s) {
   else if (done === s.total && s.total > 0) setBadge('complete', 'COMPLETE');
   else setBadge('idle', 'STOPPED');
 
-  $('#t-done').textContent = done;
-  $('#t-total').textContent = ` / ${s.total}`;
-  $('#t-building').textContent = building;
-  $('#t-ready').textContent = ready;
-  $('#t-waiting').innerHTML = waiting + (blocked ? `<small> +${blocked} blocked</small>` : '');
-  $('#t-failed').textContent = failed;
-  $('#t-aborted').textContent = aborted;
-  $('#t-skipped').textContent = skipped;
-  const rate = s.elapsed > 30 ? (done / (s.elapsed / 60)) : null;
-  $('#t-rate').innerHTML = (rate ? rate.toFixed(1) : '–') + '<small> pkg/min</small>';
-  const eta = estimateEta(s);
-  $('#t-eta').textContent = eta != null ? `~${fmtDur(eta)}` : '–';
-
-  // a build that ended gets one summary line instead of a row of zeros
-  const ended = !s.active && !!s.build_id;
-  $('#tiles').hidden = ended;
-  $('#tsum').hidden = !ended;
-  if (ended) $('#tsum').innerHTML = summaryLine(s, c);
+  if (s.build_id) $('#tsum').innerHTML = summaryLine(s, c);
 
   const seg = (cls, n) =>
     $(`#meter .seg.${cls}`).style.flexBasis = (s.total ? (100 * n / s.total) : 0) + '%';

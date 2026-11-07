@@ -27,7 +27,7 @@
   <div class="spacer"></div>
   <div class="hbtns">
   <button id="sysBtn" title="system load"><svg viewBox="0 0 24 24"><path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg></button>
-  <div id="sysmeters" hidden>
+  <div id="sysmeters" class="nodata" hidden>
     <div class="sysm" id="sm-cores" title="per-core CPU use">
       <div class="coregrid"></div>
     </div>
@@ -58,49 +58,7 @@
     <div class="seg aborted"></div>
     <div class="seg building"></div>
   </div>
-  <div id="tiles">
-    <div class="tile hero">
-      <div class="label"><span class="dot c-done"></span>Done</div>
-      <div class="value"><span id="t-done">–</span><small id="t-total"> / –</small></div>
-    </div>
-    <div class="tile">
-      <div class="label"><span class="dot c-building"></span>Building</div>
-      <div class="value" id="t-building">–</div>
-    </div>
-    <div class="tile">
-      <div class="label"><span class="dot c-ready"></span>Ready</div>
-      <div class="value" id="t-ready">–</div>
-    </div>
-    <div class="tile">
-      <div class="label"><span class="dot c-waiting"></span>Waiting</div>
-      <div class="value" id="t-waiting">–</div>
-    </div>
-    <div class="tile">
-      <div class="label"><span class="dot c-failed"></span>Failed</div>
-      <div class="value" id="t-failed">–</div>
-    </div>
-    <div class="tile">
-      <div class="label"><span class="dot c-aborted"></span>Aborted</div>
-      <div class="value" id="t-aborted">–</div>
-    </div>
-    <div class="tile">
-      <div class="label"><span class="dot c-skipped"></span>Skipped</div>
-      <div class="value" id="t-skipped">–</div>
-    </div>
-    <div class="tile">
-      <div class="label"><span class="dot c-none"></span>Elapsed</div>
-      <div class="value" id="t-elapsed">–</div>
-    </div>
-    <div class="tile">
-      <div class="label"><span class="dot c-none"></span>Rate</div>
-      <div class="value" id="t-rate">–<small> pkg/min</small></div>
-    </div>
-    <div class="tile">
-      <div class="label"><span class="dot c-none"></span>ETA</div>
-      <div class="value" id="t-eta" title="estimated time left, from the previous build’s package durations">–</div>
-    </div>
-  </div>
-  <div id="tsum" hidden></div>
+  <div id="tsum"><span class="lead muted">Loading…</span></div>
 </section>
 
 <nav id="viewbar">
@@ -120,10 +78,7 @@
     <button id="gsclear" class="sclear" hidden title="clear the search" aria-label="clear the search"><span class="ic" data-icon="close"></span></button>
   </span>
   <span id="gscount"></span>
-  <span class="prefixwrap">
-    <button id="prefixBtn" class="linkbtn" title="hide a package name prefix in the labels"></button>
-    <div id="prefixPop" hidden></div>
-  </span>
+  <span id="viewslot"></span>
 </nav>
 
 <main id="viz">
@@ -133,7 +88,7 @@
     <p>Run <code>colcon build</code> in this workspace. The dashboard shows it as soon as colcon writes its first log.</p>
   </div>
   <section id="graphpane" class="vpane">
-    <div class="panehead">
+    <div class="panehead" id="graphhead">
       <span class="ptitle">Dependency graph</span>
       <button id="fitBtn" title="frame the whole graph"><span class="ic" data-icon="fit"></span>Fit</button>
       <button id="followBuildBtn" title="keep the camera on the packages that build now; pan or zoom to release"><span class="ic" data-icon="follow"></span>Follow</button>
@@ -153,7 +108,7 @@
   </section>
   <div id="vsplit" hidden title="drag to resize"></div>
   <section id="ganttpane" class="vpane" hidden>
-    <div class="panehead">
+    <div class="panehead" id="gantthead">
       <span class="ptitle">Timeline</span>
       <label id="gsortSel" title="timeline row order">Order <select id="gsortSelect">
         <option value="start">Start time</option>
@@ -244,6 +199,11 @@
         <label><input type="checkbox" id="setWrap"> Wrap long lines</label></div>
       <div class="srow"><span class="sk">Page layout</span>
         <button id="setReset" title="forget the view, the split, the dock height, and the graph layout">Reset to the defaults</button></div>
+    </section>
+    <section>
+      <h3>Package names</h3>
+      <div class="snote sintro">Hide a common prefix in the labels, for example <code>autoware_</code>. This browser keeps the choice for each workspace.</div>
+      <div id="setPrefix"></div>
     </section>
     <section>
       <h3>Scan roots</h3>

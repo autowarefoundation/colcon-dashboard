@@ -103,5 +103,6 @@ export async function fetchGraph() {
 export function tickElapsed() {
   let e = App.elapsedBase;
   if (App.active) e += (Date.now() - App.elapsedAt) / 1000;
-  $('#t-elapsed').textContent = fmtDur(e);
+  const el = $('#t-elapsed');  // only a live build shows the clock
+  if (el) el.textContent = fmtDur(e);
 }

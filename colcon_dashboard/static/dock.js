@@ -746,7 +746,7 @@ function seekFirstHit(p) {
 
 on('labels-changed', () => {
   for (const p of App.panes.values()) {
-    if (p.fixed) continue;
+    if (p.fixed || p.summary) continue;  // the build log and the failures have fixed names
     p.tabEl.querySelector('.tlabel').innerHTML = (p.ai ? icon('spark') : '') + esc(label(p.pkg));
   }
 });

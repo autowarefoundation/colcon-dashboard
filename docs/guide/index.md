@@ -40,15 +40,17 @@ The right side is the system strip. A colcon build can exhaust the machine, so p
 - A per-core heatmap, one cell per core. Cell color runs from the idle gray to full blue at 100% use. Hover a cell for the exact number.
 - CPU, RAM, and swap meters. A fill turns amber under pressure (CPU 85%, RAM 75%, swap 30%) and red near the limit (96%, 90%, 70%). At red the label also turns red and bold.
 - Hover the CPU meter for the load average. Hover the RAM meter for the exact percentage.
-- In a narrow window the strip folds behind a chart button and drops down on demand.
+- In a narrow window the strip folds behind a chart button. A click opens it as a dropdown, like the other dropdowns, and a click outside closes it.
 
 ## Progress strip
 
 The meter fills as the build advances: green for done, animated blue stripes for building, red for failed, orange for aborted.
 
-While a build runs, the tiles count each state: done out of the total, building, ready, waiting (plus a blocked count after a failure), failed, aborted, and skipped. Elapsed time, the rate in packages per minute, and an ETA sit at the end. The ETA is an estimate: the longest remaining dependency chain, or the remaining work spread over the workers, whichever is larger. The duration of each package comes from the previous build.
+One summary line describes the build, during the build and after it, so the page does not change shape when a build starts or ends.
 
-After the build ends, one summary line replaces the tiles, for example "502 packages built in 0:44". The line also gives the failed, aborted, skipped, and unbuilt counts. If packages printed compiler or CMake warnings, the line shows the warning count. Hover over the count to see the packages. Click it to open a package log at its first warning.
+While a build runs, the line reads, for example, "193 of 502 packages built · 3m 12s", and the time counts up. Then it counts the building, ready, waiting (including blocked), failed, aborted, and skipped packages. The rate in packages per minute and the estimated time left sit at the end. The estimate is the longest remaining dependency chain, or the remaining work spread over the workers, whichever is larger. The duration of each package comes from the previous build.
+
+After the build ends, the line reads, for example, "502 packages built in 44m 12s". It also gives the failed, aborted, skipped, and unbuilt counts. If packages printed compiler or CMake warnings, the line shows the warning count. Hover over the count to see the packages. Click it to open a package log at its first warning.
 
 ## Theme
 

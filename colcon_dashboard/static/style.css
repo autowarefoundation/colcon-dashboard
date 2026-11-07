@@ -234,26 +234,23 @@ body.offline #sysmeters { display: none; }
 
 /* system meters: colcon can eat all the RAM, keep pressure visible */
 #sysmeters { display: flex; gap: 14px; align-items: center; }
-#sysmeters[hidden] { display: none !important; }
+#sysmeters.nodata { display: none !important; }
 #sysBtn { display: none; }
 @media (max-width: 1450px) {
-  /* without generous room the meters fold behind a toggle: the inline
-     strip is wide enough to wrap the whole header when squeezed */
+  /* without generous room the meters fold into a dropdown under their
+     button (util.js initPanel), like the other dropdowns */
   #sysBtn { display: inline-block; }
-  body.showsys #sysBtn { color: var(--accent); border-color: var(--accent); }
   #sysmeters {
-    display: none;
-    position: absolute;
-    top: 42px;
-    right: 12px;
-    z-index: 35;
+    position: fixed;
+    z-index: 47;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-l);
     padding: 10px 14px;
     box-shadow: var(--shadow-pop);
+    animation: drop-in 120ms ease-out;
   }
-  body.showsys #sysmeters { display: flex; }
+  #sysmeters[hidden] { display: none; }
 }
 .sysm { width: 96px; }
 #sm-cores { width: auto; }
@@ -325,23 +322,11 @@ body.offline #sysmeters { display: none; }
   animation: slide 1.2s linear infinite;
 }
 @keyframes slide { to { background-position: 0 0, -17px 0; } }
-#tiles { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-end; }
-.tile { min-width: 64px; }
-.tile .label {
-  font-size: var(--fs-xs);
-  color: var(--ink2);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-.tile .label .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.tile .value { font-size: var(--fs-xl); font-weight: 600; line-height: 1.2; }
-.tile .value small { font-size: var(--fs-s); font-weight: 400; color: var(--muted); }
-.tile.hero .value { font-size: var(--fs-2xl); }
-#tiles[hidden], #tsum[hidden] { display: none; }
 #tsum { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; font-size: var(--fs-m); color: var(--ink2); }
 #tsum .lead { font-size: var(--fs-xl); font-weight: 600; color: var(--ink); }
+#tsum .lead.muted { color: var(--muted); }
+#tsum #t-elapsed { font-variant-numeric: tabular-nums; }
+#tsum .meta { margin-left: auto; color: var(--muted); white-space: nowrap; }
 #tsum .part { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 #tsum .part .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 #tsum b { color: var(--ink); font-weight: 600; }
@@ -388,25 +373,15 @@ body.offline #sysmeters { display: none; }
   border-radius: 0;
 }
 #viewbar .vtab.on { color: var(--ink); border-bottom-color: var(--accent); }
-.prefixwrap { position: relative; margin-left: auto; font-size: var(--fs-xs); }
-#prefixBtn { color: var(--muted); font-size: var(--fs-xs); }
-#prefixBtn::after { content: " ▾"; }
-#prefixBtn:empty { display: none; }
-#prefixPop {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 40;
-  width: 300px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-l);
-  box-shadow: var(--shadow-pop); color: var(--ink2); font-size: var(--fs-s);
-}
-#prefixPop[hidden] { display: none; }
-#prefixPop .pphead { font-weight: 600; color: var(--ink); }
-#prefixPop label { display: flex; align-items: baseline; gap: 6px; cursor: pointer; }
-#prefixPop .ppmuted { color: var(--muted); }
-#prefixPop #prefixInput { font: var(--fs-s) var(--mono); padding: 4px 7px; margin-left: 20px; }
-#prefixPop .ppsug { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 20px; }
-#prefixPop .ppsug button { font: var(--fs-xs) var(--mono); padding: 1px 7px; border-radius: var(--r-pill); }
-#prefixPop .ppsug small { color: var(--muted); }
-#prefixPop .ppnote { color: var(--muted); font-size: var(--fs-xs); }
+/* the "Package names" section of the settings (graph.js) */
+#setPrefix { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-s); color: var(--ink2); }
+#setPrefix label { display: flex; align-items: baseline; gap: 6px; cursor: pointer; }
+#setPrefix .ppmuted { color: var(--muted); }
+#setPrefix #prefixInput { font: var(--fs-s) var(--mono); color: var(--ink); background: var(--page); border: 1px solid var(--border); border-radius: var(--r-m); padding: 4px 7px; margin-left: 20px; }
+#setPrefix .ppsug { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 20px; }
+#setPrefix .ppsug button { font: var(--fs-xs) var(--mono); padding: 1px 7px; }
+#setPrefix .ppsug small { color: var(--muted); }
+#setPrefix .ppnote { color: var(--muted); font-size: var(--fs-xs); }
 #viewbar .vsep { width: 1px; align-self: stretch; margin: 4px 3px; background: var(--border); }
 #followBuildBtn.on {
   color: var(--accent);
@@ -460,6 +435,9 @@ body.offline #sysmeters { display: none; }
 .panehead button, .panehead select { font-size: var(--fs-xs); padding: 1px 7px; }
 .panehead .ptitle { display: none; color: var(--ink2); font-weight: 600; margin-right: 6px; }
 #viz.split .panehead .ptitle { display: inline; }
+/* a single view: its pane toolbar sits at the right end of the view bar */
+#viewslot { margin-left: auto; display: flex; }
+#viewslot .panehead { padding: 0; min-height: 0; border: 0; background: none; }
 #graphwrap, #ganttwrap { position: relative; flex: 1; min-height: 0; }
 /* the 2D graph is a canvas (draw.js): its looks live there, not here */
 #graph { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }

@@ -23,7 +23,9 @@ function loadPrefixPref() {
   return { mode: 'auto' };
 }
 
+// returns true when the hidden prefixes changed
 export function computePrefix() {
+  const before = (App.prefixes || []).join(',');
   const names = Object.keys(App.graph).filter(n => App.graph[n].in_build);
   const freq = {};
   for (const n of names) {
@@ -41,13 +43,9 @@ export function computePrefix() {
   App.prefixes = (pref.mode === 'custom' ? pref.list
     : pref.mode === 'off' ? [] : App.prefixAuto ? [App.prefixAuto] : [])
     .slice().sort((a, b) => b.length - a.length);  // the longest match wins
-  renderPrefixBtn();
-}
-
-function renderPrefixBtn() {
-  const n = App.prefixes.length;
-  $('#prefixBtn').textContent = !n ? 'full names'
-    : n === 1 ? `“${App.prefixes[0]}” hidden` : `${n} prefixes hidden`;
+  // a re-render while the user types in it would take the focus away
+  if (!$('#setPrefix').contains(document.activeElement)) renderPrefixSettings();
+  return App.prefixes.join(',') !== before;
 }
 
 function setPrefixPref(pref) {
@@ -60,14 +58,14 @@ function parsePrefixList(text) {
   return [...new Set(text.split(/[\s,]+/).filter(Boolean))];
 }
 
-function renderPrefixPop() {
-  const pop = $('#prefixPop');
+// the "Package names" section of the settings panel
+function renderPrefixSettings() {
+  const pop = $('#setPrefix');
   const auto = App.prefixAuto
     ? `<span class="ppmuted">now “${esc(App.prefixAuto)}”, ${App.prefixCands[0][1]} of ${App.prefixTotal}</span>`
     : '<span class="ppmuted">no common prefix found</span>';
   const custom = App.prefixMode === 'custom' ? App.prefixes : [];
   pop.innerHTML = `
-    <div class="pphead">Hide a name prefix in the labels</div>
     <label><input type="radio" name="pfx" value="auto"> Detect it ${auto}</label>
     <label><input type="radio" name="pfx" value="off"> Show the full names</label>
     <label><input type="radio" name="pfx" value="custom"> Hide these prefixes:</label>
@@ -76,7 +74,7 @@ function renderPrefixPop() {
     ${App.prefixCands.length ? `<div class="ppsug">${App.prefixCands.map(([p, c]) =>
       `<button data-p="${esc(p)}" class="${custom.includes(p) ? 'on' : ''}">${esc(p)} <small>${c}</small></button>`
     ).join('')}</div>` : ''}
-    <div class="ppnote">The graph, the timeline, and the log tabs use the short names. Tooltips show the full names.</div>`;
+    <div class="ppnote">The graph, the timeline, the log tabs, and the failures use the short names. The pane headers and the tooltips show the full names.</div>`;
   pop.querySelector(`input[value="${App.prefixMode}"]`).checked = true;
   const input = pop.querySelector('#prefixInput');
   const applyCustom = () => setPrefixPref({ mode: 'custom', list: parsePrefixList(input.value) });
@@ -86,7 +84,7 @@ function renderPrefixPop() {
       if (!input.value.trim()) input.value = App.prefixes.join(', ');
       applyCustom();
     } else setPrefixPref({ mode: r.value });
-    renderPrefixPop();
+    renderPrefixSettings();
     if (r.value === 'custom') $('#prefixInput').focus();
   });
   input.oninput = () => {
@@ -105,17 +103,7 @@ function renderPrefixPop() {
 }
 
 export function initPrefixMenu() {
-  const btn = $('#prefixBtn'), pop = $('#prefixPop');
-  btn.onclick = () => {
-    pop.hidden = !pop.hidden;
-    if (!pop.hidden) renderPrefixPop();
-  };
-  document.addEventListener('pointerdown', ev => {
-    if (!pop.hidden && !ev.target.closest('.prefixwrap')) pop.hidden = true;
-  });
-  pop.addEventListener('keydown', ev => {
-    if (ev.key === 'Escape' || ev.key === 'Enter') { pop.hidden = true; btn.focus(); }
-  });
+  renderPrefixSettings();
 }
 
 export const measureCtx = document.createElement('canvas').getContext('2d');
@@ -465,8 +453,10 @@ export function showNodeTooltip(name, ev) {
 export function hideTooltip() { $('#tooltip').hidden = true; }
 
 on('graph', () => {
-  computePrefix();
-  buildGraphView();
+  // new prefixes relabel the tabs and the timeline too (labels-changed),
+  // and the graph rebuilds in its own labels-changed handler below
+  if (computePrefix()) emit('labels-changed');
+  else buildGraphView();
 });
 
 on('state', () => updateNodes());

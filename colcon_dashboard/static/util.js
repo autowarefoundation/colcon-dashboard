@@ -163,10 +163,13 @@ function syncPanel(panel) {
   placePanel(panel);
 }
 
+// a wrapper panel holds its box in .wsbox; a small panel is its own box
+const boxOf = panel => panel.querySelector('.wsbox') || panel;
+
 function placePanel(panel) {
   const cfg = PANELS.get(panel);
   if (panel.hidden || cfg.inPlace()) return;
-  const box = panel.querySelector('.wsbox');
+  const box = boxOf(panel);
   if (cfg.side) {
     box.style.top = `${$('#topbar').getBoundingClientRect().bottom}px`;
     return;
@@ -187,7 +190,7 @@ addEventListener('pointerdown', ev => {
   if (ev.target.closest?.('#confirm')) return;
   for (const [panel, cfg] of PANELS) {
     if (panel.hidden || cfg.side || cfg.inPlace()) continue;
-    if (panel.querySelector('.wsbox').contains(ev.target) || cfg.trigger.contains(ev.target)) continue;
+    if (boxOf(panel).contains(ev.target) || cfg.trigger.contains(ev.target)) continue;
     panel.hidden = true;
   }
 }, true);
