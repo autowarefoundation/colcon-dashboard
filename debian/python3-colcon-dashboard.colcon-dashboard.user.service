@@ -1,0 +1,9 @@
+[Unit]
+Description=Colcon Dashboard
+
+[Service]
+ExecStart=/usr/bin/colcon-dashboard
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

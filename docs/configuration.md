@@ -29,6 +29,7 @@ claude_bin =            ; explicit path to the claude CLI
 [ui]
 editor_url =            ; e.g. vscode://file{path}:{line} - file:line log
                         ; lines get a link that opens your editor.
+browser = auto          ; auto, chromium, firefox, or default
 
 [discover]
 extra_roots =           ; e.g. /mnt/data, ~/ros - more directories for
@@ -69,9 +70,20 @@ JetBrains IDEs need the project name (`{project}`, the workspace directory name)
 editor_url = jetbrains://clion/navigate/reference?project={project}&path={path}:{line0}
 ```
 
+## Browser
+
+The tray icon, `colcon-dashboard --app`, and a click on a notification open the dashboard in a browser. The `browser` key chooses which one:
+
+| Value | What opens |
+|---|---|
+| `auto` (the default) | It follows the default browser of your desktop. For Chrome, Chromium, Edge, or Brave, the [installed app](desktop-app.md) or an app window. For Firefox, a new window. |
+| `chromium` | The first of Chrome, Chromium, Brave, Edge, and Vivaldi that is installed, as `auto` uses it |
+| `firefox` | A new Firefox window |
+| `default` | A tab in the default browser |
+
 ## Build notifications
 
-The bell in the page notifies you only while a dashboard page is open. To get a notification without a page, set a command in `[notify]`. The server runs it once when a build ends:
+If the page runs on the same machine as the server, the bell hands its choice to the server. The server then shows the notifications on your desktop, also with no page open (see [Desktop app](desktop-app.md#desktop-notifications)). For other channels, set a command in `[notify]`. The server runs it once when a build ends:
 
 ```ini
 [notify]

@@ -1,14 +1,19 @@
-"""The desktop app: launch, server control, and the app-menu entry.
+"""The desktop side: the --app launcher, the tray launcher, server
+control for the tray, and the applications-menu entry.
 
-The window itself lives in gui.py and needs GTK 4, libadwaita, and
-WebKitGTK 6.0 through PyGObject. Those come from apt, not from pip:
+colcon-dashboard --app starts the server when none answers, then opens
+the dashboard in the browser that fits best (browser.py): the installed
+dashboard app, an app window, or a browser window.
 
-    sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-webkit-6.0
+colcon-dashboard --tray shows the tray icon (tray.py). The tray needs
+PyGObject (Gio, GLib, GdkPixbuf), which comes from apt, not from pip:
 
-A pipx or venv install cannot see them. Then launch() runs the app under
-the system Python, with only this package on its path, and the server
-commands still run under the install's own Python. This module itself
-is standard library only; the server never imports it or gui.py.
+    sudo apt install python3-gi gir1.2-gdkpixbuf-2.0
+
+A pipx or venv install cannot see it. Then launch_tray() runs the tray
+under the system Python, with only this package on its path, and the
+server commands still run under the install's own Python. This module
+itself is standard library only. The server never imports it or tray.py.
 """
 
 import os
@@ -17,30 +22,32 @@ import subprocess
 import sys
 import time
 
-from .cli import probe_server, read_server, server_url, unit_path, user_systemd_works
+from . import browser
+from .cli import probe_server, read_server, register_workspace, server_url
 from .registry import CACHE_DIR
+from .service import APP_ID, SYSTEM_PYTHON, TRAY_CHECK, unit_known
 
-APP_ID = "io.github.autowarefoundation.ColconDashboard"
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(PKG_DIR, "data")
-SYSTEM_PYTHON = "/usr/bin/python3"
-# the Python of the install, when the app runs under the system Python
+# the Python of the install, when the tray runs under the system Python
 PYTHON_ENV = "COLCON_DASHBOARD_PYTHON"
 SHIM_DIR = os.path.join(CACHE_DIR, "app-path")
-APT_HINT = ("sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1"
-            " gir1.2-webkit-6.0")
-GI_CHECK = ("import gi; gi.require_version('Gtk', '4.0');"
-            " gi.require_version('Adw', '1'); gi.require_version('WebKit', '6.0');"
-            " from gi.repository import Adw, Gtk, WebKit")
+APT_HINT = "sudo apt install python3-gi gir1.2-gdkpixbuf-2.0"
 
 
-def gi_problem():
-    """None when this Python can show the window, else the reason."""
+def gi_works(python=None):
+    """True when python (default: this one) can run the tray."""
+    if python is None:
+        try:
+            exec(TRAY_CHECK, {})
+        except (ImportError, ValueError):  # no gi, or a missing typelib
+            return False
+        return True
     try:
-        exec(GI_CHECK, {})
-    except (ImportError, ValueError) as exc:  # no gi, or a missing typelib
-        return str(exc)
-    return None
+        return subprocess.run([python, "-c", TRAY_CHECK], stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL).returncode == 0
+    except OSError:
+        return False
 
 
 def shim_path():
@@ -62,29 +69,37 @@ def not_system_python():
             or os.path.realpath(sys.executable) != os.path.realpath(SYSTEM_PYTHON))
 
 
-def launch(workspace=None):
-    """Show the app window. Returns only when the window closes."""
-    problem = gi_problem()
-    if problem is None:
-        from .gui import run
-        return run(workspace)
-    if (os.path.exists(SYSTEM_PYTHON) and not_system_python()
-            and subprocess.run([SYSTEM_PYTHON, "-c", GI_CHECK],
-                               stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL).returncode == 0):
+def launch_tray():
+    """Show the tray icon. Returns only when the tray quits."""
+    if gi_works():
+        from .tray import run
+        return run()
+    if os.path.exists(SYSTEM_PYTHON) and not_system_python() and gi_works(SYSTEM_PYTHON):
         env = dict(os.environ)
         env["PYTHONPATH"] = os.pathsep.join(
             p for p in (shim_path(), env.get("PYTHONPATH")) if p)
         env.setdefault(PYTHON_ENV, sys.executable)
-        args = [SYSTEM_PYTHON, "-m", "colcon_dashboard.gui"]
-        os.execve(SYSTEM_PYTHON, args + ([workspace] if workspace else []), env)
-    raise SystemExit(
-        f"the desktop app needs GTK 4, libadwaita, and WebKitGTK 6.0 ({problem}).\n"
-        f"Install them with:\n  {APT_HINT}\n"
-        "or open the dashboard in a browser:  colcon-dashboard --open")
+        os.execve(SYSTEM_PYTHON, [SYSTEM_PYTHON, "-m", "colcon_dashboard.tray"], env)
+    raise SystemExit(f"the tray icon needs PyGObject. Install it with:\n  {APT_HINT}")
 
 
-# -- the server, seen from the app ---------------------------------------------
+def open_app(workspace=None):
+    """colcon-dashboard --app: start the server when none answers, then
+    open the dashboard."""
+    info = read_server()
+    if not probe_server(info):
+        ok, msg = start_server()
+        if not ok:
+            raise SystemExit(msg)
+        info = read_server()
+    if workspace:
+        register_workspace(info, workspace)
+    url = server_url(info, workspace)
+    browser.open_dashboard(url)
+    print(f"opened {url}")
+
+
+# -- the server, seen from the tray --------------------------------------------
 
 def cli_cmd(*args):
     """The colcon-dashboard command line, under the install's own Python."""
@@ -103,23 +118,6 @@ def child_env():
         env.pop("PYTHONPATH", None)
     env.pop(PYTHON_ENV, None)
     return env
-
-
-def service_installed():
-    return os.path.exists(unit_path())
-
-
-def server_status():
-    """What the app shows: does a server answer, where, and who runs it."""
-    info = read_server()
-    alive = probe_server(info)
-    return {
-        "alive": alive,
-        "url": server_url(info) if alive else None,
-        "pid": info.get("pid") if alive else None,
-        "service": service_installed(),
-        "systemd": user_systemd_works(),
-    }
 
 
 def run_cli(*args, timeout=30):
@@ -144,13 +142,14 @@ def wait_alive(alive, deadline=10.0):
 
 
 def start_server():
-    """Through the service when it is installed, else in the background,
-    where the server outlives the window. Returns (ok, message)."""
-    if service_installed():
+    """Through the service when systemd knows it, else in the background,
+    where the server outlives the caller. Returns (ok, message)."""
+    if unit_known():
         ok, msg = run_cli("--start-service")
         return (ok and wait_alive(True)), msg
     os.makedirs(CACHE_DIR, exist_ok=True)
-    log = open(os.path.join(CACHE_DIR, "server.log"), "ab")
+    log_path = os.path.join(CACHE_DIR, "server.log")
+    log = open(log_path, "ab")
     try:
         subprocess.Popen(cli_cmd(), env=child_env(), stdin=subprocess.DEVNULL,
                          stdout=log, stderr=subprocess.STDOUT,
@@ -161,11 +160,12 @@ def start_server():
         log.close()
     if wait_alive(True):
         return True, "the server runs"
-    return False, f"the server did not answer; see {os.path.join(CACHE_DIR, 'server.log')}"
+    return False, f"the server did not answer; see {log_path}"
 
 
 def stop_server():
-    if service_installed():
+    """Stop the server. The service stays enabled for the next login."""
+    if unit_known():
         ok, msg = run_cli("--stop-service")
     else:
         ok, msg = run_cli("--stop")
@@ -173,19 +173,11 @@ def stop_server():
 
 
 def restart_server():
-    if service_installed():
+    if unit_known():
         ok, msg = run_cli("--restart-service")
         return (ok and wait_alive(True)), msg
     ok, msg = stop_server()
     return start_server() if ok else (ok, msg)
-
-
-def set_start_at_login(on):
-    """Install or remove the systemd user service."""
-    if on and not user_systemd_works():
-        return False, "systemd user services do not work on this machine"
-    ok, msg = run_cli("--install-service" if on else "--uninstall-service", timeout=60)
-    return ok, msg
 
 
 # -- the app-menu entry --------------------------------------------------------
@@ -201,15 +193,6 @@ def entry_path():
 
 def icon_path():
     return os.path.join(data_home(), "icons", "hicolor", "scalable", "apps", APP_ID + ".svg")
-
-
-def system_entry():
-    """The entry that the deb package installs, or None."""
-    for base in ("/usr/share", "/usr/local/share"):
-        path = os.path.join(base, "applications", APP_ID + ".desktop")
-        if os.path.exists(path):
-            return path
-    return None
 
 
 def desktop_entry(exe):
@@ -240,11 +223,8 @@ def install_desktop():
                 ["gtk-update-icon-cache", "-qtf", os.path.join(data_home(), "icons", "hicolor")]):
         if shutil.which(cmd[0]):
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    print("Colcon Dashboard is now in the applications menu")
-    if gi_problem() and subprocess.run(
-            [SYSTEM_PYTHON, "-c", GI_CHECK], stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL).returncode != 0:
-        print(f"the app needs GTK 4, libadwaita, and WebKitGTK 6.0:\n  {APT_HINT}")
+    print("Colcon Dashboard is now in the applications menu. It opens the dashboard"
+          " in your browser.")
 
 
 def uninstall_desktop():
@@ -256,7 +236,3 @@ def uninstall_desktop():
             removed = True
     if not removed:
         print("the applications menu entry is not installed")
-
-
-def desktop_installed():
-    return os.path.exists(entry_path()) or system_entry() is not None

@@ -83,13 +83,27 @@ def user_systemd_works():
     return systemctl("show-environment", quiet=True) == 0
 
 
+# where a package installs user units (systemd.unit(5))
+PACKAGE_UNIT_DIRS = ("/etc/systemd/user", "/usr/local/lib/systemd/user",
+                     "/usr/lib/systemd/user", "/lib/systemd/user")
+
+
 def unit_known():
-    """True when systemd knows the unit: the user's or the package's."""
+    """True when the unit exists: the user's or the package's. Right
+    after an apt install, systemd sees it only after a daemon-reload."""
     if os.path.exists(unit_path()):
+        return True
+    if any(os.path.exists(os.path.join(d, SERVICE)) for d in PACKAGE_UNIT_DIRS):
         return True
     if not shutil.which("systemctl"):
         return False
     return systemctl_out("show", "-p", "LoadState", "--value", SERVICE) == "loaded"
+
+
+def reload_if_unseen():
+    """A daemon-reload when systemd does not see the unit yet."""
+    if systemctl_out("show", "-p", "LoadState", "--value", SERVICE) != "loaded":
+        systemctl("daemon-reload", quiet=True)
 
 
 def login_enabled():
@@ -122,7 +136,7 @@ def set_login(on):
     if on:
         if not unit_known():
             write_unit()
-            systemctl("daemon-reload", quiet=True)
+        reload_if_unseen()
         if systemctl_out("is-enabled", SERVICE) == "masked":
             systemctl("unmask", SERVICE, quiet=True)
         systemctl("enable", SERVICE, quiet=True)

@@ -8,7 +8,7 @@ maintenance and systemd user service commands:
     colcon-dashboard --install-service | --uninstall-service |
                      --start-service | --stop-service |
                      --restart-service | --service-status
-    colcon-dashboard --app [WORKSPACE] | --install-desktop |
+    colcon-dashboard --app [WORKSPACE] | --tray | --install-desktop |
                      --uninstall-desktop
 
 Option defaults resolve as: command line > config.ini > built-in.
@@ -36,7 +36,7 @@ from . import __version__
 from .config import CONFIG, write_template
 from .monitor import prune_builds
 from .registry import CACHE_DIR, GLOBAL_PORT, Registry, SERVER_FILE
-from .service import (SERVICE, systemctl, unit_known, unit_path,
+from .service import (SERVICE, reload_if_unseen, systemctl, unit_known, unit_path,
                       user_systemd_works, write_unit)
 from .web import Handler
 
@@ -205,6 +205,7 @@ def require_service():
 
 def service_verb(verb):
     require_service()
+    reload_if_unseen()
     if systemctl(verb, SERVICE) != 0:
         raise SystemExit(f"systemctl --user {verb} {SERVICE} failed")
     if verb in ("start", "restart"):
@@ -319,7 +320,8 @@ EXAMPLES = """\
 examples:
   colcon-dashboard .                 start the server (or reuse it) and open this workspace
   colcon-dashboard . --open          the same, and open it in the browser
-  colcon-dashboard . --app           the same, in the desktop app window
+  colcon-dashboard . --app           the same, in the installed app or an app window
+  colcon-dashboard --tray            show the tray icon
   colcon-dashboard --install-service run the server at login, as a systemd user service
   colcon-dashboard --status          the build status of this workspace, in the terminal
   colcon-dashboard --prune --keep 5  delete all but the newest 5 builds and 5 test runs
@@ -330,7 +332,7 @@ The settings file is ~/.config/colcon-dashboard/config.ini. A flag always wins o
 # the actions: at most one per call
 ACTIONS = ("stop", "stop_all", "list_workspaces", "status", "prune", "install_service",
            "uninstall_service", "start_service", "stop_service", "restart_service",
-           "service_status", "app", "install_desktop", "uninstall_desktop")
+           "service_status", "app", "tray", "install_desktop", "uninstall_desktop")
 
 
 def build_parser():
@@ -381,10 +383,12 @@ def build_parser():
                           " config.ini change)")
     svc.add_argument("--service-status", action="store_true",
                      help="show the service status")
-    app = ap.add_argument_group("desktop app (needs GTK 4, libadwaita, and WebKitGTK 6.0)")
+    app = ap.add_argument_group("desktop")
     app.add_argument("--app", action="store_true",
-                     help="open the dashboard in its own window; starts the"
-                          " server when none runs")
+                     help="open the dashboard in the installed app, an app window,"
+                          " or a browser window; starts the server when none runs")
+    app.add_argument("--tray", action="store_true",
+                     help="show the tray icon (needs python3-gi)")
     app.add_argument("--install-desktop", action="store_true",
                      help="add Colcon Dashboard to the applications menu")
     app.add_argument("--uninstall-desktop", action="store_true",
@@ -416,13 +420,15 @@ def main():
         return service_verb("restart")
     if args.service_status:
         return show_service_status()
-    if args.app or args.install_desktop or args.uninstall_desktop:
+    if args.app or args.tray or args.install_desktop or args.uninstall_desktop:
         from . import desktop  # the server never loads the desktop code
         if args.install_desktop:
             return desktop.install_desktop()
         if args.uninstall_desktop:
             return desktop.uninstall_desktop()
-        return desktop.launch(resolve_workspace(args.workspace) if args.workspace else None)
+        if args.tray:
+            return desktop.launch_tray()
+        return desktop.open_app(resolve_workspace(args.workspace) if args.workspace else None)
 
     host = args.host or CONFIG.host or "127.0.0.1"
     explicit_port = args.port if args.port is not None else CONFIG.port

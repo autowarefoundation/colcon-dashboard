@@ -16,10 +16,10 @@ The server needs Python 3.8 or newer and nothing else. It has zero dependencies.
     ```bash
     sudo add-apt-repository ppa:xmfcx/colcon-dashboard
     sudo apt install python3-colcon-dashboard
-    colcon-dashboard --install-service
+    colcon-dashboard --start-service
     ```
 
-    The package upgrades with the usual system updates (`sudo apt upgrade`).
+    The package enables the systemd user service for every user, so the server starts at each login. The last command starts it now. The package upgrades with the usual system updates (`sudo apt upgrade`).
 
 === "pipx"
 
@@ -82,9 +82,9 @@ The server needs Python 3.8 or newer and nothing else. It has zero dependencies.
     pipx install --force ./colcon-dashboard
     ```
 
-The service starts the server at login and restarts it on failure. Open <http://127.0.0.1:8642/> and pick your workspace. That is the whole setup.
+The service starts the server at login and restarts it on failure. Open <http://localhost:8642/> and pick your workspace. That is the whole setup.
 
-To use the dashboard in its own window instead of a browser, install the [desktop app](desktop-app.md).
+To use the dashboard in its own window, [install it as an app](desktop-app.md) from the browser.
 
 After an upgrade, run `colcon-dashboard --restart-service`. The running server stays on the old version until a restart.
 
@@ -107,7 +107,7 @@ colcon-dashboard --service-status
 
 ## Uninstall
 
-1. Remove the service first. If you remove the package first, the service file stays and fails at every login. For a pipx or pip install, also remove the applications menu entry.
+1. For a pipx or pip install, remove the service first. If you remove the package first, the service file stays and fails at every login. Also remove the applications menu entry. The apt package removes its own service.
 
     ```bash
     colcon-dashboard --uninstall-service

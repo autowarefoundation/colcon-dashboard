@@ -8,5 +8,4 @@ Icon=io.github.autowarefoundation.ColconDashboard
 Terminal=false
 Categories=Development;
 Keywords=colcon;ROS;ROS 2;build;dashboard;autoware;
-StartupNotify=true
-StartupWMClass=io.github.autowarefoundation.ColconDashboard
+StartupNotify=false

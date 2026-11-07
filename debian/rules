@@ -2,3 +2,8 @@
 
 %:
 	dh $@ --with python3 --buildsystem=pybuild
+
+# the user unit is colcon-dashboard.service, the name that the CLI uses,
+# and dh enables it for every user: the server starts at the next login
+override_dh_installsystemduser:
+	dh_installsystemduser --name=colcon-dashboard

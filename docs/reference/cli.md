@@ -24,11 +24,12 @@ description: >-
 | `--uninstall-service` | | Stop, disable, and remove the service |
 | `--start-service` `--stop-service` `--restart-service` | | Control the service |
 | `--service-status` | | Show the service and server status |
-| `--app` | | Open the [desktop app](../desktop-app.md), on the workspace when one is given. It starts the server when none runs |
+| `--app` | | Open the dashboard in the [installed app](../desktop-app.md), an app window, or a browser window, on the workspace when one is given. It starts the server when none runs |
+| `--tray` | | Show the [tray icon](../desktop-app.md#the-tray-icon). It needs PyGObject |
 | `--install-desktop` | | Add Colcon Dashboard to the applications menu of this user |
 | `--uninstall-desktop` | | Remove it from the applications menu |
 
-A call takes one action at most: `--stop`, `--list`, `--status`, `--prune`, one of the service flags, or one of the desktop app flags. `colcon-dashboard --help` groups the flags and shows examples.
+A call takes one action at most: `--stop`, `--list`, `--status`, `--prune`, one of the service flags, or one of the desktop flags. `colcon-dashboard --help` groups the flags and shows examples.
 
 A command line flag always wins over the [config file](../configuration.md).
 

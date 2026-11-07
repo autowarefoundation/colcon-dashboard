@@ -19,9 +19,9 @@ An SSH tunnel is the safe way. The server keeps its default bind address, `127.0
     ssh -L 8642:127.0.0.1:8642 build-machine
     ```
 
-2. Open <http://127.0.0.1:8642/> in your browser.
+2. Open <http://localhost:8642/> in your browser.
 
-The page then counts as `localhost` for your browser, so desktop notifications work too. Browsers allow notifications only on `localhost` and on `https` addresses.
+The page then counts as `localhost` for your browser, so desktop notifications work too, and you can [install the dashboard as an app](desktop-app.md). Browsers allow both only on `localhost` and on `https` addresses.
 
 !!! warning "Use `host = 0.0.0.0` only on a network that you trust"
 

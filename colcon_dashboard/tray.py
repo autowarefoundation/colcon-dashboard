@@ -1,8 +1,13 @@
-"""The tray icon of the desktop app, over D-Bus.
+"""The tray icon (colcon-dashboard --tray), over D-Bus.
 
-GTK 4 has no tray API, and AppIndicator needs GTK 3, which cannot load
-next to GTK 4. So this module speaks the two protocols that every tray
-host reads (the Ubuntu AppIndicator extension, KDE, waybar, swaybar):
+The tray is a thin client of the server: it shows whether the server
+runs and which builds run, opens the dashboard in the browser, and
+starts, restarts, and stops the server. It owns nothing: "Quit" closes
+only the icon, and the server keeps running.
+
+AppIndicator needs GTK 3, and the tray needs no window at all. So this
+module speaks the two protocols that every tray host reads (the Ubuntu
+AppIndicator extension, KDE, waybar, swaybar):
 
     org.kde.StatusNotifierItem   the icon, its tooltip, and the clicks
     com.canonical.dbusmenu       the menu that a right click opens
@@ -13,9 +18,16 @@ The tray is "available" only while a StatusNotifierWatcher runs: a
 plain GNOME without the AppIndicator extension has none.
 """
 
+import json
 import os
+import sys
+import threading
+import urllib.request
 
-from gi.repository import GdkPixbuf, Gio, GLib
+import gi
+
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import GdkPixbuf, Gio, GLib  # noqa: E402
 
 ITEM_PATH = "/StatusNotifierItem"
 MENU_PATH = "/MenuBar"
@@ -314,3 +326,169 @@ class Tray:
         item = self.items[i - 1]
         if item and item.get("enabled", True) and item.get("action"):
             GLib.idle_add(lambda: item["action"]() and False)
+
+
+# -- the tray app ----------------------------------------------------------------
+
+POLL_SECONDS = 3
+BUS_NAME = "io.github.autowarefoundation.ColconDashboard.Tray"
+# loopback requests must not go through an http_proxy from the environment
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+class TrayApp:
+    """The icon, its menu, and a poll of the server every few seconds."""
+
+    def __init__(self, conn, loop):
+        from . import desktop  # standard library only, like the server modules
+        self.desktop = desktop
+        self.loop = loop
+        self.alive = False
+        self.busy = None  # "starting", "stopping", "restarting", or None
+        self.builds = []
+        logo = os.path.join(desktop.PKG_DIR, "static", "logo-dark.svg")  # panels are mostly dark
+        self.tray = Tray(conn, desktop.APP_ID, logo, self.open, self.on_available)
+        self.update()
+        self.poll()
+        GLib.timeout_add_seconds(POLL_SECONDS, self.poll)
+
+    # -- the server -------------------------------------------------------
+
+    def poll(self):
+        threading.Thread(target=self._fetch, daemon=True).start()
+        return True  # keep the timer
+
+    def _fetch(self):
+        from .cli import api_url, read_server
+        info = read_server()
+        alive, builds = False, []
+        if info and "port" in info:
+            try:
+                with OPENER.open(api_url(info, "/api/live"), timeout=2) as r:
+                    builds = json.load(r).get("workspaces", [])
+                alive = True
+            except (OSError, ValueError):
+                pass
+        GLib.idle_add(self._fetched, alive, builds)
+
+    def _fetched(self, alive, builds):
+        self.alive, self.builds = alive, builds
+        self.update()
+        return False
+
+    def run_job(self, verb, work):
+        """Run a slow server command off the main loop."""
+        if self.busy:
+            return
+        self.busy = verb
+        self.update()
+
+        def target():
+            ok, msg = work()
+            GLib.idle_add(done, ok, msg)
+
+        def done(ok, msg):
+            self.busy = None
+            if not ok and msg:
+                self.notify_failure(msg)
+            self.poll()
+            return False
+        threading.Thread(target=target, daemon=True).start()
+
+    def notify_failure(self, msg):
+        from . import notify
+        if not notify.send("Colcon Dashboard", msg, urgent=True):
+            print(msg, file=sys.stderr)
+
+    # -- the actions ------------------------------------------------------
+
+    def open(self, workspace=None):
+        def work():
+            from .cli import read_server, server_url
+            if not self.alive:
+                ok, msg = self.desktop.start_server()
+                if not ok:
+                    return ok, msg
+            from . import browser
+            browser.open_dashboard(server_url(read_server(), workspace))
+            return True, ""
+        if self.alive:
+            work()
+        else:
+            self.run_job("starting", work)
+
+    def on_available(self, ok):
+        if ok:
+            self.update()
+        else:
+            print("no tray host answers: the icon shows when one starts (on GNOME,"
+                  " the AppIndicator extension)", file=sys.stderr)
+
+    def update(self):
+        state = self.busy or ("running" if self.alive else "stopped")
+        running = [b for b in self.builds if b.get("active")]
+        if not self.alive:
+            tip = "The server does not run."
+        elif running:
+            tip = ", ".join(f"{os.path.basename(b['path'])}: {b['done']}/{b['total']}"
+                            for b in running)
+        else:
+            tip = "No build runs."
+        self.tray.set_state(tip, gray=not self.alive and not self.busy)
+        idle = self.busy is None
+        items = [{"label": "Open Dashboard", "enabled": idle, "action": self.open},
+                 None,
+                 {"label": f"Server: {state}", "enabled": False}]
+        for b in self.builds[:6]:
+            name = os.path.basename(b["path"]) or b["path"]
+            if b.get("active"):
+                what = f"building {b['done']}/{b['total']}"
+            elif b.get("failed"):
+                what = f"{b['failed']} failed"
+            elif b.get("total") and b.get("done") == b.get("total"):
+                what = "complete"
+            else:
+                continue  # no build seen there yet
+            items.append({"label": f"    {name}: {what}", "enabled": idle,
+                          "action": lambda p=b["path"]: self.open(p)})
+        d = self.desktop
+        items += [None,
+                  {"label": "Start the Server", "enabled": idle and not self.alive,
+                   "action": lambda: self.run_job("starting", d.start_server)},
+                  {"label": "Restart the Server", "enabled": idle and self.alive,
+                   "action": lambda: self.run_job("restarting", d.restart_server)},
+                  {"label": "Stop the Server", "enabled": idle and self.alive,
+                   "action": lambda: self.run_job("stopping", d.stop_server)},
+                  None,
+                  {"label": "Quit the Tray Icon", "action": self.quit}]
+        self.tray.set_menu(items)
+
+    def quit(self):
+        self.tray.close()
+        self.loop.quit()
+
+
+def run():
+    try:
+        conn = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    except GLib.Error as exc:
+        raise SystemExit(f"no D-Bus session bus: {exc.message}")
+    # one tray per session: a second one exits at once
+    reply = conn.call_sync("org.freedesktop.DBus", "/org/freedesktop/DBus",
+                           "org.freedesktop.DBus", "RequestName",
+                           GLib.Variant("(su)", (BUS_NAME, 4)),  # 4: do not queue
+                           GLib.VariantType("(u)"), Gio.DBusCallFlags.NONE, -1, None)
+    if reply.unpack()[0] not in (1, 4):  # 1: the owner now, 4: the owner before
+        print("the tray icon runs already")
+        return 0
+    loop = GLib.MainLoop()
+    TrayApp(conn, loop)
+    try:
+        loop.run()
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(run())

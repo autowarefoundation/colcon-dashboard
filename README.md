@@ -16,7 +16,7 @@ The server uses only the Python standard library, with zero dependencies. It wor
 - **AI failure analysis**: one click starts a headless [claude](https://claude.com/claude-code) run on a failed package and streams the investigation live.
 - **System pressure**: a per-core heatmap plus CPU, RAM, and swap meters, because a colcon build can exhaust the machine.
 - **Build history**: every build and `colcon test` run, with outcomes, durations, and deltas against the previous run.
-- **Desktop app**: the dashboard in its own window, from the applications menu. The app starts and stops the server for you, and it stays in the system tray.
+- **Desktop app**: Chrome, Edge, and Brave install the dashboard as an app with its own window. An optional tray icon shows the builds and controls the server, and the server sends desktop notifications also with no page open.
 
 ## Install
 
@@ -25,8 +25,10 @@ On Ubuntu, install the apt package. It upgrades with the usual system updates:
 ```bash
 sudo add-apt-repository ppa:xmfcx/colcon-dashboard
 sudo apt install python3-colcon-dashboard
-colcon-dashboard --install-service
+colcon-dashboard --start-service
 ```
+
+The package enables the service for every user, so the server starts at each login.
 
 On any distribution, pipx does the same job.
 
@@ -40,9 +42,9 @@ pipx upgrade colcon-dashboard
 
 Plain `pip install colcon-dashboard` also works in a virtual environment with Python 3.8 or newer.
 
-The service starts the server at login. Open <http://127.0.0.1:8642/> and pick your workspace. That is the whole setup. After an upgrade, run `colcon-dashboard --restart-service` to load the new version.
+The service starts the server at login. Open <http://localhost:8642/> and pick your workspace. That is the whole setup. After an upgrade, run `colcon-dashboard --restart-service` to load the new version.
 
-To use the dashboard in its own window, run `colcon-dashboard --app`, or open Colcon Dashboard from the applications menu. The [desktop app page](https://autowarefoundation.github.io/colcon-dashboard/desktop-app/) lists what it needs.
+To use the dashboard in its own window, install it as an app from the address bar of Chrome, Edge, or Brave. The [desktop app page](https://autowarefoundation.github.io/colcon-dashboard/desktop-app/) covers the app, Firefox, and the tray icon.
 
 The [install page](https://autowarefoundation.github.io/colcon-dashboard/install/) covers the install from a checkout and the service commands.
 
@@ -53,7 +55,7 @@ Build as you always do, and open the page of your workspace:
 ```text
 $ colcon build
 $ colcon-dashboard . --open
-already running: http://127.0.0.1:8642/?ws=%2Fhome%2Fuser%2Fws
+already running: http://localhost:8642/?ws=%2Fhome%2Fuser%2Fws
 ```
 
 This is the output when the service runs the server. Without the service, the same command starts the server in the terminal, in the foreground, until you press Ctrl+C.

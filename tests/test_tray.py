@@ -1,4 +1,4 @@
-"""tray.py: the icon pixmaps and the dbusmenu layout. Needs PyGObject
+"""tray.py: the icon pixmaps, the dbusmenu layout, and the tray menu. Needs PyGObject
 and GdkPixbuf, so it skips where they are missing (the deb build)."""
 
 import os
@@ -70,6 +70,57 @@ class Menu(unittest.TestCase):
         while ctx.pending():
             ctx.iteration(False)
         self.assertEqual(ran, ["a"])
+
+
+class FakeTray:
+    def set_state(self, tip, gray):
+        self.tip, self.gray = tip, gray
+
+    def set_menu(self, items):
+        self.items = items
+
+
+@unittest.skipIf(tray is None, "needs PyGObject and GdkPixbuf")
+class AppMenu(unittest.TestCase):
+    def make(self, alive, builds, busy=None):
+        from colcon_dashboard import desktop
+        app = tray.TrayApp.__new__(tray.TrayApp)  # no bus, no poll
+        app.desktop, app.tray = desktop, FakeTray()
+        app.alive, app.builds, app.busy = alive, builds, busy
+        app.update()
+        return app.tray
+
+    def labels(self, t):
+        return {it["label"]: it.get("enabled", True) for it in t.items if it}
+
+    def test_running_server_with_a_build(self):
+        t = self.make(True, [
+            {"path": "/ws/robot", "active": True, "done": 3, "total": 10, "failed": 0},
+            {"path": "/ws/old", "active": False, "done": 5, "total": 5, "failed": 0},
+            {"path": "/ws/new", "active": False, "done": 0, "total": 0, "failed": 0}])
+        self.assertEqual(t.tip, "robot: 3/10")
+        self.assertFalse(t.gray)
+        labels = self.labels(t)
+        self.assertIn("    robot: building 3/10", labels)
+        self.assertIn("    old: complete", labels)
+        self.assertNotIn("    new: complete", labels)  # no build seen there
+        self.assertFalse(labels["Start the Server"])
+        self.assertTrue(labels["Stop the Server"])
+
+    def test_stopped_server_is_gray(self):
+        t = self.make(False, [])
+        self.assertTrue(t.gray)
+        self.assertEqual(t.tip, "The server does not run.")
+        labels = self.labels(t)
+        self.assertTrue(labels["Start the Server"])
+        self.assertFalse(labels["Restart the Server"])
+        self.assertTrue(labels["Open Dashboard"])  # it starts the server first
+
+    def test_busy_disables_the_actions(self):
+        labels = self.labels(self.make(True, [], busy="restarting"))
+        self.assertIn("Server: restarting", labels)
+        self.assertFalse(labels["Stop the Server"])
+        self.assertTrue(labels["Quit the Tray Icon"])
 
 
 if __name__ == "__main__":

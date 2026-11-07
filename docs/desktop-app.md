@@ -1,105 +1,103 @@
 ---
 icon: lucide/app-window
 description: >-
-  Open Colcon Dashboard from the applications menu, in its own window. The
-  app starts the server when none runs, controls it, and stays in the tray.
+  Install the dashboard as an app with its own window, open it from the
+  applications menu, and watch the server from the tray icon.
 ---
 
 # Desktop app
 
-The desktop app shows the dashboard in its own window, with an entry in the applications menu. You do not have to open a browser or remember the port.
+The dashboard is a web page, and your browser can install it as an app. The app has its own window, a menu entry, and a dock icon, and it runs at full browser speed. The server keeps running in the background as a systemd user service, so the app opens at once.
 
-When you open the app and no server runs, the app starts one. The header bar shows the server state, and its menu restarts or stops the server. The menu also turns on the systemd user service, which starts the server at login. When you close the window, the app keeps running as an icon in the system tray.
+## Install the dashboard as an app
 
-## Install
+Chrome, Chromium, Edge, and Brave can install the dashboard:
 
-The app uses GTK 4, libadwaita, and WebKitGTK 6.0. Ubuntu 22.04 and newer have them.
+1. Open <http://localhost:8642/>.
+2. Click the install icon at the right end of the address bar. You can also open the browser menu and choose **Cast, save, and share** > **Install page as app**.
+3. Click **Install**.
 
-=== "Ubuntu PPA"
+The browser adds Colcon Dashboard to the applications menu. If the app already shows a window, a second launch brings that window to the front.
 
-    The apt package recommends the app libraries, so `apt` installs them with the package. The package also adds Colcon Dashboard to the applications menu.
+Use the address `localhost:8642` for the install. The browser ties the app and its saved page settings to one exact address, and `127.0.0.1:8642` counts as a different one. Browsers also install apps only from `localhost` or from `https` addresses. To install the app for a dashboard on another machine, open it through an [SSH tunnel](remote.md#use-an-ssh-tunnel).
 
-    ```bash
-    sudo apt install python3-colcon-dashboard
-    ```
+## Firefox and other browsers
 
-=== "pipx or pip"
+The page works fully in a Firefox tab. Only the separate app window depends on the Firefox version and the install type:
 
-    1. Install the app libraries:
+- Firefox 150 and newer on Linux have web apps (Taskbar Tabs) behind the `browser.taskbarTabs.enabled` setting in `about:config`.
+- The Snap and Flatpak builds of Firefox do not have Taskbar Tabs yet. Ubuntu installs the Snap build by default.
+- The third-party PWAsForFirefox extension installs the dashboard as an app on Linux today.
 
-        ```bash
-        sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-webkit-6.0
-        ```
+## The applications menu entry
 
-    2. Add Colcon Dashboard to the applications menu:
+The apt package adds Colcon Dashboard to the applications menu. For a pipx or pip install, add it yourself:
 
-        ```bash
-        colcon-dashboard --install-desktop
-        ```
+```bash
+colcon-dashboard --install-desktop
+```
 
-    The libraries come from apt, and a pipx environment cannot see them. The app then runs under the system Python (`/usr/bin/python3`). The server commands still run under the Python of your install.
-
-## Open the app
-
-Open Colcon Dashboard from the applications menu. From a terminal, open the app on a workspace:
+The entry runs `colcon-dashboard --app`. You can also run it in a terminal, with an optional workspace:
 
 ```bash
 colcon-dashboard --app ~/autoware
 ```
 
-If the app already runs, the command opens the workspace in the open window.
+The command starts the server if none runs. Then it opens the dashboard in the default browser of your desktop:
 
-## The window
+- Chrome, Chromium, Edge, or Brave: the installed app, else an app window without tabs.
+- Firefox: a new window.
+- Any other browser: a new tab.
 
-The header bar holds these controls:
+To choose the browser yourself, set `browser` in the [configuration file](configuration.md#browser).
 
-- The server state: running, working, or stopped. Hover over it to see the address and what runs the server (the service or a background process).
-- The reload button.
-- The menu: reload, open the page in the browser, fullscreen, restart or stop the server, start the server at login, add the app to the applications menu, the keyboard shortcuts, the About window, keep running in the tray, and quit.
-
-The header bar takes the light or dark theme of the page. Desktop notifications from the bell button show as system notifications. Links to the documentation, GitHub, and your editor open in their usual apps.
-
-The app keeps the window size, the zoom level, and the last page that you viewed. It keeps the page settings (theme, notifications, layout) apart from your browser.
-
-| Key | Action |
-|---|---|
-| ++ctrl+r++ or ++f5++ | Reload the page |
-| ++f11++ | Fullscreen |
-| ++ctrl+plus++ / ++ctrl+minus++ / ++ctrl+0++ | Zoom in, zoom out, reset the zoom |
-| ++ctrl+shift+i++ or ++f12++ | The web inspector |
-| ++ctrl+q++ | Quit the app (the server keeps running) |
+If you installed the app in Chrome, the applications menu shows two Colcon Dashboard entries. Both open the same app.
 
 ## The tray icon
 
-When you close the window, the window hides, and the app stays in the system tray. Build notifications still arrive. The first time, a notification says where the app went.
+The tray icon is optional. To turn it on, open the settings (the gear button) and select **show the tray icon**. The icon then also starts at every login.
 
-- Click the icon to show or hide the window.
-- Right-click the icon for the menu: the server state, start, restart, or stop the server, start the server at login, open the page in the browser, and quit.
+- Click the icon to open the dashboard.
+- Right-click the icon for the menu: the server state, the builds of the open workspaces, and start, restart, or stop the server.
+- **Quit the Tray Icon** closes only the icon. The server keeps running.
 
-The icon turns gray when the server stops. Hover over it to see the server state and the build progress.
+The icon turns gray when the server stops. Hover over it to see the build progress.
 
-To quit the app, choose **Quit** in the tray menu or in the window menu, or press ++ctrl+q++. To make the close button quit the app instead, turn off **Keep Running in the Tray** in the window menu.
+The tray icon needs PyGObject. The apt package recommends it. For a pipx install, install it with apt:
 
-The tray needs a tray host. KDE, waybar, and swaybar have one. On Ubuntu, the AppIndicator extension (on by default) is the host. A plain GNOME desktop has no tray. There the close button quits the app.
+```bash
+sudo apt install python3-gi gir1.2-gdkpixbuf-2.0
+```
+
+The tray also needs a tray host. KDE, waybar, and swaybar have one. On Ubuntu, the AppIndicator extension (on by default) is the host. A plain GNOME desktop (for example on Fedora) needs the AppIndicator extension.
 
 ## The server
 
-If you quit the app, the server keeps running. Other browser pages and the CLI still use it.
+The settings dialog controls the server:
 
-If the app starts the server and the service is not installed, the server runs as a background process. Its output goes to `~/.cache/colcon-dashboard/server.log`.
+- **start the server when you log in** turns the systemd user service on or off.
+- **Restart the server** restarts it, for example after a change to `config.ini`.
+- **Stop the server…** stops it until the next login.
 
-When the server stops, the window shows "The dashboard server is not running". Click **Start the Server**, or turn on **Start the server at login** to install the service.
+When the server does not answer, the page shows how to start it again, and it opens the dashboard by itself when the server answers.
 
-## Remove the app
+## Desktop notifications
 
-1. For a pipx or pip install, remove the menu entry:
+If the page runs on the same machine as the server, the server shows the build notifications on your desktop. They arrive also when no dashboard is open. A click on a notification opens the dashboard. The bell button and the settings choose them, as before.
 
-    ```bash
-    colcon-dashboard --uninstall-desktop
-    ```
+On another machine, through an SSH tunnel, the browser shows the notifications while a dashboard page is open.
 
-2. To remove the page settings of the app too, delete its data directory:
+## Upgrade from the WebKit window
 
-    ```bash
-    rm -r ~/.local/share/colcon-dashboard
-    ```
+Version 0.10 and older had a separate window that used WebKitGTK. That window is gone, and the browser app replaces it. For a pipx or pip install, run these commands once after the upgrade:
+
+```bash
+colcon-dashboard --install-desktop     # the entry now opens the browser
+colcon-dashboard --restart-service
+```
+
+To free the disk space of the old window, delete its data directory:
+
+```bash
+rm -r ~/.local/share/colcon-dashboard
+```

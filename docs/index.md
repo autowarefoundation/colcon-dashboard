@@ -20,10 +20,10 @@ The server uses only the Python standard library, with zero dependencies. It wor
     ```bash
     sudo add-apt-repository ppa:xmfcx/colcon-dashboard
     sudo apt install python3-colcon-dashboard
-    colcon-dashboard --install-service
+    colcon-dashboard --start-service
     ```
 
-    The package upgrades with the usual system updates (`sudo apt upgrade`).
+    The package starts the server at each login. It upgrades with the usual system updates (`sudo apt upgrade`).
 
 === "pipx"
 
@@ -66,7 +66,7 @@ The server uses only the Python standard library, with zero dependencies. It wor
     pipx install --force ./colcon-dashboard
     ```
 
-Open <http://127.0.0.1:8642/> and pick your workspace. That is the whole setup. After an upgrade, run `colcon-dashboard --restart-service`. The [install page](install.md) has the service commands.
+Open <http://localhost:8642/> and pick your workspace. That is the whole setup. After an upgrade, run `colcon-dashboard --restart-service`. The [install page](install.md) has the service commands.
 
 ## What you get
 

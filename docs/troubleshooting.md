@@ -50,7 +50,9 @@ The running server keeps its version until a restart. After an upgrade, run `col
 
 ## The bell shows a warning
 
-The browser blocks desktop notifications. Hold the mouse over the bell to read the reason.
+If the page runs on the same machine as the server, the server shows the notifications through `notify-send` (the `libnotify-bin` package) or `gdbus`. Click **test** next to the notification choice in the settings to send one. If none arrives, make sure that `notify-send test` shows a notification in a terminal.
+
+On another machine, the browser shows the notifications, and it can block them. Hold the mouse over the bell to read the reason.
 
 - Browsers allow notifications only on `localhost` and on `https` addresses. A LAN address such as `http://192.168.1.10:8642/` does not work. Use an [SSH tunnel](remote.md#use-an-ssh-tunnel) and open the page through `localhost`.
 - If you denied the permission before, allow notifications for the page in the site settings of your browser.

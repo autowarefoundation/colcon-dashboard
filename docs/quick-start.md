@@ -12,7 +12,7 @@ Build as you always do, and open the page of your workspace:
 ```text
 $ colcon build
 $ colcon-dashboard . --open
-already running: http://127.0.0.1:8642/?ws=%2Fhome%2Fuser%2Fws
+already running: http://localhost:8642/?ws=%2Fhome%2Fuser%2Fws
 ```
 
 This is the output when the [service](install.md#service-commands) runs the server. `--open` opens the page in your browser. Without it, open the printed address yourself.
@@ -22,8 +22,8 @@ If no server runs, the same command starts one in the terminal. It prints its ad
 ```text
 $ colcon-dashboard .
 Colcon Dashboard
-  url: http://127.0.0.1:8642/
-  workspace: http://127.0.0.1:8642/?ws=%2Fhome%2Fuser%2Fws
+  url: http://localhost:8642/
+  workspace: http://localhost:8642/?ws=%2Fhome%2Fuser%2Fws
   stop: Ctrl+C, or colcon-dashboard --stop
 ```
 
