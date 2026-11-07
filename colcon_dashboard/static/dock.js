@@ -613,14 +613,16 @@ export function updateMarks(p) {
   box.textContent = '';
   const h = p.pre.scrollHeight;
   if (!h || h <= p.pre.clientHeight) return;  // no scrollbar: nothing to find
-  const lines = p.pre.querySelectorAll('.ln.l-err, .ln.l-warn');
+  // m-err and m-warn: the same lines in raw mode, where they keep no color
+  const lines = p.pre.querySelectorAll('.ln.l-err, .ln.l-warn, .ln.m-err, .ln.m-warn');
   const step = Math.max(1, Math.ceil(lines.length / MAX_MARKS));
   const frag = document.createDocumentFragment();
   for (let i = 0; i < lines.length; i += step) {
     const ln = lines[i];
     if (!ln.offsetParent) continue;  // inside a closed group
     const m = document.createElement('span');
-    m.className = ln.classList.contains('l-err') ? 'mk err' : 'mk warn';
+    const err = ln.classList.contains('l-err') || ln.classList.contains('m-err');
+    m.className = err ? 'mk err' : 'mk warn';
     m.style.top = `${(100 * ln.offsetTop / h).toFixed(2)}%`;
     m.title = lineText(ln).trim().slice(0, 160);
     m.onclick = () => {

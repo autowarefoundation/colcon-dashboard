@@ -109,27 +109,36 @@ export function renderLogLine(ctx, line, frag) {
         lc.appendChild(document.createTextNode(text));
       }
     }
-  } else if (ctx.ai || ctx.raw) {
+  } else if (ctx.ai) {
     lc.textContent = line;
   } else {
     let lst = ctx.lint || (ctx.lint = newLintState());
+    let text = line;
     if (ctx.fixed) {
       const pm = PKG_RE.exec(line);
       if (pm) {
         pkg = pm[1];
-        lc.append(pkgTag(pkg), ' ');
-        line = line.slice(pm[0].length);
+        text = line.slice(pm[0].length);
         // parallel jobs interleave their lines: each package keeps its
         // own lint state (a CMake warning block, the last diagnostic)
         const by = ctx.lintBy || (ctx.lintBy = new Map());
-        if (!by.has(pm[1])) by.set(pm[1], newLintState());
-        lst = by.get(pm[1]);
+        if (!by.has(pkg)) by.set(pkg, newLintState());
+        lst = by.get(pkg);
       }
     }
-    const r = lintLine(line, lst);
-    if (r.cls.length) ln.classList.add(...r.cls);
-    lc.append(...r.nodes);
-    fold = r.fold;
+    const r = lintLine(text, lst);
+    if (ctx.raw) {
+      // the exact text, but the marks beside the scrollbar still find
+      // the errors and warnings: m-err and m-warn carry no style
+      lc.textContent = line;
+      if (r.cls.includes('l-err')) ln.classList.add('m-err');
+      else if (r.cls.includes('l-warn')) ln.classList.add('m-warn');
+    } else {
+      if (pkg) lc.append(pkgTag(pkg), ' ');
+      if (r.cls.length) ln.classList.add(...r.cls);
+      lc.append(...r.nodes);
+      fold = r.fold;
+    }
   }
   lc.appendChild(document.createTextNode('\n'));
 
