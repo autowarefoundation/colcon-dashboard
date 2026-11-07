@@ -49,7 +49,8 @@ export function updatePaneHeads() {
     p.el.querySelector('.ph').textContent =
       st && st.s === 'building'
         ? (st.ph || '') + (st.pct != null ? ` ${st.pct}%` : '') : '';
-    p.el.querySelector('.errn').textContent = st?.err ? `${st.err} stderr lines` : '';
+    p.el.querySelector('.errn').textContent =
+      st?.err ? `${st.err} stderr line${st.err === 1 ? '' : 's'}` : '';
     const dot = p.tabEl.querySelector('.dot');
     dot.className = 'dot ' + (STATE_DOT[s] || 'c-waiting');
   }

@@ -38,15 +38,18 @@ export async function pollState() {
   $('#vizEmpty').hidden = s.nows || !/^no (colcon build logs|events\.log)/.test(s.error || '');
   if (s.nows) {
     setBadge('idle', 'PICK A WORKSPACE');
-    $('#ws').textContent = 'pick a workspace';
-    $('#buildid').textContent = 'builds';
+    // write into the switchers' value lines: header.js fills their parts
+    $('#ws .sw-val').textContent = 'Pick a workspace';
+    $('#buildid .sw-val').textContent = 'No build';
     emit('state-lost');
     return;
   }
   if (s.error) {
     $('#vizEmpty .why').textContent = s.error;
-    setBadge('idle', 'WAITING');
-    $('#buildid').textContent = s.error;
+    const loading = s.error.startsWith('scanning');
+    setBadge('idle', loading ? 'LOADING' : 'WAITING');
+    $('#buildid .sw-val').textContent = loading ? 'Loading…' : 'No build yet';
+    $('#buildid').title = s.error;
     updateSysMeters(s.sys);
     emit('state-lost');
     return;
