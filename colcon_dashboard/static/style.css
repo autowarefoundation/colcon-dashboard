@@ -120,7 +120,6 @@ button.on {
   row-gap: 6px;
 }
 #topbar .brand { font-size: 14px; white-space: nowrap; display: flex; align-items: center; gap: 7px; }
-#topbar .brand b { font-weight: 650; }
 #topbar .brand .logo { width: 22px; height: 22px; }
 /* each logo comes as a light and a dark image; the theme shows one */
 img.logo { display: inline-block; vertical-align: middle; }

@@ -14,7 +14,7 @@ export async function initHeaderMeta() {
   if (App.cfg.version) {
     const v = `v${App.cfg.version}`;
     $('#stopBtn').title = `stop the dashboard server (${v})`;
-    document.querySelector('#topbar .brand').title = `colcon-dashboard ${v}`;
+    document.querySelector('#topbar .brand').title = `Colcon Dashboard ${v}`;
   }
 }
 
