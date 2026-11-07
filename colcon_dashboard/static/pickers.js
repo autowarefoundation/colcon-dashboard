@@ -2,7 +2,7 @@ import { label } from './graph.js';
 import { setBadge } from './header.js';
 import { App } from './state.js';
 import { toast } from './toasts.js';
-import { $, esc, fmtAgo, fmtBytes, fmtDur, initPanel, PINNED_BUILD, WS, wsParam } from './util.js';
+import { $, esc, fmtAgo, fmtBytes, fmtDur, icon, initPanel, PINNED_BUILD, WS, wsParam } from './util.js';
 
 export const WS_SORTS = {
   // a workspace building now has the newest build, so "last built"
@@ -78,7 +78,7 @@ function wsRow(w, inGroup) {
   star.className = 'star' + (w.fav ? ' on' : '');
   star.title = w.fav ? 'unstar' : 'star';
   star.setAttribute('aria-label', `${w.fav ? 'unstar' : 'star'} ${shown}`);
-  star.textContent = '★';
+  star.innerHTML = icon('star');
   item.append(a, star);
   star.onclick = async ev => {
     ev.preventDefault();
@@ -103,7 +103,7 @@ function wsSection(list, title, extra) {
 function renderFound(list, found) {
   const rescan = document.createElement('button');
   rescan.className = 'linkbtn';
-  rescan.textContent = wsScanning ? 'scanning…' : 'rescan';
+  rescan.textContent = wsScanning ? 'Scanning…' : 'Rescan';
   rescan.disabled = wsScanning;
   rescan.onclick = scanWs;
   wsSection(list, `Found on disk${found.length ? ` (${found.length})` : ''}`, rescan);
@@ -205,7 +205,7 @@ export function showUpdateNote(update) {
     `(installed ${esc(update.current)}) - ` +
     `<a href="https://github.com/autowarefoundation/colcon-dashboard/releases"` +
     ` target="_blank" rel="noopener">release notes</a>` +
-    `<button class="dismiss" title="hide until the next release">✕</button>`;
+    `<button class="dismiss" title="hide until the next release" aria-label="hide">${icon('close')}</button>`;
   note.querySelector('.dismiss').onclick = () => {
     localStorage.setItem('cmc-upd-dismissed', update.latest);
     note.remove();
@@ -221,7 +221,7 @@ export async function openWsPicker() {
     showScanRoots(false);
     $('#wsinput').focus();
   }
-  if (!wsItems.length) list.innerHTML = '<div class="wsempty">loading…</div>';
+  if (!wsItems.length) list.innerHTML = '<div class="wsempty">Loading…</div>';
   try {
     const d = await (await fetch('/api/workspaces')).json();
     wsHome = d.home || '';
@@ -266,7 +266,7 @@ function rootRow(root, i) {
   div.className = 'wsrow';
   div.innerHTML =
     '<input class="rootedit" type="text" spellcheck="false" title="edit, then press Enter">' +
-    '<button class="rootdel" title="remove this scan root">✕</button>';
+    `<button class="rootdel" title="remove this scan root" aria-label="remove">${icon('close')}</button>`;
   const input = div.querySelector('.rootedit');
   input.value = root;
   const commit = () => {
@@ -424,7 +424,7 @@ export async function openBuildPicker(retry) {
   const tries = typeof retry === 'number' ? retry : 0;  // onclick passes an event
   $('#bpick').hidden = false;
   const list = $('#blist');
-  if (!tries) list.innerHTML = '<div class="wsempty">loading…</div>';
+  if (!tries) list.innerHTML = '<div class="wsempty">Loading…</div>';
   let d;
   try {
     d = await (await fetch(`/api/builds${wsParam()}`)).json();
@@ -489,17 +489,17 @@ export async function openBuildPicker(retry) {
     del.className = 'del';
     del.title = "delete this build's logs";
     del.setAttribute('aria-label', `delete the logs of ${b.id}`);
-    del.textContent = '🗑';
+    del.innerHTML = icon('delete');
     item.append(a, del);
     del.onclick = async ev => {
       ev.preventDefault();
       ev.stopPropagation();
       if (!del.classList.contains('sure')) {  // ask once, then act
         del.classList.add('sure');
-        del.textContent = 'delete?';
+        del.textContent = 'Delete?';
         setTimeout(() => {
           del.classList.remove('sure');
-          del.textContent = '🗑';
+          del.innerHTML = icon('delete');
         }, 2500);
         return;
       }

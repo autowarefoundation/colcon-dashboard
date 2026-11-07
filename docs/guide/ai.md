@@ -7,7 +7,7 @@ description: >-
 
 # AI failure analysis
 
-When the [claude CLI](https://claude.com/claude-code) is installed, the pane of a failed package shows an **✦ ask claude** button. It starts a headless `claude` run in the workspace, with the tail of the failed log as the prompt. A new ✦ pane streams the investigation live: the files it reads, the commands it runs, and the answer.
+When the [claude CLI](https://claude.com/claude-code) is installed, the pane of a failed package shows an **Ask Claude** button. It starts a headless `claude` run in the workspace, with the tail of the failed log as the prompt. A new Claude pane streams the investigation live: the files it reads, the commands it runs, and the answer.
 
 <!-- TODO(images): an analysis pane streaming an investigation. -->
 

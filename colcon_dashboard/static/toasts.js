@@ -1,4 +1,4 @@
-import { $ } from './util.js';
+import { $, icon } from './util.js';
 
 /* ---------------- toasts ---------------- */
 
@@ -8,7 +8,7 @@ export function toast(html, cls = '', onclick = null, ttl = 9000) {
   const t = document.createElement('div');
   t.className = 'toast ' + cls;
   t.innerHTML = `<div class="tbody">${html}</div>`
-    + '<button class="tclose" title="close" aria-label="close">✕</button>';
+    + `<button class="tclose" title="close" aria-label="close">${icon('close')}</button>`;
   t.onclick = ev => {
     if (!ev.target.closest('.tclose') && onclick) onclick();
     t.remove();

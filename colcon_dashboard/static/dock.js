@@ -5,7 +5,7 @@ import { label } from './graph.js';
 import { mode } from './modes.js';
 import { App } from './state.js';
 import { toast } from './toasts.js';
-import { $, copyText, esc, failNote, fmtDur, wsParam } from './util.js';
+import { $, copyText, esc, failNote, fmtDur, icon, wsParam } from './util.js';
 
 /* ---------------- log dock ---------------- */
 
@@ -105,8 +105,8 @@ export function createPane(name) {
   tab.className = 'ltab';
   tab.innerHTML =
     `<span class="dot ${fixed ? 'c-building' : 'c-waiting'}"></span>` +
-    `<span class="tlabel">${fixed ? 'build log' : (ai ? '✦ ' : '') + esc(label(pkg))}</span>` +
-    (fixed ? '' : `<button class="x" title="close">✕</button>`);
+    `<span class="tlabel">${fixed ? 'Build log' : (ai ? icon('spark') : '') + esc(label(pkg))}</span>` +
+    (fixed ? '' : `<button class="x" title="close" aria-label="close">${icon('close')}</button>`);
   tab.onclick = ev => {
     if (ev.target.classList.contains('x')) closePane(name);
     else activatePane(name);
@@ -124,30 +124,30 @@ export function createPane(name) {
   pane.className = 'pane';
   pane.innerHTML = `
     <div class="phead">
-      <span class="pname">${fixed ? 'colcon build' : (ai ? `✦ claude · ${esc(pkg)}` : esc(name))}</span>
+      <span class="pname">${fixed ? 'colcon build' : (ai ? `${icon('spark')}Claude · ${esc(pkg)}` : esc(name))}</span>
       <span class="chip">…</span>
       <span class="ph"></span>
       <span class="errn"></span>
-      ${fixed || ai ? '' : `<button class="askai" hidden title="explain this failure with the claude CLI">✦ ask claude</button>
-      <button class="cpath" hidden title="copy the package source path">⧉ path</button>
-      <button class="locate" title="find this package in the graph or the timeline">⌖ locate</button>`}
+      ${fixed || ai ? '' : `<button class="askai" hidden title="explain this failure with the claude CLI">${icon('spark')}Ask Claude</button>
+      <button class="cpath" hidden title="copy the package source path">${icon('copy')}Path</button>
+      <button class="locate" title="find this package in the graph or the timeline">${icon('locate')}Locate</button>`}
       <span class="grow"></span>
-      <span class="searchwrap"><input class="search" type="text" placeholder="search" spellcheck="false"><button class="sclear" hidden title="clear the search">✕</button></span>
+      <span class="searchwrap"><input class="search" type="text" placeholder="Search log" spellcheck="false"><button class="sclear" hidden title="clear the search" aria-label="clear the search">${icon('close')}</button></span>
       <span class="scount"></span>
-      <button class="sprev" title="previous match" disabled>↑</button>
-      <button class="snext" title="next match" disabled>↓</button>
-      ${fixed || ai ? '' : `<label>file <select class="fsel">
-        <option value="streams">output (timestamped)</option>
-        <option value="combined">stdout+stderr</option>
+      <button class="sprev" title="previous match" aria-label="previous match" disabled>${icon('up')}</button>
+      <button class="snext" title="next match" aria-label="next match" disabled>${icon('down')}</button>
+      ${fixed || ai ? '' : `<label>File <select class="fsel">
+        <option value="streams">Output (timestamped)</option>
+        <option value="combined">stdout + stderr</option>
         <option value="stderr">stderr</option>
         <option value="stdout">stdout</option>
-        <option value="command">commands</option>
+        <option value="command">Commands</option>
       </select></label>`}
-      ${ai ? '' : `<button class="tsbtn on" title="show or hide timestamps">🕒 ts</button>
-      <button class="earlier" style="display:none" title="load the whole log from the start">⤒ load all</button>`}
-      <button class="wrapbtn" title="soft-wrap long lines">↩ wrap</button>
-      <button class="follow on" title="auto-scroll to the end">⤓ follow</button>
-      ${fixed ? '' : `<button class="close" title="close pane">✕</button>`}
+      ${ai ? '' : `<button class="earlier" style="display:none" title="load the whole log from the start">${icon('top')}Load all</button>
+      <button class="tsbtn on" title="show or hide timestamps">${icon('clock')}Time</button>`}
+      <button class="wrapbtn" title="soft-wrap long lines">${icon('wrap')}Wrap</button>
+      <button class="follow on" title="auto-scroll to the end">${icon('follow')}Follow</button>
+      ${fixed ? '' : `<button class="close" title="close pane" aria-label="close pane">${icon('close')}</button>`}
     </div>
     <div class="lognote" hidden></div>
     <pre tabindex="0" class="showts"></pre>`;
@@ -199,8 +199,8 @@ export function createPane(name) {
     const row = document.createElement('div');
     row.className = 'askrow';
     row.innerHTML =
-      `<input type="text" placeholder="ask claude a follow-up question…" spellcheck="false">
-       <button>ask</button>`;
+      `<input type="text" placeholder="Ask Claude a follow-up question…" spellcheck="false">
+       <button>Ask</button>`;
     const input = row.querySelector('input');
     const send = () => {
       const t = input.value.trim();
@@ -370,7 +370,7 @@ export async function loadEarlier(p) {
     p.trimmed = false;
   }
   p.loadingEarlier = true;
-  p.earlierBtn.textContent = '⤒ loading…';
+  p.earlierBtn.innerHTML = `${icon('top')}Loading…`;
   const base = p.fixed
     ? `/api/buildlog?`
     : `/api/log/${encodeURIComponent(p.name)}?file=${p.file}&`;
@@ -405,7 +405,7 @@ export async function loadEarlier(p) {
     updateEarlierBtn(p);
     if (p.query) runSearch(p);
   } catch (e) { /* transient */ }
-  p.earlierBtn.textContent = '⤒ load all';
+  p.earlierBtn.innerHTML = `${icon('top')}Load all`;
   p.loadingEarlier = false;
 }
 
@@ -565,8 +565,8 @@ export function createFailPane() {
   $('#panes .placeholder')?.remove();
   const tab = document.createElement('div');
   tab.className = 'ltab';
-  tab.innerHTML = `<span class="dot c-failed"></span><span>✗ failures</span>` +
-    `<button class="x" title="close">✕</button>`;
+  tab.innerHTML = `<span class="dot c-failed"></span><span class="tlabel">Failures</span>` +
+    `<button class="x" title="close" aria-label="close">${icon('close')}</button>`;
   tab.title = 'every failed package, in failure order';
   tab.onclick = ev => {
     if (ev.target.classList.contains('x')) closePane(FAIL_PANE);
@@ -578,11 +578,11 @@ export function createFailPane() {
   pane.className = 'pane';
   pane.innerHTML = `
     <div class="phead">
-      <span class="pname">failed packages</span>
-      <span class="chip failed">…</span>
+      <span class="pname heading">Failed packages</span>
+      <span class="count"><span class="dot c-failed"></span><b class="fcount">…</b> failed</span>
       <span class="grow"></span>
-      <button class="fcopyall" title="copy every failure as text, for an issue or a chat">⧉ copy all</button>
-      <button class="close" title="close pane">✕</button>
+      <button class="fcopyall" title="copy every failure as text, for an issue or a chat">${icon('copy')}Copy all</button>
+      <button class="close" title="close pane" aria-label="close pane">${icon('close')}</button>
     </div>
     <div class="fsummary"></div>`;
   $('#panes').appendChild(pane);
@@ -609,14 +609,14 @@ export function buildFailItem(name, st) {
       ${App.prev?.failed && !App.prev.failed.includes(name)
         ? '<span class="chip newfail" title="it did not fail in the last run">new</span>' : ''}
       <span class="grow"></span>
-      <button class="fcopy" title="copy the name, the reason, and the log tail as text">⧉ copy</button>
-      <button class="askai" ${App.ai ? '' : 'hidden'} title="explain this failure with the claude CLI">✦ ask claude</button>
-      <button class="fopen" title="open the full log pane">open log</button>
+      <button class="fcopy" title="copy the name, the reason, and the log tail as text">${icon('copy')}Copy</button>
+      <button class="askai" ${App.ai ? '' : 'hidden'} title="explain this failure with the claude CLI">${icon('spark')}Ask Claude</button>
+      <button class="fopen" title="open the full log pane">${icon('log')}Open log</button>
     </div>
     ${st.cmd ? `<div class="fcmd mono" title="the command that failed">$ ${esc(st.cmd)}</div>` : ''}
     ${(st.tr?.fail || []).length ? `<ul class="ftests">${st.tr.fail.map(f =>
       `<li><span class="mono">${esc(f.n)}</span>${f.m ? ` - ${esc(f.m)}` : ''}</li>`).join('')}</ul>` : ''}
-    <pre class="ftail">loading…</pre>`;
+    <pre class="ftail">Loading…</pre>`;
   el.dataset.head = `${name}: ${failNote(st)}` + (dur ? `, failed after ${dur}` : '')
     + (st.cmd ? `\n$ ${st.cmd}` : '')
     + (st.tr?.fail || []).map(f => `\nFAILED ${f.n}${f.m ? `: ${f.m}` : ''}`).join('');
@@ -664,7 +664,7 @@ export async function fillFailTail(item, name) {
 }
 
 export function refreshFailSummary(p, failed) {
-  p.el.querySelector('.chip').textContent = `${failed.length} failed`;
+  p.el.querySelector('.fcount').textContent = failed.length;
   const box = p.el.querySelector('.fsummary');
   // move a node only when it is new or misplaced: re-appending an
   // unchanged node every tick would destroy the user's text selection
@@ -747,7 +747,7 @@ function seekFirstHit(p) {
 on('labels-changed', () => {
   for (const p of App.panes.values()) {
     if (p.fixed) continue;
-    p.tabEl.querySelector('.tlabel').textContent = (p.ai ? '✦ ' : '') + label(p.pkg);
+    p.tabEl.querySelector('.tlabel').innerHTML = (p.ai ? icon('spark') : '') + esc(label(p.pkg));
   }
 });
 

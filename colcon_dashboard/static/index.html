@@ -109,15 +109,15 @@
   <button class="vtab" data-view="split">Side by side</button>
   <span class="vsep"></span>
   <span id="stateChips" title="highlight packages by state, in every view">
-    <button data-filter="failed">failed</button>
-    <button data-filter="building">building</button>
-    <button data-filter="waiting">waiting</button>
-    <button data-filter="done">done</button>
+    <button data-filter="failed"><span class="dot c-failed"></span>Failed</button>
+    <button data-filter="building"><span class="dot c-building"></span>Building</button>
+    <button data-filter="waiting"><span class="dot c-waiting"></span>Waiting</button>
+    <button data-filter="done"><span class="dot c-done"></span>Done</button>
   </span>
   <span class="searchwrap">
-    <input id="gsearch" type="text" placeholder="find package" spellcheck="false"
+    <input id="gsearch" type="text" placeholder="Find package" spellcheck="false"
            title="highlight matching packages; Enter jumps through them">
-    <button id="gsclear" class="sclear" hidden title="clear the search">✕</button>
+    <button id="gsclear" class="sclear" hidden title="clear the search" aria-label="clear the search"><span class="ic" data-icon="close"></span></button>
   </span>
   <span id="gscount"></span>
   <span class="prefixwrap">
@@ -135,17 +135,17 @@
   <section id="graphpane" class="vpane">
     <div class="panehead">
       <span class="ptitle">Dependency graph</span>
-      <button id="fitBtn" title="frame the whole graph">Fit</button>
-      <button id="followBuildBtn" title="keep the camera on the packages that build now; pan or zoom to release">⌖ follow build</button>
-      <label id="layoutSel" title="graph layout">layout <select id="layoutSelect">
-        <option value="layered">layered</option>
-        <option value="force">force</option>
+      <button id="fitBtn" title="frame the whole graph"><span class="ic" data-icon="fit"></span>Fit</button>
+      <button id="followBuildBtn" title="keep the camera on the packages that build now; pan or zoom to release"><span class="ic" data-icon="follow"></span>Follow</button>
+      <label id="layoutSel" title="graph layout">Layout <select id="layoutSelect">
+        <option value="layered">Layered</option>
+        <option value="force">Force</option>
         <option value="3d">3D</option>
       </select></label>
-      <span id="scopeCtl" title="which packages the graph shows">show
+      <span id="scopeCtl" title="which packages the graph shows">Show
         <span class="seg">
-          <button id="scopeBuild" class="on">this build</button>
-          <button id="scopeAll">whole workspace</button>
+          <button id="scopeBuild" class="on">This build</button>
+          <button id="scopeAll">Whole workspace</button>
         </span>
       </span>
     </div>
@@ -155,19 +155,19 @@
   <section id="ganttpane" class="vpane" hidden>
     <div class="panehead">
       <span class="ptitle">Timeline</span>
-      <label id="gsortSel" title="timeline row order">order <select id="gsortSelect">
-        <option value="start">start time</option>
-        <option value="duration">duration</option>
-        <option value="end">end time</option>
-        <option value="status">status</option>
+      <label id="gsortSel" title="timeline row order">Order <select id="gsortSelect">
+        <option value="start">Start time</option>
+        <option value="duration">Duration</option>
+        <option value="end">End time</option>
+        <option value="status">Status</option>
       </select></label>
-      <button id="gfollowBtn" class="on" title="auto-scroll to the newest packages as they start">⤓ follow new</button>
+      <button id="gfollowBtn" class="on" title="auto-scroll to the newest packages as they start"><span class="ic" data-icon="follow"></span>Follow</button>
     </div>
     <div id="ganttwrap"><svg id="gaxis"></svg><svg id="gantt"></svg></div>
   </section>
   <div id="tooltip" hidden></div>
   <div id="forceCtl" hidden title="how far the simulation spreads the nodes">
-    <label for="spreadSlider">spread</label>
+    <label for="spreadSlider">Spread</label>
     <input id="spreadSlider" type="range" min="0.4" max="2.5" step="0.05" value="1">
   </div>
 </main>
@@ -175,7 +175,7 @@
 <div id="dockbar" title="drag to resize"></div>
 <section id="dock">
   <div id="logtabs" role="tablist" aria-label="log panes">
-    <button id="closeAll" hidden title="close every tab except the build log">✕ close all</button>
+    <button id="closeAll" hidden title="close every tab except the build log"><span class="ic" data-icon="close"></span>Close all</button>
   </div>
   <div id="panes">
     <div class="placeholder">Click a package in the graph or timeline to open its build log - each package gets its own pane.</div>
@@ -204,10 +204,10 @@
   <div class="cbox wsbox">
     <div class="wshead">Workspaces
       <span class="wshead-r">
-        <label class="wssort">sort <select id="wssort">
-          <option value="built">last built</option>
-          <option value="builds">build count</option>
-          <option value="logs">log size</option>
+        <label class="wssort">Sort <select id="wssort">
+          <option value="built">Last built</option>
+          <option value="builds">Build count</option>
+          <option value="logs">Log size</option>
         </select></label>
         <button id="rootsbtn" class="linkbtn" title="the directories that the scan searches">Scan roots…</button>
       </span>
@@ -230,20 +230,20 @@
 
 <div id="settings" hidden>
   <div class="wsbox setbox" role="region" aria-label="Settings">
-    <div class="wshead">Settings <button class="sclose" title="close (Esc)">✕</button></div>
+    <div class="wshead">Settings <button class="sclose" title="close (Esc)" aria-label="close"><span class="ic" data-icon="close"></span></button></div>
     <section>
       <h3>This browser</h3>
       <div class="srow"><span class="sk">Theme</span>
-        <span class="seg" id="setTheme"><button data-v="light">light</button><button data-v="dark">dark</button></span></div>
+        <span class="seg" id="setTheme"><button data-v="light">Light</button><button data-v="dark">Dark</button></span></div>
       <div class="srow"><span class="sk">Notifications</span>
-        <span class="seg" id="setNotify"><button data-v="off">off</button><button data-v="on">on</button><button data-v="sound">on + chime</button></span>
-        <button id="setNotifyTest" title="send a notification now">test</button></div>
+        <span class="seg" id="setNotify"><button data-v="off">Off</button><button data-v="on">On</button><button data-v="sound">On + chime</button></span>
+        <button id="setNotifyTest" title="send a notification now">Test</button></div>
       <div class="snote" id="setNotifyNote" hidden></div>
       <div class="srow"><span class="sk">Log panes</span>
-        <label><input type="checkbox" id="setTs"> timestamps</label>
-        <label><input type="checkbox" id="setWrap"> wrap long lines</label></div>
+        <label><input type="checkbox" id="setTs"> Timestamps</label>
+        <label><input type="checkbox" id="setWrap"> Wrap long lines</label></div>
       <div class="srow"><span class="sk">Page layout</span>
-        <button id="setReset" title="forget the view, the split, the dock height, and the graph layout">reset to the defaults</button></div>
+        <button id="setReset" title="forget the view, the split, the dock height, and the graph layout">Reset to the defaults</button></div>
     </section>
     <section>
       <h3>Scan roots</h3>
@@ -254,8 +254,8 @@
       <h3>Server <span class="sver"></span></h3>
       <dl id="setServer"></dl>
       <div class="snote">To change these, edit the configuration file, then restart the server.</div>
-      <div class="srow"><label><input type="checkbox" id="setLogin"> start the server when you log in</label></div>
-      <div class="srow"><label><input type="checkbox" id="setTray"> show the tray icon</label></div>
+      <div class="srow"><label><input type="checkbox" id="setLogin"> Start the server when you log in</label></div>
+      <div class="srow"><label><input type="checkbox" id="setTray"> Show the tray icon</label></div>
       <div class="snote" id="setServerNote" hidden></div>
       <div class="srow"><button id="restartBtn" title="restart the dashboard server">Restart the server</button>
         <button id="stopBtn" class="danger" title="stop the dashboard server">Stop the server…</button></div>

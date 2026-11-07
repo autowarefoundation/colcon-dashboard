@@ -13,7 +13,7 @@ A Gantt chart of every started package, with a dashed now line. The time axis st
 
 The **order** menu sorts the rows: by start time, by duration with the longest build first, by end time, or by status with failures on top. The choice persists.
 
-The chart makes the parallelism and the long serial chains visible. It auto-scrolls to the newest bars as they start. Scroll up to release, or use the **⤓ follow new** toggle. Drag anywhere to pan, like the graph.
+The chart makes the parallelism and the long serial chains visible. It auto-scrolls to the newest bars as they start. Scroll up to release, or use the **Follow** toggle. Drag anywhere to pan, like the graph.
 
 Click a bar or a package name and its log pane opens while the graph flies to that package. From the pure timeline, this click switches to the side-by-side view, so the graph comes in without losing the timeline.
 

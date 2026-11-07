@@ -77,6 +77,11 @@
 }
 
 * { box-sizing: border-box; }
+/* icons (util.js icon): they take the text color and sit beside the label */
+svg.ic { width: 14px; height: 14px; fill: currentColor; flex: none; vertical-align: -2px; }
+button:has(> svg.ic) { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+button[hidden] { display: none !important; }  /* the rule above must not show a hidden button */
+.tlabel svg.ic, .pname svg.ic { width: 12px; height: 12px; margin-right: 4px; vertical-align: -1px; }
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -179,26 +184,23 @@ img.logo.dark { display: none; }
   #topbar .hbtns { position: static; order: -1; flex-basis: 100%; justify-content: flex-end; }
 }
 .hbtns { display: flex; align-items: center; gap: 12px; }
+/* the status badge: one shape for every state, in the state's color */
 .badge {
   font-size: var(--fs-xs);
   font-weight: 650;
   letter-spacing: 0.4px;
   padding: 1px 8px;
   border-radius: var(--r-pill);
-  border: 1px solid var(--border);
+  border: 1px solid currentColor;
+  background: color-mix(in srgb, currentColor 10%, transparent);
   color: var(--muted);
   white-space: nowrap;
 }
-.badge.live { color: var(--good); border-color: var(--good); }
+.badge.live { color: var(--good); }
 .badge.live .dot { animation: blink 1.6s ease-in-out infinite; }
-.badge.complete {
-  color: #fff;
-  background: var(--good);
-  border-color: var(--good);
-  font-weight: 700;
-}
-.badge.failed { color: var(--critical); border-color: var(--critical); }
-.badge.off { color: #fff; border-color: #fff; font-size: var(--fs-s); }
+.badge.complete { color: var(--good); }
+.badge.failed { color: var(--critical); }
+.badge.off { color: #fff; font-size: var(--fs-s); }
 
 /* the server is gone: the whole top panel turns red */
 body.offline #topbar {
@@ -360,7 +362,7 @@ body.offline #sysmeters { display: none; }
 #bargs[hidden] { display: none; }
 .fitem .ftests { margin: 2px 0 4px; padding-left: 18px; font-size: var(--fs-s); color: var(--ink2); }
 .fitem .ftests li { margin: 1px 0; overflow-wrap: anywhere; }
-.chip.newfail { color: var(--critical); border-color: var(--critical); font-weight: 650; }
+.fitem .fhead .chip.newfail { color: var(--critical); font-weight: 650; }
 .fitem .fcmd { font-size: var(--fs-xs); color: var(--ink2); margin: 2px 0 4px; overflow-wrap: anywhere; }
 .wsrow .wpath .bargs { display: block; color: var(--muted); font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
 
@@ -609,7 +611,8 @@ body.offline #sysmeters { display: none; }
 }
 .ltab.on { background: var(--surface); color: var(--ink); border-color: var(--baseline); }
 .ltab .dot { width: 7px; height: 7px; border-radius: 50%; }
-.ltab .x { color: var(--muted); padding: 0 1px; border: 0; background: none; box-shadow: none; font-size: var(--fs-s); }
+.ltab .x { display: inline-flex; color: var(--muted); padding: 0 1px; border: 0; background: none; box-shadow: none; font-size: var(--fs-s); }
+.ltab .x svg.ic { width: 12px; height: 12px; }
 .ltab .x:hover { color: var(--critical); }
 #panes { flex: 1; min-height: 0; position: relative; }
 #panes .placeholder {
@@ -635,12 +638,20 @@ body.offline #sysmeters { display: none; }
   row-gap: 4px;
 }
 .pane .phead .pname { font-family: var(--mono); font-weight: 650; color: var(--ink); white-space: nowrap; }
+.pane .phead .pname.heading { font-family: var(--sans); }  /* a title, not a package name */
+/* tags: a value (a state, a reason, "new", "latest") in a light tint of
+   its color. Tags never act as buttons: filters and toggles are buttons. */
 .pane .phead .chip,
-.fitem .fhead .chip {
+.fitem .fhead .chip,
+.wsrow .tag,
+.wsrow .btag {
   padding: 0 7px;
   border-radius: var(--r-pill);
-  border: 1px solid var(--border);
+  border: 0;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: var(--muted);
   font-size: var(--fs-xs);
+  white-space: nowrap;
 }
 .pane .lognote {
   padding: 6px 12px;
@@ -648,11 +659,14 @@ body.offline #sysmeters { display: none; }
   color: var(--muted);
   border-bottom: 1px solid var(--grid);
 }
-.pane .phead .chip.done { color: var(--good); border-color: var(--good); }
-.pane .phead .chip.building { color: var(--accent); border-color: var(--accent); }
+.pane .phead .chip.done { color: var(--good); }
+.pane .phead .chip.building { color: var(--accent); }
 .pane .phead .chip.failed,
-.fitem .fhead .chip.failed { color: var(--critical); border-color: var(--critical); }
-.pane .phead .chip.aborted { color: var(--serious); border-color: var(--serious); }
+.fitem .fhead .chip.failed { color: var(--critical); }
+.pane .phead .chip.aborted { color: var(--serious); }
+/* a count: a colored dot and a number, like the summary line */
+.pane .phead .count { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-s); color: var(--ink2); }
+.pane .phead .count .dot { width: 8px; height: 8px; border-radius: 50%; }
 .pane .phead .grow { flex: 1; }
 .pane .phead select, .pane .phead button { padding: 1px 7px; font-size: var(--fs-xs); }
 .pane pre {
@@ -862,11 +876,9 @@ body.offline #sysmeters { display: none; }
 #gscount { font-size: var(--fs-xs); color: var(--muted); min-width: 40px; }
 /* state chips: filter by state like search filters by name */
 #stateChips { display: inline-flex; gap: 4px; }
-#stateChips button { font-size: var(--fs-xs); padding: 2px 8px; border-radius: var(--r-pill); }
-#stateChips button[data-filter="failed"].on { color: var(--critical); border-color: var(--critical); }
-#stateChips button[data-filter="building"].on { color: var(--accent); border-color: var(--accent); }
-#stateChips button[data-filter="waiting"].on { color: var(--ink); border-color: var(--baseline); }
-#stateChips button[data-filter="done"].on { color: var(--good); border-color: var(--good); }
+/* filters are toggle buttons with a state dot; on, they look pressed */
+#stateChips button { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-xs); padding: 2px 8px; }
+#stateChips .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 
 .searchwrap { position: relative; display: inline-flex; align-items: center; }
 .searchwrap input { padding-right: 22px; }
@@ -1198,23 +1210,10 @@ body.offline #topbar .switcher svg { fill: #fff; }
 }
 .wsitem > .del:hover { color: var(--critical); }
 .wsitem > .del.sure { color: #fff; background: var(--critical); border-radius: var(--r-s); padding: 0 6px; }
-.wsrow .tag {
-  font-size: var(--fs-2xs);
-  padding: 0 6px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--accent);
-  color: var(--accent);
-}
-.wsrow .btag {
-  font-size: var(--fs-2xs);
-  padding: 0 6px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--muted);
-  color: var(--muted);
-}
-.wsrow .btag.passed { border-color: var(--good); color: var(--good); }
-.wsrow .btag.failed { border-color: var(--critical); color: var(--critical); }
-.wsrow .btag.aborted { border-color: var(--serious); color: var(--serious); }
+.wsrow .tag { color: var(--accent); }
+.wsrow .btag.passed { color: var(--good); }
+.wsrow .btag.failed { color: var(--critical); }
+.wsrow .btag.aborted { color: var(--serious); }
 .wsrow .bstats { flex: 1; text-align: right; }
 /* a long build row wraps onto a second line, never sideways */
 #blist .wsrow { flex-wrap: wrap; row-gap: 2px; }

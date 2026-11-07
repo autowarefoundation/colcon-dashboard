@@ -2,7 +2,7 @@ import { getNotifyMode, notifyBlocked, serverNotifies, setNotifyMode, testNotify
 import { loadScanRoots, mountScanRoots } from './pickers.js';
 import { App } from './state.js';
 import { savedTheme, setTheme } from './theme.js';
-import { $, copyText, esc, initPanel } from './util.js';
+import { $, copyText, esc, icon, initPanel } from './util.js';
 
 /* ---------------- settings side panel ----------------
    One place for the choices this browser keeps (theme, notifications,
@@ -109,7 +109,7 @@ function renderServer() {
       : `as a process that you started (pid ${serverInfo.pid})`;
   const rows = [
     ['runs', runs],
-    ['configuration file', `<code>${esc(cfg.path)}</code> <button class="copy" data-copy="${esc(cfg.path)}" title="copy the path">⧉</button>`
+    ['configuration file', `<code>${esc(cfg.path)}</code> <button class="copy" data-copy="${esc(cfg.path)}" title="copy the path" aria-label="copy the path">${icon('copy')}</button>`
       + (cfg.exists ? '' : ` ${unset('(not created yet: every value is the default)')}`)],
     ['address', esc(location.host)],
     ['log directory', cfg.log_base ? `<code>${esc(cfg.log_base)}</code>` : `<code>log</code> ${unset('(default)')}`],

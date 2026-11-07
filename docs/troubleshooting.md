@@ -59,7 +59,7 @@ On another machine, the browser shows the notifications, and it can block them. 
 
 For notifications without an open page, set a [notification command](configuration.md#build-notifications).
 
-## There is no "ask claude" button
+## There is no "Ask Claude" button
 
 The button shows only when the server finds the `claude` CLI. The server looks in `PATH`, then in `~/.local/bin`. The systemd service has a short `PATH`, so it can miss a `claude` that your shell finds. Set the full path in `config.ini`, and restart the service:
 

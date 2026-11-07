@@ -14,9 +14,10 @@ import { startStatePolling, tickElapsed } from './poller.js';
 import { initSettings } from './settings.js';
 import { App } from './state.js';
 import { initTheme } from './theme.js';
-import { $, mirrorPressed } from './util.js';
+import { $, fillIcons, mirrorPressed } from './util.js';
 import { initViews } from './views.js';
 
+fillIcons();
 initTheme();
 mirrorPressed();
 const deepPkg = initViews();  // a #pkg=... deep link, or null

@@ -37,8 +37,10 @@ export const THEME_ICONS = {
 
 export function applyTheme(mode) {
   document.documentElement.dataset.theme = mode;
-  $('#themeBtn').innerHTML = THEME_ICONS[mode];
-  $('#themeBtn').title = `theme: ${mode} - click for ${mode === 'light' ? 'dark' : 'light'}`;
+  // the button shows the theme that a click switches to
+  const next = mode === 'light' ? 'dark' : 'light';
+  $('#themeBtn').innerHTML = THEME_ICONS[next];
+  $('#themeBtn').title = `switch to the ${next} theme`;
   emit('theme-changed');
   // an installed app colors its title bar like the page's top bar
   const surface = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();

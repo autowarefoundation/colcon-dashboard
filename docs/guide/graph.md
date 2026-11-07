@@ -42,7 +42,7 @@ Edges take color from their endpoints:
 - Double-click a log tab in the dock to center the view on that package.
 - Drag to pan, scroll to zoom. **Fit** frames the whole graph.
 - When you zoom out so far that a label would be a mere smudge (under 1.5 pixels high), the labels hide and each node becomes a plain colored box. Until then, the labels stay, even when they are small.
-- **⌖ follow build** keeps the camera on the packages that build now, so the action stays framed as the build moves. If you pan or zoom by hand, the camera is yours again.
+- **Follow** keeps the camera on the packages that build now, so the action stays framed as the build moves. If you pan or zoom by hand, the camera is yours again.
 - The **show** switch picks what the graph draws: only the packages of this build, or the whole workspace.
 - When most package names share a prefix such as `autoware_`, the labels hide it. Tooltips keep the full name. To pick other prefixes, or to show the full names, click the prefix menu at the right end of the view bar. The menu suggests the common prefixes of the workspace, and you can hide more than one. The page saves the choice per workspace in this browser.
 
@@ -54,4 +54,4 @@ The **layout** menu picks one of three modes, and the choice persists:
 - `force`: a live spring simulation with the same left-to-right anchoring. Drag nodes to rearrange. The simulation cools and stops by itself.
 - `3d`: the build as a wavefront. Building packages share one central plane, finished discs stack to its left, and waiting discs queue to the right by dependency depth. Packages glide through the blue plane as the build advances. Left-drag orbits. Shift-drag, right-drag, or middle-drag pans. The wheel zooms. The camera rotates by itself until the first grab.
 
-Fit and follow build drive the camera in every mode. In the force and 3D modes, the camera keeps the whole graph in view while the nodes spread out. The first pan, zoom, or drag stops this, and Fit starts it again. In the force and 3D modes, a **spread** slider in the corner scales how far the simulation spreads the nodes.
+Fit and Follow drive the camera in every mode. In the force and 3D modes, the camera keeps the whole graph in view while the nodes spread out. The first pan, zoom, or drag stops this, and Fit starts it again. In the force and 3D modes, a **Spread** slider in the corner scales how far the simulation spreads the nodes.
