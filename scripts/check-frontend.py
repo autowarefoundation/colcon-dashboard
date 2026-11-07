@@ -46,6 +46,8 @@ ALLOWED = {
     'poller': ['bus', 'header', 'modes', 'state', 'toasts', 'util'],
     'settings': ['notify', 'pickers', 'state', 'theme', 'util'],
     'state': [],
+    # sw.js is the service worker, not an ES module: it imports nothing
+    'sw': [],
     'theme': ['bus', 'util'],
     'toasts': ['util'],
     'util': [],

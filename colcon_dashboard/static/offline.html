@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colcon Dashboard</title>
+<!-- sw.js shows this page when the server does not answer. It must work
+     with no server: everything it needs is inline or in the sw.js cache. -->
+<style>
+  :root { color-scheme: light; --page: #f2f6fb; --surface: #fbfdff; --ink: #0a1f3d;
+          --muted: #5d6f88; --border: rgba(10, 31, 61, 0.12); --accent: #1e7fd9; }
+  :root[data-theme="dark"] { color-scheme: dark; --page: #06101e; --surface: #0c1a2d;
+          --ink: #e8f1fb; --muted: #7489a4; --border: rgba(214, 232, 252, 0.12); --accent: #3a95ea; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
+         background: var(--page); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 520px; width: 100%; background: var(--surface); border: 1px solid var(--border);
+         border-radius: 14px; padding: 28px; }
+  h1 { font-size: 20px; margin: 12px 0 6px; }
+  p { margin: 8px 0; color: var(--muted); }
+  code { font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink);
+         background: var(--page); border: 1px solid var(--border); border-radius: 6px;
+         padding: 2px 6px; display: inline-block; margin: 2px 0; }
+  .logo { width: 48px; height: 48px; }
+  .dark { display: none; }
+  :root[data-theme="dark"] .light { display: none; }
+  :root[data-theme="dark"] .dark { display: inline; }
+  .wait { color: var(--accent); }
+</style>
+<script>try { if (localStorage.getItem('cmc-theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}</script>
+</head>
+<body>
+<main>
+  <img class="logo light" src="logo.svg" alt=""><img class="logo dark" src="logo-dark.svg" alt="">
+  <h1>The dashboard server does not run</h1>
+  <p>Start it from the Colcon Dashboard tray icon, or run one of these commands in a terminal:</p>
+  <p><code>colcon-dashboard --start-service</code> if the server runs as a systemd user service</p>
+  <p><code>colcon-dashboard</code> in all other cases</p>
+  <p class="wait">This page opens the dashboard when the server answers.</p>
+</main>
+<script>
+  // the URL is still the one that failed: reload it once the server answers
+  setInterval(() => {
+    fetch('/api/ping', { cache: 'no-store' })
+      .then(r => { if (r.ok) location.reload(); }, () => {});
+  }, 2000);
+</script>
+</body>
+</html>

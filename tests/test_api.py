@@ -131,6 +131,27 @@ class ApiTest(unittest.TestCase):
     def wsq(self):
         return urllib.parse.quote(self.ws, safe="")
 
+    def test_installable_app_files(self):
+        st, body, ctype = self.get("/manifest.webmanifest")
+        self.assertEqual(st, 200)
+        self.assertTrue(ctype.startswith("application/manifest+json"), ctype)
+        manifest = json.loads(body)
+        self.assertEqual(manifest["start_url"], "/")
+        self.assertEqual(manifest["display"], "standalone")
+        sizes = set()
+        for icon in manifest["icons"]:
+            st, _, ctype = self.get("/" + icon["src"])
+            self.assertEqual(st, 200, icon["src"])
+            self.assertTrue(ctype.startswith(icon["type"]), icon["src"])
+            sizes.add(icon["sizes"])
+        # Chrome installs an app only with icons of at least these sizes
+        self.assertTrue({"192x192", "512x512"} <= sizes)
+        # a service worker controls only the paths below its own path
+        st, _, ctype = self.get("/sw.js")
+        self.assertEqual(st, 200)
+        self.assertTrue(ctype.startswith("text/javascript"), ctype)
+        self.assertEqual(self.get("/offline.html")[0], 200)
+
     def test_ping(self):
         st, body, _ = self.get("/api/ping")
         self.assertEqual(st, 200)

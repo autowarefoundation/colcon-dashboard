@@ -44,3 +44,6 @@ addEventListener('resize', () => {
   if (App.view === 'gantt') drawGantt();
   mode().resize?.();
 });
+// the service worker makes the page installable as an app (sw.js); browsers
+// offer it only on localhost or https, where navigator.serviceWorker exists
+navigator.serviceWorker?.register('sw.js').catch(() => { /* not installable */ });

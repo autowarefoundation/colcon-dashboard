@@ -22,6 +22,7 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 import webbrowser
@@ -38,6 +39,10 @@ from .config import CONFIG, write_template
 from .monitor import prune_builds
 from .registry import CACHE_DIR, GLOBAL_PORT, Registry, SERVER_FILE
 from .web import Handler
+
+
+class HTTPServerV6(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
 
 
 def read_server():
@@ -61,8 +66,18 @@ def probe_server(info, timeout=0.8):
 
 
 def display_host(host):
-    """A host a browser can open: the wildcard binds become loopback."""
+    """A host that the CLI can reach: the wildcard binds become loopback."""
     return "127.0.0.1" if host in (None, "", "0.0.0.0", "::") else host
+
+
+def browser_host(host):
+    """The host in the addresses that people open: localhost for every
+    loopback or wildcard bind. A browser ties an installed app, its saved
+    settings, and its notification permission to one exact origin, so
+    all of these must name the same one."""
+    if host in (None, "", "0.0.0.0", "::", "::1", "localhost") or str(host).startswith("127."):
+        return "localhost"
+    return host
 
 
 def lan_ip():
@@ -78,7 +93,7 @@ def lan_ip():
 
 
 def server_url(info, workspace=None):
-    base = f"http://{display_host(info.get('host'))}:{info['port']}/"
+    base = f"http://{browser_host(info.get('host'))}:{info['port']}/"
     if workspace:
         base += "?ws=" + quote(workspace, safe="")
     return base
@@ -540,8 +555,18 @@ def main():
             raise SystemExit(f"port {explicit_port} is in use ({where})")
         server = ThreadingHTTPServer((host, 0), Handler)  # any free port
         print(f"port {port} is in use: serving on port"
-              f" {server.server_address[1]} instead")
+              f" {server.server_address[1]} instead.\n"
+              f"An installed dashboard app opens http://localhost:{port}/"
+              " and cannot reach this server.")
     port = server.server_address[1]
+    servers = [server]
+    if host == "127.0.0.1":
+        # browsers try localhost at ::1 first: answer there too, or every
+        # first request waits for the fallback to 127.0.0.1
+        try:
+            servers.append(HTTPServerV6(("::1", port), Handler))
+        except OSError:
+            pass  # no IPv6 on this machine
 
     lock_file.seek(0)
     lock_file.truncate()
@@ -550,6 +575,10 @@ def main():
 
     registry = Registry(log_base)
     Handler.registry = registry
+    # a stop request ends every listener, not only the one that took it
+    Handler.on_stop = lambda: [s.shutdown() for s in servers]
+    for extra in servers[1:]:
+        threading.Thread(target=extra.serve_forever, daemon=True).start()
     if workspace:
         registry.monitor(workspace)
     if (CONFIG.auto_prune_keep and CONFIG.auto_prune_keep >= 1) or CONFIG.notify_command:

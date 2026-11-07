@@ -2,7 +2,7 @@
 
 import unittest
 
-from colcon_dashboard.cli import display_host, fmt_bytes, fmt_dur, unit_path
+from colcon_dashboard.cli import browser_host, display_host, fmt_bytes, fmt_dur, server_url, unit_path
 from colcon_dashboard.events import BUILD_DIR_RE
 from colcon_dashboard.registry import _ver_key
 
@@ -28,6 +28,20 @@ class DisplayHost(unittest.TestCase):
 
     def test_real_hosts_stay(self):
         self.assertEqual(display_host("192.168.1.7"), "192.168.1.7")
+
+
+class BrowserHost(unittest.TestCase):
+    def test_loopback_binds_open_as_localhost(self):
+        for host in (None, "", "0.0.0.0", "::", "::1", "127.0.0.1", "localhost"):
+            self.assertEqual(browser_host(host), "localhost", host)
+
+    def test_real_hosts_stay(self):
+        self.assertEqual(browser_host("192.168.1.7"), "192.168.1.7")
+
+    def test_server_url(self):
+        info = {"host": "127.0.0.1", "port": 8642}
+        self.assertEqual(server_url(info), "http://localhost:8642/")
+        self.assertEqual(server_url(info, "/ws/a b"), "http://localhost:8642/?ws=%2Fws%2Fa%20b")
 
 
 class UnitPath(unittest.TestCase):

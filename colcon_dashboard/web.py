@@ -19,7 +19,8 @@ from .registry import discover_all, update_status
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 MIME = {".html": "text/html", ".js": "text/javascript", ".css": "text/css",
-        ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon"}
+        ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
+        ".webmanifest": "application/manifest+json"}
 
 
 def _local_names():
@@ -72,6 +73,7 @@ def query_int(q, key, default):
 
 class Handler(BaseHTTPRequestHandler):
     registry = None  # set in main()
+    on_stop = None  # set in main(): ends every listener (IPv4 and IPv6)
 
     def log_message(self, *args):
         pass
@@ -112,7 +114,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/stop":
             self._send(200, json.dumps({"ok": True}))
             # a handler thread may signal the serve_forever loop to end
-            threading.Thread(target=self.server.shutdown, daemon=True).start()
+            stop = Handler.on_stop or self.server.shutdown
+            threading.Thread(target=stop, daemon=True).start()
             return
         if path == "/api/register":
             mon = self._monitor(q)

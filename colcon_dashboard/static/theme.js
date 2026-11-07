@@ -40,6 +40,7 @@ export function applyTheme(mode) {
   $('#themeBtn').innerHTML = THEME_ICONS[mode];
   $('#themeBtn').title = `theme: ${mode} - click for ${mode === 'light' ? 'dark' : 'light'}`;
   emit('theme-changed');
-  // the desktop app (gui.py) colors its header bar to match
-  window.webkit?.messageHandlers?.colconTheme?.postMessage(mode);
+  // an installed app colors its title bar like the page's top bar
+  const surface = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();
+  if (surface) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', surface);
 }
