@@ -16,6 +16,7 @@ export const App = {
   prefixes: [],         // label prefixes to hide (graph.js computePrefix)
   prefixMode: 'auto',
   prefixAuto: '',
+  prefixKept: '',       // the common prefix that auto mode keeps: the rest is too short
   prefixCands: [],
   prefixTotal: 0,
   lay: null,

@@ -11,8 +11,15 @@ import { $, esc, failNote, fmtDur, WS } from './util.js';
 /* Label prefixes: a prefix that most packages share, such as autoware_,
    hides in the labels. The choice is per workspace and per browser:
    {mode: 'auto'} (the most common first word, when more than half of
-   the packages share it), {mode: 'off'}, or {mode: 'custom', list}. */
+   the packages share it and the names stay long without it), {mode:
+   'off'}, or {mode: 'custom', list}. */
 const PREFIX_KEY = 'cmc-prefix:' + (WS || '');
+// auto mode hides a prefix only when the median of the rest of the names
+// has this many characters: autoware_ leaves 20 in Autoware, but tf2_
+// leaves 5 in the tf2 stack, where "ros", "py", and "msgs" say nothing
+const AUTO_MIN_MEDIAN = 8;
+// in every mode, a label keeps its prefix rather than get shorter than this
+const MIN_LABEL = 4;
 
 function loadPrefixPref() {
   try {
@@ -37,7 +44,13 @@ export function computePrefix() {
     .sort((a, b) => b[1] - a[1]).slice(0, 6);
   App.prefixTotal = names.length;
   const best = App.prefixCands[0];
-  App.prefixAuto = best && best[1] > names.length * 0.5 ? best[0] : '';
+  App.prefixAuto = App.prefixKept = '';
+  if (best && best[1] > names.length * 0.5) {
+    const rest = names.filter(n => n.startsWith(best[0]))
+      .map(n => n.length - best[0].length).sort((a, b) => a - b);
+    if (rest[rest.length >> 1] >= AUTO_MIN_MEDIAN) App.prefixAuto = best[0];
+    else App.prefixKept = best[0];
+  }
   const pref = loadPrefixPref();
   App.prefixMode = pref.mode;
   App.prefixes = (pref.mode === 'custom' ? pref.list
@@ -63,7 +76,9 @@ function renderPrefixSettings() {
   const pop = $('#setPrefix');
   const auto = App.prefixAuto
     ? `<span class="ppmuted">now “${esc(App.prefixAuto)}”, ${App.prefixCands[0][1]} of ${App.prefixTotal}</span>`
-    : '<span class="ppmuted">no common prefix found</span>';
+    : App.prefixKept
+      ? `<span class="ppmuted">keeps “${esc(App.prefixKept)}”: the names are short without it</span>`
+      : '<span class="ppmuted">no common prefix found</span>';
   const custom = App.prefixMode === 'custom' ? App.prefixes : [];
   pop.innerHTML = `
     <label><input type="radio" name="pfx" value="auto"> Detect it ${auto}</label>
@@ -111,7 +126,7 @@ measureCtx.font = '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace
 
 export function label(name) {
   for (const p of App.prefixes)
-    if (name.length > p.length && name.startsWith(p)) return name.slice(p.length);
+    if (name.length - p.length >= MIN_LABEL && name.startsWith(p)) return name.slice(p.length);
   return name;
 }
 

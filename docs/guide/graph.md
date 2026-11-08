@@ -56,7 +56,7 @@ When you zoom out so far that the labels can no longer be read, each node become
 
 The **Show** switch picks the packages: only the packages of this build, or the whole workspace.
 
-When most package names start with the same prefix, such as `autoware_`, the labels leave it out, so the names stay short. The tooltips and the pane headers keep the full names. To choose the prefix yourself, open the settings and use **Package names**.
+When most package names start with the same prefix, such as `autoware_`, the labels leave it out, so the names stay short. The page does this only when the names stay long enough without the prefix. In the tf2 stack, for example, `tf2_` stays, because `tf2_ros` would become `ros`. A label also never gets shorter than four characters. The tooltips and the pane headers keep the full names. To choose the prefix yourself, open the settings and use **Package names**.
 
 ## Layouts
 
