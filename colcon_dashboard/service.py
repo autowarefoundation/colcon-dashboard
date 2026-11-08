@@ -15,6 +15,8 @@ import shutil
 import subprocess
 import sys
 
+from . import browser
+
 SERVICE = "colcon-dashboard.service"
 
 SERVICE_UNIT = """\
@@ -231,3 +233,76 @@ def start_tray():
     except OSError:
         return False
     return True
+
+
+# -- the applications-menu entry -------------------------------------------------
+
+ENTRY = APP_ID + ".desktop"
+# the key that marks an entry that sync_menu_entry hid: "own" for the
+# user's entry (--install-desktop), "override" for a copy that hides the
+# package's entry
+HIDDEN_KEY = "X-Colcon-Dashboard-Hidden"
+
+
+def user_entry_path():
+    base = os.environ.get("XDG_DATA_HOME") or os.path.join(
+        os.path.expanduser("~"), ".local", "share")
+    return os.path.join(base, "applications", ENTRY)
+
+
+def package_entry_path():
+    for base in ("/usr/share", "/usr/local/share"):
+        path = os.path.join(base, "applications", ENTRY)
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def _read(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except (OSError, TypeError, UnicodeDecodeError):
+        return None
+
+
+def sync_menu_entry():
+    """Hide our menu entry while a browser has the dashboard installed as
+    an app, and show it again when the app is gone. Both entries are named
+    Colcon Dashboard, and the menu would list it twice. Returns what it
+    did: "hidden", "shown", or None."""
+    app = browser.installed_app() is not None
+    path = user_entry_path()
+    text = _read(path)
+    marked = text is not None and HIDDEN_KEY + "=" in text
+    if app and not marked:
+        base, kind = (text, "own") if text is not None else (_read(package_entry_path()), "override")
+        if base is None:
+            return None  # no entry of ours to hide
+        out = []
+        for line in base.splitlines():
+            if line.startswith("NoDisplay="):
+                continue
+            out.append(line)
+            if line.strip() == "[Desktop Entry]":
+                out += ["NoDisplay=true", f"{HIDDEN_KEY}={kind}"]
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w") as f:
+                f.write("\n".join(out) + "\n")
+        except OSError:
+            return None
+        return "hidden"
+    if not app and marked:
+        try:
+            if HIDDEN_KEY + "=override" in text:
+                os.unlink(path)  # the package's entry shows again
+            else:
+                kept = [ln for ln in text.splitlines()
+                        if not ln.startswith(("NoDisplay=", HIDDEN_KEY + "="))]
+                with open(path, "w") as f:
+                    f.write("\n".join(kept) + "\n")
+        except OSError:
+            return None
+        return "shown"
+    return None

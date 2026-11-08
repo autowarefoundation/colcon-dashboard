@@ -36,8 +36,8 @@ from . import __version__
 from .config import CONFIG, write_template
 from .monitor import prune_builds
 from .registry import CACHE_DIR, GLOBAL_PORT, Registry, SERVER_FILE
-from .service import (SERVICE, reload_if_unseen, systemctl, unit_known, unit_path,
-                      user_systemd_works, write_unit)
+from .service import (SERVICE, reload_if_unseen, sync_menu_entry, systemctl, unit_known,
+                      unit_path, user_systemd_works, write_unit)
 from .web import Handler
 
 
@@ -556,6 +556,17 @@ def main():
         # the headless service must watch builds to auto-prune them, to
         # run the [notify] command, and to send desktop notifications
         registry.watch_recents()
+
+    # one "Colcon Dashboard" in the applications menu: ours hides while a
+    # browser has the dashboard installed as an app (service.py)
+    def watch_menu_entry():
+        while True:
+            try:
+                sync_menu_entry()
+            except Exception:  # a desktop file must never stop the server
+                pass
+            time.sleep(30)
+    threading.Thread(target=watch_menu_entry, daemon=True).start()
 
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     info = {"host": host, "port": port}

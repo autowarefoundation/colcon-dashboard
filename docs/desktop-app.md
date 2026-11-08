@@ -51,7 +51,7 @@ The command starts the server if none runs. Then it opens the dashboard in the d
 
 To choose the browser yourself, set `browser` in the [configuration file](configuration.md#browser).
 
-If you installed the app in Chrome, the applications menu shows two Colcon Dashboard entries. Both open the same app.
+While a browser has the dashboard installed as an app, the server hides this entry, so the applications menu lists Colcon Dashboard once. If you uninstall the app, the entry shows again within 30 seconds.
 
 ## The tray icon
 

@@ -99,5 +99,69 @@ class TrayAutostart(unittest.TestCase):
         self.assertIn("python3-gi", msg)
 
 
+ENTRY_TEXT = "[Desktop Entry]\nType=Application\nName=Colcon Dashboard\nExec=colcon-dashboard --app\n"
+
+
+class MenuEntry(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.home = tmp.name
+        p = mock.patch.dict(os.environ, {"XDG_DATA_HOME": self.home})
+        p.start()
+        self.addCleanup(p.stop)
+        self.pkg = os.path.join(self.home, "pkg.desktop")
+        p = mock.patch.object(service, "package_entry_path", lambda: None)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def app(self, installed):
+        return mock.patch.object(service.browser, "installed_app",
+                                 return_value=["chrome", "--app-id=x"] if installed else None)
+
+    def read(self):
+        with open(service.user_entry_path()) as f:
+            return f.read()
+
+    def test_own_entry_hides_and_shows(self):
+        os.makedirs(os.path.dirname(service.user_entry_path()))
+        with open(service.user_entry_path(), "w") as f:
+            f.write(ENTRY_TEXT)
+        with self.app(True):
+            self.assertEqual(service.sync_menu_entry(), "hidden")
+            self.assertIsNone(service.sync_menu_entry())  # once is enough
+        self.assertIn("NoDisplay=true", self.read())
+        self.assertIn("Exec=colcon-dashboard --app", self.read())
+        with self.app(False):
+            self.assertEqual(service.sync_menu_entry(), "shown")
+        self.assertNotIn("NoDisplay", self.read())
+        self.assertNotIn(service.HIDDEN_KEY, self.read())
+
+    def test_package_entry_hides_through_an_override(self):
+        with open(self.pkg, "w") as f:
+            f.write(ENTRY_TEXT)
+        with mock.patch.object(service, "package_entry_path", lambda: self.pkg):
+            with self.app(True):
+                self.assertEqual(service.sync_menu_entry(), "hidden")
+            self.assertIn("=override", self.read())
+            with self.app(False):
+                self.assertEqual(service.sync_menu_entry(), "shown")
+        self.assertFalse(os.path.exists(service.user_entry_path()))
+        with open(self.pkg) as f:
+            self.assertEqual(f.read(), ENTRY_TEXT)  # the package's file stays
+
+    def test_nothing_to_hide(self):
+        with self.app(True):
+            self.assertIsNone(service.sync_menu_entry())
+
+    def test_a_visible_entry_without_the_app_stays(self):
+        os.makedirs(os.path.dirname(service.user_entry_path()))
+        with open(service.user_entry_path(), "w") as f:
+            f.write(ENTRY_TEXT)
+        with self.app(False):
+            self.assertIsNone(service.sync_menu_entry())
+        self.assertEqual(self.read(), ENTRY_TEXT)
+
+
 if __name__ == "__main__":
     unittest.main()
