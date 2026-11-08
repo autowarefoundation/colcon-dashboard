@@ -152,7 +152,7 @@ export function createPane(name) {
       <button class="follow on" title="auto-scroll to the end">${icon('follow')}Follow</button>
     </div>
     <div class="lognote" hidden></div>
-    <div class="logwrap"><pre tabindex="0" class="showts"></pre><div class="lmarks" aria-hidden="true"></div></div>`;
+    <div class="logwrap"><pre tabindex="0" class="showts"></pre><div class="lmarks" aria-hidden="true"></div><div class="lload" hidden role="progressbar" aria-label="loading the log"><div class="lfill"></div></div></div>`;
   $('#panes').appendChild(pane);
 
   const p = {
@@ -274,6 +274,8 @@ export function createPane(name) {
     if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
   };
   p.pre.addEventListener('scroll', () => {
+    // a load's own scrolls arrive late and must not switch Follow off
+    if (p.loading) return;
     const atEnd = p.pre.scrollTop + p.pre.clientHeight >= p.pre.scrollHeight - 24;
     if (p.follow !== atEnd) {
       p.follow = atEnd;
@@ -437,9 +439,17 @@ export async function pollPane(p) {
   // cap), out of sight: it shows once it sits at its place, so that the
   // load does not scroll through the log
   const first = p.offset < 0;
+  const bar = p.el.querySelector('.lload');
+  const fill = bar?.firstChild;
   if (first) {
     p.loading = true;
     p.pre.classList.add('loading');
+    if (bar) {
+      clearTimeout(p.barTimer);
+      bar.classList.remove('done');
+      fill.style.width = '0%';
+      bar.hidden = false;
+    }
   }
   try {
     if (p.offset < 0) p.offset = 0;
@@ -464,6 +474,7 @@ export async function pollPane(p) {
       if (r.reset) p.view.reset();
       p.offset = r.offset;
       if (r.data) appendLog(p, r.data);
+      if (first && fill && r.size) fill.style.width = `${Math.min(100, 100 * r.offset / r.size)}%`;
       if (!r.data || !(r.offset < r.size)) break;
     }
   } catch (e) { /* transient */ }
@@ -476,6 +487,11 @@ export async function pollPane(p) {
     p.loading = false;
     if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
     p.pre.classList.remove('loading');
+    if (bar) {  // full, then gone
+      fill.style.width = '100%';
+      bar.classList.add('done');
+      p.barTimer = setTimeout(() => { bar.hidden = true; }, 250);
+    }
   }
   p.fetching = false;
   if (r && !p.fixed && !p.ai) updateLogNote(p, r);
