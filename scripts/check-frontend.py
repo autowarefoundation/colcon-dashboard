@@ -33,7 +33,7 @@ ALLOWED = {
     'force': ['camera', 'draw', 'modes', 'state'],
     'g3d': ['bus', 'camera', 'force', 'graph', 'gsearch', 'modes', 'state',
             'util'],
-    'gantt': ['bus', 'graph', 'gsearch', 'state', 'util'],
+    'gantt': ['bus', 'graph', 'gsearch', 'namefit', 'state', 'util'],
     'graph': ['bus', 'camera', 'draw', 'gsearch', 'modes', 'state', 'util'],
     'gsearch': ['bus', 'camera', 'draw', 'state', 'util'],
     'header': ['bus', 'state', 'util'],
@@ -47,6 +47,8 @@ ALLOWED = {
     # "logview.js": the EasyPrivacy list of ad blockers blocks that name
     'logpane': ['ansi', 'lint', 'md'],
     'modes': ['state'],
+    # namefit.js fits package names in a list; it imports nothing
+    'namefit': [],
     'notify': ['bus', 'logo', 'state', 'util'],
     'pickers': ['graph', 'header', 'state', 'toasts', 'util'],
     'poller': ['bus', 'header', 'modes', 'state', 'toasts', 'util'],

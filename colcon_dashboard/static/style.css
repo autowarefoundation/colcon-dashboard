@@ -489,6 +489,8 @@ body.offline #sysmeters { display: none; }
 /* gantt */
 .gname { font: var(--fs-xs) var(--mono); fill: var(--ink2); }
 .gname.failed { fill: var(--critical); }
+/* the words that many names share (namefit.js): lighter, in any color */
+.gname .gc { fill-opacity: 0.5; }
 .gtick line { stroke: var(--grid); }
 .gzebra { fill: var(--zebra); }
 .ghover { fill: var(--line-hover); }

@@ -1,6 +1,7 @@
 import { emit, on } from './bus.js';
 import { hideTooltip, label, showNodeTooltip } from './graph.js';
 import { GS } from './gsearch.js';
+import { cutRanges, fitNames } from './namefit.js';
 import { App } from './state.js';
 import { $, fmtDur, PINNED_BUILD, svgEl, WS } from './util.js';
 
@@ -124,6 +125,7 @@ export function drawGantt() {
     lbl.textContent = fmtDur(t);
   }
 
+  const fitted = fitNames(rows.map(([name]) => label(name)), fit);
   const seen = new Set();
   rows.forEach(([name, p], i) => {
     seen.add(name);
@@ -138,9 +140,10 @@ export function drawGantt() {
     const y = TOP + i * ROW;
     // a mark that does not rely on color: ✗ failed, ◌ aborted
     const mark = p.s === 'failed' ? '✗ ' : p.s === 'aborted' ? '◌ ' : '';
-    const text = mark + label(name);
-    const shown = text.length > fit ? text.slice(0, fit - 1) + '…' : text;
-    if (shown !== r.text) { r.tn.textContent = shown; r.text = shown; }
+    const f = fitted[i];
+    const ranges = mark ? cutRanges(f.text, fit - mark.length, f.u) : f.ranges;
+    const key = mark + f.text + f.mask + ranges.join();
+    if (key !== r.text) { nameParts(r.tn, mark, f, ranges); r.text = key; }
     r.tn.setAttribute('x', GUT - 8);
     r.tn.setAttribute('y', y + 11);
     r.tn.classList.toggle('failed', p.s === 'failed');
@@ -207,6 +210,29 @@ function placeHover() {
   const shown = i >= 0 && i < G.order.length;
   G.hov.style.display = shown ? '' : 'none';
   if (shown) G.hov.setAttribute('y', TOP + i * ROW);
+}
+
+// the name of one row: the shown parts, with the words that many names
+// share in muted tspans, so that the part that differs stands out
+function nameParts(tn, mark, f, ranges) {
+  tn.textContent = mark;
+  let run = '', muted = false;
+  const flush = () => {
+    if (!run) return;
+    if (muted) svgEl('tspan', { class: 'gc' }, tn).textContent = run;
+    else tn.append(run);
+    run = '';
+  };
+  const put = (ch, m) => {
+    if (m !== muted) { flush(); muted = m; }
+    run += ch;
+  };
+  ranges.forEach(([a, b], i) => {
+    if (i) put('…', false);
+    for (let k = a; k < b; k++) put(f.text[k], f.mask[k] === '1');
+  });
+  if (ranges[ranges.length - 1][1] < f.text.length) put('…', false);
+  flush();
 }
 
 export function initGanttPan() {
