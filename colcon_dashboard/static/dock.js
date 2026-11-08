@@ -6,7 +6,7 @@ import { LogView } from './logpane.js';
 import { mode } from './modes.js';
 import { App } from './state.js';
 import { toast } from './toasts.js';
-import { $, copyText, esc, failNote, fmtDur, icon, wsParam } from './util.js';
+import { $, copyText, esc, failNote, fmtDur, icon, PINNED_BUILD, WS, wsParam } from './util.js';
 
 /* ---------------- log dock ---------------- */
 
@@ -279,7 +279,13 @@ export function createPane(name) {
       p.follow = atEnd;
       followBtn.classList.toggle('on', atEnd);
     }
+    clearTimeout(p.saveTimer);
+    p.saveTimer = setTimeout(() => savePos(p), 250);
   });
+  // a chunk that got or lost its highlight can change the height: a pane
+  // that follows the end stays at the end
+  p.view.onLayout = () => { if (p.follow) p.pre.scrollTop = p.pre.scrollHeight; };
+  p.restorePending = loadPos(p);  // where this pane was before a reload
   App.panes.set(name, p);
   updateCloseAll();
   pollPane(p);
@@ -458,6 +464,8 @@ export async function pollPane(p) {
   // nothing yet (the server still loads the build): stay a fresh pane,
   // which pollAllPanes polls also in the background
   if (!p.view.lines && !p.view.buf) p.offset = -1;
+  // the whole log is here: back to where the pane was before a reload
+  else if (p.restorePending && r && !(r.offset < r.size)) restorePos(p);
   p.fetching = false;
   if (r && !p.fixed && !p.ai) updateLogNote(p, r);
 }
@@ -471,6 +479,36 @@ export function appendLog(p, data) {
   if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
   scheduleMarks(p);
 }
+
+/* ---- the place in the log, kept for a reload of this tab ---- */
+
+const posKey = p => `cmc-pos:${WS || ''}|${PINNED_BUILD || ''}|${p.name}|${p.file}`;
+
+function loadPos(p) {
+  try { return JSON.parse(sessionStorage.getItem(posKey(p)) || 'null') || false; }
+  catch (e) { return false; }
+}
+
+function savePos(p) {
+  if (p.restorePending || !p.view?.lines) return;  // not before the restore
+  const a = p.follow ? null : p.view.topLine();
+  try {
+    sessionStorage.setItem(posKey(p), JSON.stringify(
+      { build: App.buildId, follow: p.follow, i: a?.i, dy: a?.dy }));
+  } catch (e) { /* not kept */ }
+}
+
+function restorePos(p) {
+  const s = p.restorePending;
+  p.restorePending = null;
+  if (!s || s.follow || s.i == null || s.i >= p.view.lines) return;
+  if (s.build && App.buildId && s.build !== App.buildId) return;  // a new build: its end
+  p.follow = false;
+  p.el.querySelector('.follow').classList.remove('on');
+  p.view.restore(s);
+}
+
+addEventListener('pagehide', () => { for (const p of App.panes.values()) if (p.view) savePos(p); });
 
 /* ---- the error and warning marks beside the scrollbar: where the
    problems sit in a long log, and a click jumps to one ---- */

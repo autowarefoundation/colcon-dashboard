@@ -44,6 +44,7 @@ export class LogView {
     this.ai = ai;
     this.raw = raw;
     this.decorate = decorate;  // a hook for each rendered line text (editor links)
+    this.onLayout = null;      // after a change of the layout (the pane re-pins the end)
     pre.classList.toggle('raw', raw);
     this.linePx = 18;          // measured on the first rendered chunk
     this.io = new IntersectionObserver(es => this.onIntersect(es), { root: pre, rootMargin: NEAR });
@@ -331,6 +332,7 @@ export class LogView {
       c.rows = null;
       this.size(c);
     }
+    this.onLayout?.();
   }
 
   onIntersect(entries) {
@@ -357,6 +359,7 @@ export class LogView {
     c.el.appendChild(frag);
     c.rich = true;
     c.done = c.items.length;
+    this.onLayout?.();
     if (!this.calibrated && !this.pre.classList.contains('wrap') && c.el.offsetHeight) {
       // the real line height, for the estimates of the other chunks
       this.calibrated = true;
@@ -375,6 +378,7 @@ export class LogView {
     for (const it of c.items) if (it.g) { it.el = null; it.body = null; }
     c.rich = false;
     c.el.textContent = this.plainText(c);
+    this.onLayout?.();
   }
 
   // the selection ended: the chunks that waited change now
@@ -401,6 +405,7 @@ export class LogView {
     if (c.rich && g.el) g.el.replaceWith(this.renderItem(g));
     else if (!c.rich) c.el.textContent = this.plainText(c);
     this.size(c);
+    this.onLayout?.();
   }
 
   onBeforeMatch(ev) {

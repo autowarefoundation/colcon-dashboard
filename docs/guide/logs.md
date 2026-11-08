@@ -12,6 +12,7 @@ The dock opens with a pinned **build log** tab: the whole build, as a terminal s
 ![The failure summary: the failed package, the step and the command that failed, and the end of its log](../assets/screens/failures.webp)
 
 - A pane follows new output until you scroll up. The **Follow** button re-engages.
+- A reload of the page keeps the place in each pane: the same line at the same height, or the end when the pane followed it. A new build starts at its end.
 - A pane loads the whole log, also a build log of 10 MB and 60,000 lines, and opens at the end. Scrolling, resizing, and the **Wrap** button stay fast at any log size, because the pane lays out only the part near the view.
 - A selection over more than one line copies whole lines, exactly as the log has them: also the lines inside folded groups. While the timestamps are hidden, the copy leaves them out. A selection inside one line copies just that part.
 - The browser's own find (++ctrl+f++) also reaches the lines inside folded groups, and it opens the group of a match.
