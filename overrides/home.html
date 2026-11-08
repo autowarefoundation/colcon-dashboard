@@ -34,8 +34,20 @@
         </div>
       </div>
       <figure class="cd-hero__shot">
-        <img class="cd-img-light" src="{{ 'assets/screens/hero-light.webp' | url }}" width="1440" height="900" alt="Colcon Dashboard during a live Autoware build: the timeline at the left, the dependency graph at the right with the building packages in blue, and the build log below">
-        <img class="cd-img-dark" src="{{ 'assets/screens/hero-dark.webp' | url }}" width="1440" height="900" alt="Colcon Dashboard during a live Autoware build, in the dark theme">
+        {#- one looping video per theme; hero.js plays the one of the current
+            theme. The still is the poster, and it stays for reduced motion. -#}
+        <video class="cd-vid" data-scheme="default" muted loop playsinline preload="none" width="1600" height="1000"
+               poster="{{ 'assets/screens/hero-light.webp' | url }}"
+               aria-label="Colcon Dashboard during a live Autoware build: the timeline at the left, the dependency graph at the right with the building packages in blue, and the build log below">
+          <source data-src="{{ 'assets/screens/hero-light.webm' | url }}" type="video/webm">
+          <source data-src="{{ 'assets/screens/hero-light.mp4' | url }}" type="video/mp4">
+        </video>
+        <video class="cd-vid" data-scheme="slate" muted loop playsinline preload="none" width="1600" height="1000"
+               poster="{{ 'assets/screens/hero-dark.webp' | url }}"
+               aria-label="Colcon Dashboard during a live Autoware build, in the dark theme">
+          <source data-src="{{ 'assets/screens/hero-dark.webm' | url }}" type="video/webm">
+          <source data-src="{{ 'assets/screens/hero-dark.mp4' | url }}" type="video/mp4">
+        </video>
         <figcaption>A live build of Autoware: 502 packages on 24 workers.</figcaption>
       </figure>
     </div>

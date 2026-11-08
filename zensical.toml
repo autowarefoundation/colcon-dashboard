@@ -7,7 +7,7 @@ site_author = "Mete Fatih Cırıt"
 copyright = "Copyright &copy; 2026 Autoware Foundation"
 
 extra_css = ["stylesheets/extra.css"]
-extra_javascript = ["javascripts/shell.js"]
+extra_javascript = ["javascripts/shell.js", "javascripts/hero.js"]
 
 repo_url = "https://github.com/autowarefoundation/colcon-dashboard"
 repo_name = "autowarefoundation/colcon-dashboard"

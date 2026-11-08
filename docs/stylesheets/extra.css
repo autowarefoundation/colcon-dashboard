@@ -50,6 +50,8 @@
 /* the logo has a light version (navy tube) and a dark version (white tube) */
 [data-md-color-scheme="slate"] .md-logo img { content: url("../assets/logo-dark.svg"); }
 .only-dark-logo, .cd-img-dark { display: none; }
+[data-md-color-scheme="default"] .cd-vid[data-scheme="slate"],
+[data-md-color-scheme="slate"] .cd-vid[data-scheme="default"] { display: none; }
 [data-md-color-scheme="slate"] .only-light-logo,
 [data-md-color-scheme="slate"] .cd-img-light { display: none; }
 [data-md-color-scheme="slate"] .only-dark-logo,
@@ -129,7 +131,8 @@
 .cd-hero__install .highlight code { border-radius: 0 0 10px 10px; box-shadow: 0 8px 24px var(--cd-glow); }
 .md-typeset .cd-hero__then { margin: 0.7em 0 0; text-align: center; font-size: 0.72rem; color: var(--cd-muted); }
 .cd-hero__shot { margin: 2.4rem 0 0; width: 100%; max-width: 64rem; }
-.cd-hero__shot img {
+.cd-hero__shot img, .cd-hero__shot video {
+  display: block;
   width: 100%;
   height: auto;
   border-radius: 12px;
