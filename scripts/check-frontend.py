@@ -19,7 +19,7 @@ STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # module -> modules it may import from (kept sorted)
 ALLOWED = {
     'ai': ['bus', 'dock', 'state', 'util'],
-    'ansi': ['lint'],
+    'ansi': ['lint', 'md'],
     'app': ['ai', 'bus', 'camera', 'dock', 'g3d', 'gantt', 'gsearch',
             'header', 'help', 'modes', 'notify', 'pickers', 'poller',
             'settings', 'state', 'theme', 'util', 'views'],
@@ -41,10 +41,11 @@ ALLOWED = {
     # logo.js is a copy of the logo generator; it imports nothing
     # lint.js colors the recurring parts of colcon logs; it imports nothing
     'lint': [],
+    'md': [],
     'logo': [],
     # logpane.js keeps a whole log as data and shows it in chunks. Not
     # "logview.js": the EasyPrivacy list of ad blockers blocks that name
-    'logpane': ['ansi', 'lint'],
+    'logpane': ['ansi', 'lint', 'md'],
     'modes': ['state'],
     'notify': ['bus', 'logo', 'state', 'util'],
     'pickers': ['graph', 'header', 'state', 'toasts', 'util'],

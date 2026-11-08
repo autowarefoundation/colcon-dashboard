@@ -1,5 +1,6 @@
 import { advanceSgr, buildLine, newSgr, PKG_RE, sgrActive, stripAnsi, TS_RE } from './ansi.js';
 import { lintLine, newLintState, pkgTag } from './lint.js';
+import { mdLine, newMdState } from './md.js';
 
 /* ---------------- the log view ----------------
    A pane keeps its whole log as data: the lines as strings, and per
@@ -46,6 +47,7 @@ export class LogView {
     this.decorate = decorate;  // a hook for each rendered line text (editor links)
     this.onLayout = null;      // after a change of the layout (the pane re-pins the end)
     pre.classList.toggle('raw', raw);
+    pre.classList.toggle('ai', ai);  // prose: Markdown rows (md.js), no stripes
     this.linePx = 18;          // measured on the first rendered chunk
     this.io = new IntersectionObserver(es => this.onIntersect(es), { root: pre, rootMargin: NEAR });
     this.waiting = new Set();  // chunks that wait for the selection to end
@@ -70,6 +72,7 @@ export class LogView {
     this.chunks = [];
     this.open = new Map(); // package -> the group that its install lines join
     this.lintBy = new Map();
+    this.mdSt = newMdState();  // the Claude pane: the open code fence
     this.sgr = newSgr();
     this.problems = [];    // [line, 'err' | 'warn'], for the marks
     this.hits = [];
@@ -129,7 +132,8 @@ export class LogView {
     this.pkg[i] = pkg;
     let fold = null;
     if (this.ai) {
-      this.cls[i] = '';
+      this.st[i] = { ...this.mdSt };
+      this.cls[i] = mdLine(text, this.mdSt, false).cls.join(' ');
     } else {
       // parallel jobs interleave their lines: each package keeps its own
       // lint state (a CMake warning block, the last diagnostic)
@@ -261,7 +265,7 @@ export class LogView {
   lineEl(i) {
     const ln = buildLine(this.text[i], {
       fixed: this.fixed, ai: this.ai, raw: this.raw, cls: this.cls[i],
-      st: this.st[i] ? { ...this.st[i] } : newLintState(),
+      st: this.st[i] ? { ...this.st[i] } : this.ai ? newMdState() : newLintState(),
       sgr: this.sgrAt.has(i) ? { ...this.sgrAt.get(i) } : newSgr(),
     });
     ln.dataset.i = i;

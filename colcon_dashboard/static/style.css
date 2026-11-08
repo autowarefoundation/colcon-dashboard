@@ -731,6 +731,59 @@ body.offline #sysmeters { display: none; }
 .pane pre .ln.l-done { color: var(--good); }
 .pane pre .ln.l-sum { font-weight: 600; color: var(--ink); }
 .pane pre .ln:hover { background: var(--line-hover); }
+
+/* the Claude pane: Claude's answer as Markdown (md.js), in a prose font,
+   with the question, the tool calls, and the timing line around it */
+.pane pre.ai { font: var(--fs-m)/1.65 var(--sans); color: var(--ink); padding: 10px 18px 14px; }
+/* as specific as the wrap rule above, and later: the row rules below win */
+.pane pre.ai .ln { max-width: 92ch; padding: 0 2px; text-indent: 0; }
+.pane pre.ai .ln:nth-child(even), .pane pre.ai .ln:hover { background: none; }
+.pane pre.ai .ln.hit { background: color-mix(in srgb, var(--warning) 22%, transparent); }
+.pane pre.ai .md-blank { line-height: 0.75; }
+.pane pre.ai .md-q { font-size: var(--fs-l); font-weight: 650; margin-top: 0.4em; color: var(--ink); }
+.pane pre.ai .md-qmark { color: var(--accent); }
+.pane pre.ai .md-tool { font: var(--fs-xs)/1.7 var(--mono); color: var(--muted); }
+.pane pre.ai .md-arrow { color: var(--accent); }
+.pane pre.ai .md-tname { color: var(--ink2); font-weight: 600; }
+.pane pre.ai .md-end { font-size: var(--fs-xs); color: var(--muted); margin-top: 0.5em; padding-top: 0.4em; border-top: 1px solid var(--grid); }
+.pane pre.ai .md-h { font-weight: 700; margin-top: 0.45em; letter-spacing: -0.01em; }
+.pane pre.ai .md-h1 { font-size: 1.3em; }
+.pane pre.ai .md-h2 { font-size: 1.15em; }
+.pane pre.ai .md-h3 { font-size: 1.02em; }
+.pane pre.ai strong { font-weight: 650; color: var(--ink); }
+.pane pre.ai .md-a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.pane pre.ai .md-ic {
+  font: 0.9em var(--mono);
+  padding: 0.05em 0.35em;
+  border-radius: var(--r-s);
+  background: color-mix(in srgb, var(--accent) 9%, var(--page));
+  color: color-mix(in srgb, var(--accent) 55%, var(--ink));
+}
+/* a list item hangs its bullet; a deeper item indents one step */
+.pane pre.ai .md-li, .pane pre.ai .md-cont { padding-left: calc(var(--md-d, 0) * 1.4em + 1.5em); }
+.pane pre.ai .md-li { text-indent: -1.1em; }
+.pane pre.ai .md-d1 { --md-d: 1; } .pane pre.ai .md-d2 { --md-d: 2; }
+.pane pre.ai .md-d3 { --md-d: 3; } .pane pre.ai .md-d4 { --md-d: 4; }
+.pane pre.ai .md-bullet { color: var(--accent); }
+.pane pre.ai .md-num { color: var(--accent); font-weight: 650; font-variant-numeric: tabular-nums; }
+.pane pre.ai .md-quote { color: var(--ink2); font-style: italic; box-shadow: inset 3px 0 var(--baseline); padding-left: 0.9em; }
+.pane pre.ai .md-hr .md-rule { display: inline-block; width: 100%; border-top: 1px solid var(--grid); vertical-align: middle; }
+.pane pre.ai .md-table { font: var(--fs-s)/1.6 var(--mono); }
+.pane pre.ai .md-mark { color: var(--muted); }
+/* a code block: the fences cap a tinted box around the code rows */
+.pane pre.ai .md-code, .pane pre.ai .md-fence {
+  font: var(--fs-s)/1.55 var(--mono);
+  background: var(--page);
+  box-shadow: inset 3px 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  padding-left: 1em;
+  max-width: 92ch;
+}
+.pane pre.ai .md-code { color: var(--ink); white-space: pre-wrap; }
+.pane pre.ai .md-in { margin-left: calc(var(--md-d, 0) * 1.4em + 1.5em); }
+.pane pre.ai .md-fence { font-size: var(--fs-2xs); color: var(--muted); border-radius: var(--r-s) var(--r-s) 0 0; margin-top: 0.3em; }
+.pane pre.ai .md-fence-end { border-radius: 0 0 var(--r-s) var(--r-s); margin-top: 0; margin-bottom: 0.3em; line-height: 1; }
+.pane pre.ai .md-fence .md-mark { display: none; }  /* the data keeps the fence: a copy has it */
+.pane pre.ai .md-lang { text-transform: uppercase; letter-spacing: 0.06em; }
 @keyframes lflash { from { background: color-mix(in srgb, var(--accent) 35%, transparent); } }
 .pane pre .ln.flash { animation: lflash 1.2s ease-out; }
 

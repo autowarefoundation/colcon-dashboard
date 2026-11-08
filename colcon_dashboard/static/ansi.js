@@ -1,4 +1,5 @@
 import { lintLine, newLintState, pkgTag } from './lint.js';
+import { mdLine } from './md.js';
 
 /* ---- ANSI (SGR) rendering: real terminal colors in the log panes ---- */
 
@@ -99,7 +100,13 @@ export function buildLine(line, o) {
   const lc = document.createElement('span');
   lc.className = 'lc';
   ln.appendChild(lc);
-  if (line.includes('\x1b') || sgrActive(o.sgr)) {
+  if (o.ai) {
+    // Claude's answer is Markdown (md.js). The server's own lines in the
+    // transcript carry a dim or bold ANSI code: the row classes replace it.
+    const r = mdLine(stripAnsi(line), o.st);
+    if (r.cls.length) ln.classList.add(...r.cls);
+    lc.append(...r.nodes);
+  } else if (line.includes('\x1b') || sgrActive(o.sgr)) {
     // real terminal colors win over the lint. The test reads the text
     // without its color codes: GCC writes "\x1b[K" right before "error:",
     // and \b finds no word boundary between the "K" and the "e".
@@ -119,8 +126,6 @@ export function buildLine(line, o) {
         lc.appendChild(document.createTextNode(text));
       }
     }
-  } else if (o.ai) {
-    lc.textContent = line;
   } else if (o.raw) {
     let text = line;
     const head = [];
