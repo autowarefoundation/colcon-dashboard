@@ -238,6 +238,23 @@
 .md-typeset .cd-sh .c-flag { color: var(--cd-sh-flag); }
 .md-typeset .cd-sh .c-val { color: var(--cd-sh-val); }
 .md-typeset .cd-sh .c-dim { color: var(--cd-muted); }
+.md-typeset .cd-sh .c-com { color: var(--cd-muted); font-style: italic; }
+.md-typeset .cd-sh .c-op { color: var(--cd-muted); }
+/* a line that continues the one before it lines up under the command */
+.md-typeset .cd-sh .cd-cont::before { content: "  "; }
+
+/* the configuration file (ini) in the same palette: the sections like a
+   subcommand, the keys like flags, the values, and dim comments */
+.md-typeset .language-ini .highlight .k, .md-typeset .language-ini .k { color: var(--cd-sh-verb); font-weight: 600; }
+.md-typeset .language-ini .na, .md-typeset .language-ini .nn { color: var(--cd-sh-flag); }
+.md-typeset .language-ini .s, .md-typeset .language-ini .s1, .md-typeset .language-ini .s2 { color: var(--cd-sh-val); }
+.md-typeset .language-ini .o, .md-typeset .language-ini .p { color: var(--cd-muted); }
+.md-typeset .language-ini .c, .md-typeset .language-ini .c1, .md-typeset .language-ini .cm { color: var(--cd-muted); font-style: italic; }
+
+/* every code block in the box of the hero: rounded, with a fine border */
+.md-typeset .highlight code { border-radius: 10px; }
+.md-typeset .highlight pre { border-radius: 10px; }
+.md-typeset :not(.tabbed-block) > .highlight > pre > code { box-shadow: inset 0 0 0 1px var(--cd-border); }
 
 /* the top tabs as Material 3 pills: a tonal fill and the accent color on
    the active tab, a light state layer on hover, no underline */
