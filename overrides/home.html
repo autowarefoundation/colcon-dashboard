@@ -17,7 +17,21 @@
           <a href="{{ 'quick-start/' | url }}" class="md-button">Quick start</a>
           <a href="{{ config.repo_url }}" class="md-button cd-button--ghost">GitHub</a>
         </div>
-        <p class="cd-hero__install"><code>pipx install colcon-dashboard</code></p>
+        {#- the install commands, as the theme's own tabs, with the words
+            colored like a shell (extra.css .cd-sh). docs/index.md repeats
+            them at the end of the page, with other ids: keep both alike -#}
+        <div class="md-typeset cd-hero__install">
+          <div class="tabbed-set tabbed-alternate" data-tabs="9:2"><input checked="checked" id="__tabbed_9_1" name="__tabbed_9" type="radio"><input id="__tabbed_9_2" name="__tabbed_9" type="radio"><div class="tabbed-labels"><label for="__tabbed_9_1">Ubuntu (PPA)</label><label for="__tabbed_9_2">pipx</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block"><div class="language-bash highlight cd-sh"><pre id="__code_inst9a"><nav class="md-code__nav"><button class="md-code__button" title="Copy to clipboard" data-clipboard-target="#__code_inst9a &gt; code" data-md-type="copy"></button></nav><code class="md-code__content"><span class="cd-l"><span class="c-dim">sudo</span> <span class="c-prog">add-apt-repository</span> <span class="c-val">ppa:xmfcx/colcon-dashboard</span></span>
+<span class="cd-l"><span class="c-dim">sudo</span> <span class="c-prog">apt</span> <span class="c-verb">install</span> <span class="c-val">python3-colcon-dashboard</span></span>
+<span class="cd-l"><span class="c-prog">colcon-dashboard</span> <span class="c-flag">--start-service</span></span></code></pre></div></div>
+<div class="tabbed-block"><div class="language-bash highlight cd-sh"><pre id="__code_inst9b"><nav class="md-code__nav"><button class="md-code__button" title="Copy to clipboard" data-clipboard-target="#__code_inst9b &gt; code" data-md-type="copy"></button></nav><code class="md-code__content"><span class="cd-l"><span class="c-prog">pipx</span> <span class="c-verb">install</span> <span class="c-val">colcon-dashboard</span></span>
+<span class="cd-l"><span class="c-prog">colcon-dashboard</span> <span class="c-flag">--install-service</span></span></code></pre></div></div>
+</div>
+</div>
+          <p class="cd-hero__then">Then open <a href="http://localhost:8642/">localhost:8642</a> and pick your workspace.</p>
+        </div>
       </div>
       <figure class="cd-hero__shot">
         <img class="cd-img-light" src="{{ 'assets/screens/hero-light.webp' | url }}" width="1440" height="900" alt="Colcon Dashboard during a live Autoware build: the timeline at the left, the dependency graph at the right with the building packages in blue, and the build log below">

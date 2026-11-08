@@ -149,20 +149,16 @@ Every build and test run stays one click away, with its outcome and its time aga
 
 <h2 class="cd-section-title">Install it in a minute</h2>
 
-=== "Ubuntu (PPA)"
-
-    ```bash
-    sudo add-apt-repository ppa:xmfcx/colcon-dashboard
-    sudo apt install python3-colcon-dashboard
-    colcon-dashboard --start-service
-    ```
-
-=== "pipx"
-
-    ```bash
-    pipx install colcon-dashboard
-    colcon-dashboard --install-service
-    ```
+<!-- the same commands as the hero (overrides/home.html), with other ids: keep both alike. The theme adds the copy buttons here. -->
+<div class="tabbed-set tabbed-alternate" data-tabs="8:2"><input checked="checked" id="__tabbed_8_1" name="__tabbed_8" type="radio"><input id="__tabbed_8_2" name="__tabbed_8" type="radio"><div class="tabbed-labels"><label for="__tabbed_8_1">Ubuntu (PPA)</label><label for="__tabbed_8_2">pipx</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block"><div class="language-bash highlight cd-sh"><pre><code class="md-code__content"><span class="cd-l"><span class="c-dim">sudo</span> <span class="c-prog">add-apt-repository</span> <span class="c-val">ppa:xmfcx/colcon-dashboard</span></span>
+<span class="cd-l"><span class="c-dim">sudo</span> <span class="c-prog">apt</span> <span class="c-verb">install</span> <span class="c-val">python3-colcon-dashboard</span></span>
+<span class="cd-l"><span class="c-prog">colcon-dashboard</span> <span class="c-flag">--start-service</span></span></code></pre></div></div>
+<div class="tabbed-block"><div class="language-bash highlight cd-sh"><pre><code class="md-code__content"><span class="cd-l"><span class="c-prog">pipx</span> <span class="c-verb">install</span> <span class="c-val">colcon-dashboard</span></span>
+<span class="cd-l"><span class="c-prog">colcon-dashboard</span> <span class="c-flag">--install-service</span></span></code></pre></div></div>
+</div>
+</div>
 
 Then open <http://localhost:8642/> and pick your workspace. Your next `colcon build` shows up there by itself.
 

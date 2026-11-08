@@ -16,6 +16,11 @@
   --cd-glow: rgba(30, 127, 217, 0.16);
   --cd-good: #06b025;
   --cd-shot-shadow: 0 24px 60px rgba(10, 31, 61, 0.18), 0 4px 14px rgba(10, 31, 61, 0.08);
+  /* shell colors, from the terminal palette of the app (style.css --t*) */
+  --cd-sh-prog: #1a7f37;
+  --cd-sh-verb: #2a78d6;
+  --cd-sh-flag: #0e7f86;
+  --cd-sh-val: #9a6700;
 }
 [data-md-color-scheme="slate"] {
   --md-primary-fg-color: #3a95ea;
@@ -34,6 +39,10 @@
   --cd-glow: rgba(58, 149, 234, 0.22);
   --cd-good: #2bd14a;
   --cd-shot-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.35);
+  --cd-sh-prog: #57ce53;
+  --cd-sh-verb: #6da7ec;
+  --cd-sh-flag: #56c8d8;
+  --cd-sh-val: #e2b93d;
 }
 
 /* the logo has a light version (navy tube) and a dark version (white tube) */
@@ -83,7 +92,7 @@
 }
 .cd-hero__lead { font-size: 1.02rem; line-height: 1.6; color: var(--cd-ink2); margin: 0 0 0.6rem; }
 .cd-hero__sub { font-size: 0.86rem; color: var(--cd-muted); margin: 0 0 1.4rem; }
-.cd-hero code {
+.cd-hero__lead code {
   font-size: 0.92em;
   padding: 0.1em 0.4em;
   border-radius: 6px;
@@ -112,7 +121,11 @@
 }
 .cd-hero .md-button--primary:hover { background: var(--md-primary-fg-color--dark); border-color: var(--md-primary-fg-color--dark); color: #fff; }
 .cd-hero .cd-button--ghost { background: transparent; color: var(--cd-ink2); }
-.cd-hero__install { margin: 1.1rem 0 0; font-size: 0.78rem; color: var(--cd-muted); }
+.cd-hero__install { max-width: 32rem; margin: 1.4rem auto 0; text-align: left; }
+.cd-hero__install .tabbed-set { margin: 0; }
+.cd-hero__install .highlight pre { margin: 0; }
+.cd-hero__install .highlight code { border-radius: 0 0 10px 10px; box-shadow: 0 8px 24px var(--cd-glow); }
+.md-typeset .cd-hero__then { margin: 0.7em 0 0; text-align: center; font-size: 0.72rem; color: var(--cd-muted); }
 .cd-hero__shot { margin: 2.4rem 0 0; width: 100%; max-width: 64rem; }
 .cd-hero__shot img {
   width: 100%;
@@ -213,3 +226,13 @@
 /* a wider page: the screenshots carry small text, and they read better
    with more room */
 .md-grid { max-width: 74rem; }
+
+/* install commands colored like a shell, as the build command dropdown of
+   the app colors them: the program, the subcommand, the flags, and the
+   values. The "$" prompt comes from CSS, so a copy leaves it out. */
+.md-typeset .cd-sh .cd-l::before { content: "$ "; color: var(--cd-muted); user-select: none; }
+.md-typeset .cd-sh .c-prog { color: var(--cd-sh-prog); font-weight: 650; }
+.md-typeset .cd-sh .c-verb { color: var(--cd-sh-verb); font-weight: 600; }
+.md-typeset .cd-sh .c-flag { color: var(--cd-sh-flag); }
+.md-typeset .cd-sh .c-val { color: var(--cd-sh-val); }
+.md-typeset .cd-sh .c-dim { color: var(--cd-muted); }
