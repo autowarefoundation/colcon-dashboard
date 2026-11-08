@@ -50,6 +50,10 @@ def remove_build_dir(log_dir, build):
         return 0
     before = dir_size(target)
     shutil.rmtree(target, ignore_errors=True)
+    if os.path.isdir(target):
+        # another thread can write the outcome cache file into the run
+        # while rmtree runs, and then the last rmdir fails: try once more
+        shutil.rmtree(target, ignore_errors=True)
     return before - (dir_size(target) if os.path.isdir(target) else 0)
 
 

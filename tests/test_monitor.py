@@ -2,9 +2,11 @@
 
 import json
 import os
+import shutil
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 from colcon_dashboard.config import CONFIG
 from colcon_dashboard.monitor import (
@@ -180,6 +182,29 @@ class PruneHelpers(unittest.TestCase):
         self.assertIn("build_2026-08-01_10-00-00", self.names())
         self.assertNotIn("build_2026-08-02_10-00-00", self.names())
         self.assertNotIn("build_2026-08-01_10-00-00", deleted)
+
+    def test_file_written_during_removal_still_goes(self):
+        # the outcome cache thread can add a file while rmtree runs
+        real = shutil.rmtree
+        calls = []
+
+        def racy_rmtree(path, ignore_errors=False):
+            calls.append(path)
+            if len(calls) > 1:
+                return real(path, ignore_errors=ignore_errors)
+            for name in os.listdir(path):
+                os.remove(os.path.join(path, name))
+            open(os.path.join(path, ".colcon-dashboard.json"), "w").close()
+            try:
+                os.rmdir(path)
+            except OSError:
+                pass
+
+        with mock.patch("colcon_dashboard.monitor.shutil.rmtree",
+                        racy_rmtree):
+            deleted, _ = prune_builds(self.log_dir, 2)
+        self.assertIn("build_2026-08-01_10-00-00", deleted)
+        self.assertNotIn("build_2026-08-01_10-00-00", self.names())
 
     @unittest.skipIf(os.geteuid() == 0, "root can delete anything")
     def test_undeletable_run_is_not_reported_deleted(self):
