@@ -229,19 +229,31 @@ function setCommand(s) {
   btn.querySelector('.bcount').textContent =
     opts.length ? `${opts.length} option${opts.length === 1 ? '' : 's'}` : '';
   // one option per line, with the shell's line continuations, so a
-  // selection of the text also pastes into a terminal
+  // selection of the text also pastes into a terminal. The words get the
+  // colors of a shell: the program, the verb, the flags, and the values;
+  // a CMake definition splits into its name and its value.
   const pre = $('#cmdpanel .cmd');
   pre.textContent = '';
-  const lines = [`colcon ${verb}`, ...opts.map(o => '  ' + o.map(shWord).join(' '))];
-  lines.forEach((line, i) => {
-    pre.append(line);
-    if (i < lines.length - 1) {
-      const c = document.createElement('span');
-      c.className = 'cont';
-      c.textContent = ' \\';
-      pre.append(c, '\n');
-    }
-  });
+  const tok = (cls, text) => {
+    const t = document.createElement('span');
+    t.className = cls;
+    t.textContent = text;
+    return t;
+  };
+  const word = (w, first) => {
+    const q = shWord(w);
+    if (first) return [tok('c-flag', q)];
+    if (q !== w) return [tok('c-str', q)];  // quoted for the shell
+    const d = /^-D([^=]+)=(.*)$/.exec(w);
+    if (d) return [tok('c-flag', '-D'), tok('c-key', d[1]), tok('c-op', '='), tok('c-val', d[2])];
+    return [tok(w.startsWith('-') ? 'c-flag' : 'c-val', w)];
+  };
+  const cont = () => [tok('c-cont', ' \\'), '\n'];
+  pre.append(tok('c-prompt', '$ '), tok('c-prog', 'colcon'), ' ', tok('c-verb', verb));
+  for (const o of opts) {
+    pre.append(...cont(), '  ');
+    o.forEach((w, i) => pre.append(...(i ? [' '] : []), ...word(w, i === 0)));
+  }
   $('#cmdpanel .cmdnote').hidden = !opts.length;
   $('#cmdpanel').dataset.line = [`colcon ${verb}`, ...opts.map(o => o.map(shWord).join(' '))].join(' ');
 }

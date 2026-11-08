@@ -988,7 +988,17 @@ body.offline #sysmeters { display: none; }
 #cmdpanel .wsbox.cmdbox { width: max-content; min-width: 280px; max-width: min(720px, calc(100vw - 16px)); }
 .cmdbox .cmdcopy { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; font-weight: 400; font-size: var(--fs-xs); }
 .cmdbox .cmd { margin: 0; padding: 10px 12px; background: var(--page); border: 1px solid var(--grid); border-radius: var(--r-s); font: var(--fs-s)/1.6 var(--mono); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
-.cmdbox .cmd .cont { color: var(--muted); }
+/* the command in the colors of a shell, from the terminal palette of
+   the log panes, so it suits both themes */
+.cmdbox .cmd .c-prompt { color: var(--muted); user-select: none; }
+.cmdbox .cmd .c-prog { color: var(--t2); font-weight: 650; }
+.cmdbox .cmd .c-verb { color: var(--t4); font-weight: 650; }
+.cmdbox .cmd .c-flag { color: var(--t6); }
+.cmdbox .cmd .c-key { color: var(--t5); }
+.cmdbox .cmd .c-op { color: var(--muted); }
+.cmdbox .cmd .c-val { color: var(--t3); }
+.cmdbox .cmd .c-str { color: var(--t3); }
+.cmdbox .cmd .c-cont { color: var(--muted); }  /* selectable: a selection pastes as one command */
 .cmdbox .cmdnote { margin: 8px 0 0; font-size: var(--fs-xs); color: var(--muted); }
 .helpbox table { width: 100%; border-collapse: collapse; font-size: var(--fs-s); }
 .helpbox td { padding: 5px 8px; border-top: 1px solid var(--grid); color: var(--ink2); }
