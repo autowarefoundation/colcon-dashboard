@@ -148,7 +148,7 @@ export function createPane(name) {
       </select></label>`}
       ${ai ? '' : `<button class="tsbtn on" title="show or hide timestamps">${icon('clock')}Time</button>`}
       <button class="wrapbtn" title="soft-wrap long lines">${icon('wrap')}Wrap</button>
-      ${ai ? '' : `<button class="rawbtn" title="show the exact log text: no highlighting, no folded lines">${icon('raw')}Raw</button>`}
+      ${ai ? '' : `<button class="rawbtn" title="show every character of the log in place: colored, but nothing folds or collapses">${icon('raw')}Raw</button>`}
       <button class="follow on" title="auto-scroll to the end">${icon('follow')}Follow</button>
     </div>
     <div class="lognote" hidden></div>

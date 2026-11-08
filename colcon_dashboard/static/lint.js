@@ -11,11 +11,16 @@
    one line tells about the next ones (a CMake warning block, the
    severity of the last GCC diagnostic) and belongs to one log.
    lintLine(text, st, false) builds no nodes: the log view classifies
-   every line that way when it arrives, and renders it later. */
+   every line that way when it arrives, and renders it later.
+   lintLine(text, st, true, true) renders for the raw view: the nodes hold
+   exactly the text, colored. */
 
 export function newLintState() { return { block: null, diag: null }; }
 
 let building = true;  // false: classify only, build no nodes
+// true: the raw view. Every character stays, in place: the rules color
+// the text, but they drop, add, or fold nothing
+let exact = false;
 
 const sp = (cls, text) => {
   if (!building) return null;
@@ -82,7 +87,7 @@ function msgNodes(msg) {
 
 function durNode(sec) {
   if (!building) return null;
-  const s = sp('dur', `${sec}s`);
+  const s = sp('dur', exact ? `[${sec}s]` : `${sec}s`);
   const v = parseFloat(sec);
   if (v >= 300) s.classList.add('slow2');
   else if (v >= 60) s.classList.add('slow1');
@@ -118,13 +123,17 @@ const ENV_RE = /^[A-Za-z_][A-Za-z0-9_]*=\S*$/;
 // opens on a click (dock.js), then the command itself
 function invokeNodes(m) {
   if (!building) return [];
-  const out = [sp('mut', `${m[1]} command in `), ...pathNodes(m[2])];
-  if (m[3]) out.push(tx(' '), sp(m[4] === '0' ? 'rc ok' : 'rc bad', `returned ${m[4]}`));
+  const q = exact ? "'" : '';  // the raw view keeps colcon's quotes
+  const out = [sp('mut', `${m[1]} command in ${q}`), ...pathNodes(m[2])];
+  if (q) out.push(tx(q));
+  if (m[3]) out.push(tx(' '), sp(m[4] === '0' ? 'rc ok' : 'rc bad', `returned ${q}${m[4]}${q}`));
   out.push(tx(': '));
   const words = m[5].split(' ');
   let i = 0;
   while (i < words.length && ENV_RE.test(words[i])) i++;
-  if (i) {
+  if (i && exact) {
+    out.push(sp('envtxt', words.slice(0, i).join(' ')), tx(' '));
+  } else if (i) {
     const label = `${i} environment variable${i === 1 ? '' : 's'}`;
     const env = sp('envfold', label);
     env.dataset.lbl = label;
@@ -140,12 +149,13 @@ function invokeNodes(m) {
   return out;
 }
 
-function progressNodes(pct, rest) {
+// head: the progress text as the log has it ("[ 42%]"), for the raw view
+function progressNodes(pct, rest, head = '') {
   const sm = STEP_RE.exec(rest);
   const step = sm?.[1];
   const cls = !sm ? [] : step === 'Built target' ? ['l-built'] : step.startsWith('Linking') ? ['l-link'] : ['l-step'];
   if (!building) return { cls, nodes: [] };
-  const bar = sp('pct', `${pct}%`);
+  const bar = sp('pct', exact && head ? head : `${pct}%`);
   bar.style.setProperty('--p', `${pct}%`);
   const out = [bar, tx(' ')];
   if (!sm) return { cls, nodes: out.concat(tx(rest)) };
@@ -157,12 +167,14 @@ function progressNodes(pct, rest) {
   return { cls, nodes: out };
 }
 
-export function lintLine(text, st, build = true) {
+export function lintLine(text, st, build = true, keep = false) {
   building = build;
+  exact = keep;
   try {
     return lint(text, st);
   } finally {
     building = true;
+    exact = false;
   }
 }
 
@@ -185,13 +197,13 @@ function lint(text, st) {
   }
   // colcon's job lines in the build log
   if ((m = /^Starting >>> (\S+)(.*)$/.exec(text))) {
-    return { cls: ['l-job', 'l-start'], fold: null, nodes: [sp('jobv', 'Starting'), tx(' '), pkgTag(m[1]), tx(m[2])] };
+    return { cls: ['l-job', 'l-start'], fold: null, nodes: [sp('jobv', 'Starting'), tx(exact ? ' >>> ' : ' '), pkgTag(m[1]), tx(m[2])] };
   }
-  if ((m = /^(Finished|Failed|Aborted)\s+<<< (\S+)(?: \[([\d.]+)s\])?(.*)$/.exec(text))) {
+  if ((m = /^(Finished|Failed|Aborted)(\s+<<< )(\S+)(?: \[([\d.]+)s\])?(.*)$/.exec(text))) {
     const kind = { Finished: 'l-fin', Failed: 'l-err', Aborted: 'l-abort' }[m[1]];
-    const nodes = [sp('jobv', m[1]), tx(' '), pkgTag(m[2])];
-    if (m[3]) nodes.push(tx(' '), durNode(m[3]));
-    nodes.push(tx(m[4]));
+    const nodes = [sp('jobv', m[1]), tx(exact ? m[2] : ' '), pkgTag(m[3])];
+    if (m[4]) nodes.push(tx(' '), durNode(m[4]));
+    nodes.push(tx(m[5]));
     return { cls: ['l-job', kind], fold: null, nodes };
   }
   if ((m = /^(--- (?:stderr|stdout): )(\S+)$/.exec(text))) {
@@ -202,7 +214,7 @@ function lint(text, st) {
 
   // CMake
   if ((m = INSTALL_RE.exec(text))) {
-    const nodes = [sp('mut', `-- ${m[1]}${m[2] ? ': ' : ''}`)];
+    const nodes = [sp('mut', text.slice(0, text.length - m[2].length))];
     if (m[2]) nodes.push(...(m[2].startsWith('/') ? pathNodes(m[2]) : [tx(m[2])]));
     return { cls: ['l-noise'], fold: 'install', nodes };
   }
@@ -211,7 +223,7 @@ function lint(text, st) {
     st.block = sev;
     const nodes = [sp(`sev ${sev}`, `CMake ${m[1]}${m[2] || ''}`)];
     if (m[3]) nodes.push(tx(' at '), ...pathNodes(`${m[4]}:${m[5]}`, 'pth fl'), tx(m[6] || ''));
-    nodes.push(tx(':'));
+    if (text.endsWith(':')) nodes.push(tx(':'));
     return { cls: [`l-${sev}`], fold: null, nodes };
   }
   if ((m = FOUND_RE.exec(text))) {
@@ -268,13 +280,13 @@ function lint(text, st) {
 
   // build steps
   if ((m = PROGRESS_RE.exec(text))) {
-    const r = progressNodes(m[1], m[2]);
+    const r = progressNodes(m[1], m[2], text.slice(0, text.length - m[2].length - 1));
     return { cls: ['l-prog', ...r.cls], fold: null, nodes: r.nodes };
   }
   if ((m = NINJA_RE.exec(text))) {
     const pct = Math.round(100 * m[1] / Math.max(1, m[2]));
-    const r = progressNodes(pct, m[3]);
-    if (building) r.nodes[0].textContent = `${m[1]}/${m[2]}`;
+    const r = progressNodes(pct, m[3], `[${m[1]}/${m[2]}]`);
+    if (building && !exact) r.nodes[0].textContent = `${m[1]}/${m[2]}`;
     return { cls: ['l-prog', ...r.cls], fold: null, nodes: r.nodes };
   }
   if ((m = STEP_RE.exec(text))) {

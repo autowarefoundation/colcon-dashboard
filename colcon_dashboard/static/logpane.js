@@ -44,6 +44,7 @@ export class LogView {
     this.ai = ai;
     this.raw = raw;
     this.decorate = decorate;  // a hook for each rendered line text (editor links)
+    pre.classList.toggle('raw', raw);
     this.linePx = 18;          // measured on the first rendered chunk
     this.io = new IntersectionObserver(es => this.onIntersect(es), { root: pre, rootMargin: NEAR });
     this.waiting = new Set();  // chunks that wait for the selection to end
@@ -445,6 +446,7 @@ export class LogView {
     const text = this.text, buf = this.buf, q = this.query, re = this.queryRe;
     this.reset();
     this.raw = raw;
+    this.pre.classList.toggle('raw', raw);
     this.query = q;
     this.queryRe = re;
     if (text.length) this.append(text.join('\n') + '\n');

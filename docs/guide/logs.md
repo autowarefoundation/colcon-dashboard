@@ -42,6 +42,6 @@ colcon writes its logs without colors, so the panes color the recurring parts of
 - The long `Invoking command` lines in package panes fold the environment variables into one chip, for example "4 environment variables". Click the chip to show them. The command and its flags stay visible.
 - Directories in paths are dimmed, so the file names stand out.
 
-To see the exact log text, click **Raw** in the pane toolbar. Raw shows every line as colcon wrote it: no highlighting, no folded groups, and no collapsed environment. Terminal colors still show, and the marks beside the scrollbar still point to the errors and warnings. The choice sticks for future panes, and **Raw output** in the settings switches it for every open pane.
+To see every character of the log in place, click **Raw** in the pane toolbar. Raw keeps the colors, the error and warning tints, and the marks beside the scrollbar, but it hides and moves nothing: no folded groups, the full environment of each command, and the text that the highlighting shortens, such as `[ 42%]`, `[0.3s]`, `>>>`, and `<<<`. A line that a highlighting rule would change shows as plain text instead. Terminal colors still show. The choice sticks for future panes, and **Raw output** in the settings switches it for every open pane.
 
 The address bar mirrors the open pane and the picked view (`#pkg=...&view=...`), so a copied link opens the same package pane for a colleague. The `ws` and `build` query parameters already pin the workspace and the build.

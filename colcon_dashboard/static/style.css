@@ -758,6 +758,11 @@ body.offline #sysmeters { display: none; }
 .pane pre .flag { color: color-mix(in srgb, var(--accent) 70%, var(--ink2)); }
 .pane pre .envfold { color: var(--muted); border: 1px dashed var(--baseline); border-radius: var(--r-s); padding: 0 5px; cursor: pointer; }
 .pane pre .envfold.open { border-style: solid; color: var(--muted); }
+.pane pre .envtxt { color: var(--muted); }
+/* raw: every character in place. No marks before the job lines, and no
+   padding inside the chips, so that the columns stay where the log has them */
+.pane pre.raw .jobv::before { content: none; }
+.pane pre.raw .pct, .pane pre.raw .dur, .pane pre.raw .pk, .pane pre.raw .qt { padding: 0; min-width: 0; text-align: left; }
 .pane pre .rc.ok { color: var(--good); }
 .pane pre .rc.bad { color: var(--critical); font-weight: 600; }
 /* a folded run of install lines: one line with the count */

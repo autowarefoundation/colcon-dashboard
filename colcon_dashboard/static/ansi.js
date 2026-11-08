@@ -82,10 +82,9 @@ const WARN_WORD = /\bwarning\b/i;
 
 /* One log line as one <span class="ln">: the timestamp, then the text in
    <span class="lc">. o: fixed (a build log line: a package tag), ai
-   (prose: no lint), raw (the exact text: no lint, but cls still marks
-   the errors and warnings for the marks), cls (the line's lint classes),
-   st (the lint state before the line), sgr (the ANSI state before it).
-   st and sgr advance past the line. */
+   (prose: no lint), raw (every character in place: colored, but nothing
+   folds, collapses, or moves), st (the lint state before the line), sgr
+   (the ANSI state before it). st and sgr advance past the line. */
 export function buildLine(line, o) {
   const ln = document.createElement('span');
   ln.className = 'ln';
@@ -102,8 +101,8 @@ export function buildLine(line, o) {
   ln.appendChild(lc);
   if (line.includes('\x1b') || sgrActive(o.sgr)) {
     // real terminal colors win over the lint
-    if (ERR_WORD.test(line)) ln.classList.add(o.raw ? 'm-err' : 'l-err');
-    else if (WARN_WORD.test(line)) ln.classList.add(o.raw ? 'm-warn' : 'l-warn');
+    if (ERR_WORD.test(line)) ln.classList.add('l-err');
+    else if (WARN_WORD.test(line)) ln.classList.add('l-warn');
     for (const part of line.split(SGR_SPLIT_RE)) {
       const m = /^\x1b\[([0-9;]*)m$/.exec(part);
       if (m) { applySgr(o.sgr, m[1]); continue; }
@@ -120,12 +119,23 @@ export function buildLine(line, o) {
   } else if (o.ai) {
     lc.textContent = line;
   } else if (o.raw) {
-    // the exact text; the marks beside the scrollbar still find the
-    // errors and warnings: m-err and m-warn carry no style
-    lc.textContent = line;
-    const cls = o.cls ?? lintLine(o.fixed ? line.replace(PKG_RE, '') : line, o.st, false).cls.join(' ');
-    if (/\bl-err\b/.test(cls)) ln.classList.add('m-err');
-    else if (/\bl-warn\b/.test(cls)) ln.classList.add('m-warn');
+    let text = line;
+    const head = [];
+    if (o.fixed) {
+      const pm = PKG_RE.exec(text);
+      if (pm) {  // the tag keeps its brackets
+        const tag = pkgTag(pm[1]);
+        tag.textContent = `[${pm[1]}]`;
+        head.push(tag, document.createTextNode(pm[0].slice(pm[1].length + 2)));
+        text = text.slice(pm[0].length);
+      }
+    }
+    const r = lintLine(text, o.st, true, true);
+    if (r.cls.length) ln.classList.add(...r.cls);
+    // the safety net: a rule that changed one character falls back to
+    // the plain text, with the line's color only
+    const same = r.nodes.map(n => n.textContent).join('') === text;
+    lc.append(...head, ...(same ? r.nodes : [text]));
   } else {
     let text = line;
     if (o.fixed) {
