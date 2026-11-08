@@ -61,17 +61,32 @@ export function sgrSpan(st) {
 
 export const TS_RE = /^\[\s*\d+(?:\.\d+)?s?\] /;
 // the build log names the package of each line after the timestamp
-const PKG_RE = /^\[([\w.+-]+)\] /;
-const FOLD_MIN = 4;  // a shorter run of install lines stays open
+export const PKG_RE = /^\[([\w.+-]+)\] /;
 
-const FOLD_LABEL = { install: 'install lines' };
+export const sgrActive = st => !!(st.bold || st.fg || st.bg);
 
-/* One log line becomes one <span class="ln">: the timestamp, then the
-   text in <span class="lc">. ctx is the pane (or a pane-like object):
-   sgr (the ANSI state), lint (lint.js state), fixed (the build log),
-   ai (prose: no lint), raw (the exact text: no lint, no folds), pre,
-   and grps (the open fold groups). Returns the line element. */
-export function renderLogLine(ctx, line, frag) {
+// the ANSI state after line, from the state before it
+export function advanceSgr(st, line) {
+  for (const part of line.split(SGR_SPLIT_RE)) {
+    const m = /^\x1b\[([0-9;]*)m$/.exec(part);
+    if (m) applySgr(st, m[1]);
+  }
+}
+
+export function stripAnsi(line) {
+  return line.replace(/\x1b\[[0-9;]*m/g, '').replace(CSI_OTHER_RE, '').replace(OSC_RE, '');
+}
+
+const ERR_WORD = /\berror\b|\bfatal\b|FAILED/i;
+const WARN_WORD = /\bwarning\b/i;
+
+/* One log line as one <span class="ln">: the timestamp, then the text in
+   <span class="lc">. o: fixed (a build log line: a package tag), ai
+   (prose: no lint), raw (the exact text: no lint, but cls still marks
+   the errors and warnings for the marks), cls (the line's lint classes),
+   st (the lint state before the line), sgr (the ANSI state before it).
+   st and sgr advance past the line. */
+export function buildLine(line, o) {
   const ln = document.createElement('span');
   ln.className = 'ln';
   const tm = TS_RE.exec(line);
@@ -81,108 +96,60 @@ export function renderLogLine(ctx, line, frag) {
     ts.textContent = tm[0];
     ln.appendChild(ts);
     line = line.slice(tm[0].length);
-    // wrapped lines indent past the timestamp (style.css)
-    if (ctx.pre && !ctx.tsw) {
-      ctx.tsw = true;
-      ctx.pre.style.setProperty('--tsw', `${tm[0].length}ch`);
-    }
   }
   const lc = document.createElement('span');
   lc.className = 'lc';
   ln.appendChild(lc);
-  let fold = null;
-  let pkg = '';
-  if (line.includes('\x1b') || ctx.sgr.bold || ctx.sgr.fg || ctx.sgr.bg) {
+  if (line.includes('\x1b') || sgrActive(o.sgr)) {
     // real terminal colors win over the lint
-    if (/\berror\b|\bfatal\b|FAILED/i.test(line)) ln.classList.add('l-err');
-    else if (/\bwarning\b/i.test(line)) ln.classList.add('l-warn');
+    if (ERR_WORD.test(line)) ln.classList.add(o.raw ? 'm-err' : 'l-err');
+    else if (WARN_WORD.test(line)) ln.classList.add(o.raw ? 'm-warn' : 'l-warn');
     for (const part of line.split(SGR_SPLIT_RE)) {
       const m = /^\x1b\[([0-9;]*)m$/.exec(part);
-      if (m) { applySgr(ctx.sgr, m[1]); continue; }
+      if (m) { applySgr(o.sgr, m[1]); continue; }
       const text = part.replace(CSI_OTHER_RE, '').replace(OSC_RE, '');
       if (!text) continue;
-      if (ctx.sgr.bold || ctx.sgr.fg || ctx.sgr.bg) {
-        const s = sgrSpan(ctx.sgr);
+      if (sgrActive(o.sgr)) {
+        const s = sgrSpan(o.sgr);
         s.textContent = text;
         lc.appendChild(s);
       } else {
         lc.appendChild(document.createTextNode(text));
       }
     }
-  } else if (ctx.ai) {
+  } else if (o.ai) {
     lc.textContent = line;
+  } else if (o.raw) {
+    // the exact text; the marks beside the scrollbar still find the
+    // errors and warnings: m-err and m-warn carry no style
+    lc.textContent = line;
+    const cls = o.cls ?? lintLine(o.fixed ? line.replace(PKG_RE, '') : line, o.st, false).cls.join(' ');
+    if (/\bl-err\b/.test(cls)) ln.classList.add('m-err');
+    else if (/\bl-warn\b/.test(cls)) ln.classList.add('m-warn');
   } else {
-    let lst = ctx.lint || (ctx.lint = newLintState());
     let text = line;
-    if (ctx.fixed) {
-      const pm = PKG_RE.exec(line);
+    if (o.fixed) {
+      const pm = PKG_RE.exec(text);
       if (pm) {
-        pkg = pm[1];
-        text = line.slice(pm[0].length);
-        // parallel jobs interleave their lines: each package keeps its
-        // own lint state (a CMake warning block, the last diagnostic)
-        const by = ctx.lintBy || (ctx.lintBy = new Map());
-        if (!by.has(pkg)) by.set(pkg, newLintState());
-        lst = by.get(pkg);
+        lc.append(pkgTag(pm[1]), ' ');
+        text = text.slice(pm[0].length);
       }
     }
-    const r = lintLine(text, lst);
-    if (ctx.raw) {
-      // the exact text, but the marks beside the scrollbar still find
-      // the errors and warnings: m-err and m-warn carry no style
-      lc.textContent = line;
-      if (r.cls.includes('l-err')) ln.classList.add('m-err');
-      else if (r.cls.includes('l-warn')) ln.classList.add('m-warn');
-    } else {
-      if (pkg) lc.append(pkgTag(pkg), ' ');
-      if (r.cls.length) ln.classList.add(...r.cls);
-      lc.append(...r.nodes);
-      fold = r.fold;
-    }
+    const r = lintLine(text, o.st);
+    if (r.cls.length) ln.classList.add(...r.cls);
+    lc.append(...r.nodes);
   }
   lc.appendChild(document.createTextNode('\n'));
-
-  // install lines fold into one group line. In the build log, each
-  // package keeps one open group: its later install lines join it, also
-  // when other packages print in between, until it prints something else.
-  // In a package pane, a group is one unbroken run.
-  const grps = ctx.grps || (ctx.grps = new Map());
-  let g = grps.get(pkg);
-  if (g && (!fold || g.kind !== fold || !(g.el.isConnected || frag.contains(g.el)))) {
-    grps.delete(pkg);
-    g = null;
-  }
-  if (!fold) {
-    frag.appendChild(ln);
-    return ln;
-  }
-  if (!g) {
-    const el = document.createElement('span');
-    el.className = 'lgrp';
-    const head = document.createElement('span');
-    head.className = 'lgrp-head';
-    head.title = 'click to show or hide these lines';
-    if (pkg) head.append(pkgTag(pkg), ' ');
-    head.appendChild(Object.assign(document.createElement('span'), { className: 'gcount' }));
-    const body = document.createElement('span');
-    body.className = 'lgrp-body';
-    el.append(head, body);
-    frag.appendChild(el);
-    g = { el, body, kind: fold, n: 0 };
-    grps.set(pkg, g);
-  }
-  g.body.appendChild(ln);
-  g.n++;
-  updateGroup(g.el, g.n, FOLD_LABEL[fold]);
   return ln;
 }
 
-// the head of a fold group: the count, and open or closed
-export function updateGroup(el, n, label) {
-  if (label) el.dataset.label = label;
-  el.dataset.n = n;
-  el.querySelector('.gcount').textContent = `${n} ${el.dataset.label}`;
-  // a group closes once it is long enough, unless the user opened it
-  if (n >= FOLD_MIN && !el.dataset.user) el.classList.add('folded');
-  el.classList.toggle('short', n < FOLD_MIN);
+// a few lines in order, with no fold groups (the failures pane): ctx keeps
+// the ANSI state (sgr) and the lint state (lint) from line to line
+export function renderLogLine(ctx, line, frag) {
+  const ln = buildLine(line, {
+    fixed: ctx.fixed, ai: ctx.ai, raw: ctx.raw,
+    st: ctx.lint || (ctx.lint = newLintState()), sgr: ctx.sgr,
+  });
+  frag.appendChild(ln);
+  return ln;
 }

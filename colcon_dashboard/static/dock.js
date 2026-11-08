@@ -1,7 +1,8 @@
-import { newSgr, renderLogLine, updateGroup } from './ansi.js';
+import { newSgr, renderLogLine } from './ansi.js';
 import { emit, on } from './bus.js';
 import { zoomToPkg } from './camera.js';
 import { label } from './graph.js';
+import { LogView } from './logview.js';
 import { mode } from './modes.js';
 import { App } from './state.js';
 import { toast } from './toasts.js';
@@ -145,8 +146,7 @@ export function createPane(name) {
         <option value="stdout">stdout</option>
         <option value="command">Commands</option>
       </select></label>`}
-      ${ai ? '' : `<button class="earlier" style="display:none" title="load the whole log from the start">${icon('top')}Load all</button>
-      <button class="tsbtn on" title="show or hide timestamps">${icon('clock')}Time</button>`}
+      ${ai ? '' : `<button class="tsbtn on" title="show or hide timestamps">${icon('clock')}Time</button>`}
       <button class="wrapbtn" title="soft-wrap long lines">${icon('wrap')}Wrap</button>
       ${ai ? '' : `<button class="rawbtn" title="show the exact log text: no highlighting, no folded lines">${icon('raw')}Raw</button>`}
       <button class="follow on" title="auto-scroll to the end">${icon('follow')}Follow</button>
@@ -158,12 +158,12 @@ export function createPane(name) {
   const p = {
     name, el: pane, tabEl: tab, pre: pane.querySelector('pre'), fixed,
     ai, pkg, running: false,
-    offset: -1, buf: '', file: fixed ? 'combined' : 'streams',
-    follow: true, lines: 0, fetching: false,
-    sgr: newSgr(), start: null, noTrim: false, loadingEarlier: false,
-    earlierBtn: pane.querySelector('.earlier'),
+    offset: -1, file: fixed ? 'combined' : 'streams',
+    follow: true, fetching: false,
+    raw: !ai && localStorage.getItem('cmc-raw') === '1',
   };
-  if (p.earlierBtn) p.earlierBtn.onclick = () => loadEarlier(p);
+  // the whole log, as data and chunks (logview.js)
+  p.view = new LogView(p.pre, { fixed, ai, raw: p.raw, decorate: lc => linkifyLine(lc) });
   const tsBtn = pane.querySelector('.tsbtn');
   if (tsBtn && localStorage.getItem('cmc-ts') === '0') {
     p.pre.classList.remove('showts');
@@ -185,6 +185,7 @@ export function createPane(name) {
     const on = p.pre.classList.toggle('wrap');
     wrapBtn.classList.toggle('on', on);
     if (!ai) localStorage.setItem('cmc-wrap', on ? '1' : '0');
+    p.view.relayout();
     scheduleMarks(p);
     if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
   };
@@ -197,9 +198,7 @@ export function createPane(name) {
     if (pk) { emit('open-pkg', pk.textContent); return; }
     const head = ev.target.closest('.lgrp-head');
     if (head) {
-      const g = head.parentElement;
-      g.classList.toggle('folded');
-      g.dataset.user = '1';
+      p.view.toggleGroup(head);
       scheduleMarks(p);
       return;
     }
@@ -209,7 +208,15 @@ export function createPane(name) {
       env.textContent = open ? env.dataset.full : env.dataset.lbl;
     }
   });
-  new ResizeObserver(() => scheduleMarks(p)).observe(p.pre);
+  // a new width: new size estimates for the chunks out of view
+  let width = 0;
+  new ResizeObserver(() => {
+    if (p.pre.clientWidth !== width) {
+      width = p.pre.clientWidth;
+      p.view.relayout();
+    }
+    scheduleMarks(p);
+  }).observe(p.pre);
   pane.querySelector('.askai')?.addEventListener('click',
     () => emit('analyze-pkg', name));
   pane.querySelector('.locate')?.addEventListener('click', () => zoomToPkg(pkg));
@@ -240,13 +247,15 @@ export function createPane(name) {
   // raw: the exact text, for when the highlighting or a fold hides something
   const rawBtn = pane.querySelector('.rawbtn');
   if (rawBtn) {
-    p.raw = localStorage.getItem('cmc-raw') === '1';
     rawBtn.classList.toggle('on', p.raw);
     rawBtn.onclick = () => {
       p.raw = !p.raw;
       rawBtn.classList.toggle('on', p.raw);
       localStorage.setItem('cmc-raw', p.raw ? '1' : '0');
-      resetPane(p);  // the next poll renders the log again
+      p.view.setRaw(p.raw);  // the data stays: only the display changes
+      if (p.view.query) updateSearchCount(p);
+      if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
+      scheduleMarks(p);
     };
   }
   pane.querySelector('.fsel')?.addEventListener('change', ev => {
@@ -273,22 +282,9 @@ export function createPane(name) {
 }
 
 export function resetPane(p) {
-  p.trimmed = false;
   p.offset = -1;
-  p.buf = '';
-  p.lines = 0;
-  p.sgr = newSgr();
-  p.lint = null;
-  p.lintBy = null;
-  p.grps = null;
-  p.start = null;
-  p.noTrim = false;
-  p.pre.textContent = '';
+  p.view.reset();
   updateMarks(p);
-}
-
-export function updateEarlierBtn(p) {
-  if (p.earlierBtn) p.earlierBtn.style.display = p.start > 0 || p.trimmed ? '' : 'none';
 }
 
 /* ---- per-pane log search ---- */
@@ -323,129 +319,37 @@ export function initSearch(p) {
   p.el.querySelector('.snext').onclick = () => stepHit(p, 1);
 }
 
-export function markHit(p, ln) {
-  ln.classList.add('hit');
-  p.hits.push(ln);
-  return ln;
-}
-
-// the text of a log line, without its timestamp
-const lineText = ln => ln.lastElementChild?.textContent || '';
-
 // re, when given, picks the lines in place of the typed text: a search
 // opened for the user (the warnings) matches what the server counted
-export function runSearch(p, re = p.queryRe) {
-  const q = p.el.querySelector('.search').value.toLowerCase();
+export function runSearch(p, re = p.view.queryRe) {
+  const q = p.el.querySelector('.search').value;
   p.seekFirst = false;
-  p.queryRe = re;
-  for (const el of p.hits || []) el.classList.remove('hit', 'hit-cur');
-  p.query = q || null;
-  p.hits = [];
-  p.hitIdx = -1;
-  if (q) {
-    for (const ln of p.pre.querySelectorAll('.ln'))
-      if (matchesQuery(p, lineText(ln))) markHit(p, ln);
-    if (p.hits.length) {
-      p.hitIdx = p.hits.length - 1;  // start at the most recent match
-      focusHit(p);
-    }
-  }
+  const n = p.view.search(q, re);
+  if (n) focusHit(p, n - 1);  // start at the most recent match
   updateSearchCount(p);
 }
 
-function matchesQuery(p, text) {
-  return p.queryRe ? p.queryRe.test(text) : text.toLowerCase().includes(p.query);
-}
-
-export function focusHit(p) {
-  p.hits.forEach((h, i) => h.classList.toggle('hit-cur', i === p.hitIdx));
-  const cur = p.hits[p.hitIdx];
-  if (cur) {
-    openGroupOf(cur);
-    if (p.follow) {
-      p.follow = false;
-      p.el.querySelector('.follow').classList.remove('on');
-    }
-    cur.scrollIntoView({ block: 'center' });
+export function focusHit(p, k = p.view.hitIdx) {
+  if (p.follow) {
+    p.follow = false;
+    p.el.querySelector('.follow').classList.remove('on');
   }
+  p.view.focusHit(k);
 }
 
 export function stepHit(p, dir) {
-  if (p.hits?.length) {
-    p.hits = p.hits.filter(h => h.isConnected);  // drop trimmed lines
-    if (p.hitIdx >= p.hits.length) p.hitIdx = p.hits.length - 1;
-  }
-  if (!p.hits?.length) {
-    updateSearchCount(p);  // the last matches scrolled out of the log
-    return;
-  }
-  p.hitIdx = (p.hitIdx + dir + p.hits.length) % p.hits.length;
-  focusHit(p);
+  if (p.view.hits.length) focusHit(p, p.view.hitIdx + dir);
   updateSearchCount(p);
 }
 
 export function updateSearchCount(p) {
+  const v = p.view;
   p.el.querySelector('.scount').textContent =
-    p.query ? `${p.hits.length ? p.hitIdx + 1 : 0}/${p.hits.length}` : '';
+    v.query ? `${v.hits.length ? v.hitIdx + 1 : 0}/${v.hits.length}` : '';
   // the arrows step through matches, so without one they do nothing
-  const none = !p.hits?.length;
+  const none = !v.hits.length;
   p.el.querySelector('.sprev').disabled = none;
   p.el.querySelector('.snext').disabled = none;
-}
-
-export async function loadEarlier(p) {
-  // prepend the whole history before p.start, keeping the view in place
-  if (p.loadingEarlier || !(p.start || p.trimmed)) return;
-  if (p.trimmed) {
-    // the line cap dropped lines from the top: load the whole log again,
-    // up to the partial last line that waits in p.buf
-    p.pre.textContent = '';
-    p.lines = 0;
-    p.hits = [];
-    p.grps = null;
-    p.start = p.offset - new TextEncoder().encode(p.buf).length;
-    p.trimmed = false;
-  }
-  p.loadingEarlier = true;
-  p.earlierBtn.innerHTML = `${icon('top')}Loading…`;
-  const base = p.fixed
-    ? `/api/buildlog?`
-    : `/api/log/${encodeURIComponent(p.name)}?file=${p.file}&`;
-  try {
-    const parts = [];
-    let start = p.start;
-    while (start > 0) {
-      const from = Math.max(0, start - 512 * 1024);
-      const r = await (await fetch(
-        `${base}offset=${from}&limit=${start - from}` +
-        `&align=${from > 0 ? 1 : 0}${wsParam('&')}`)).json();
-      parts.unshift(r.data);
-      if (!(r.start < start)) break;  // no progress: stop
-      start = r.start;
-    }
-    const all = parts.join('');
-    if (all) {
-      const frag = document.createDocumentFragment();
-      // the ANSI and lint states start fresh at line zero
-      const ctx = { sgr: newSgr(), fixed: p.fixed, ai: p.ai };
-      const lines = all.split('\n');
-      if (lines[lines.length - 1] === '') lines.pop();
-      for (const line of lines) renderLogLine(ctx, line, frag);
-      if (App.cfg?.editor_url)
-        for (const ln of frag.querySelectorAll('.ln')) linkifyLine(ln.lastElementChild);
-      const before = p.pre.scrollHeight;
-      p.pre.insertBefore(frag, p.pre.firstChild);
-      p.pre.scrollTop += p.pre.scrollHeight - before;
-      p.lines += lines.length;
-      p.noTrim = true;  // keep the history the user asked for
-    }
-    p.start = start;
-    updateEarlierBtn(p);
-    if (p.query) runSearch(p);
-    updateMarks(p);
-  } catch (e) { /* transient */ }
-  p.earlierBtn.innerHTML = `${icon('top')}Load all`;
-  p.loadingEarlier = false;
 }
 
 export function pkgAbsPath(name) {
@@ -469,6 +373,7 @@ export function closePane(name) {
   if (!p || p.fixed) return;
   // every close path counts as a dismissal, "close all" included
   if (name === FAIL_PANE) failDismissed = true;
+  p.view?.destroy();
   p.el.remove();
   p.tabEl.remove();
   App.panes.delete(name);
@@ -502,7 +407,7 @@ function updateLogNote(p, r) {
   if (p.fellBack == null) p.fellBack = false;
   const name = p.el.querySelector(`.fsel option[value="${p.file}"]`)?.textContent;
   let msg = '';
-  if (!p.lines && !p.buf) {
+  if (!p.view.lines && !p.view.buf) {
     msg = !ended ? 'Waiting for output…'
         : r.missing ? `This build wrote no ${name} log for this package.`
         : `The ${name} log of this package is empty.`;
@@ -519,79 +424,45 @@ export async function pollPane(p) {
   p.fetching = true;
   let r = null;
   try {
-    const url = p.fixed
-      ? `/api/buildlog?offset=${p.offset}${wsParam('&')}`
-      : p.ai
-        ? `/api/analysis/${encodeURIComponent(p.pkg)}?offset=${p.offset}` +
-          wsParam('&')
-        : `/api/log/${encodeURIComponent(p.name)}?offset=${p.offset}` +
-          `&file=${p.file}${wsParam('&')}`;
-    r = await (await fetch(url)).json();
-    if (p.ai) {
-      p.running = !!r.running;
-      const chip = p.el.querySelector('.chip');
-      chip.textContent = p.running ? 'thinking…' : (r.size ? 'answered' : 'ready');
-      chip.className = 'chip ' + (p.running ? 'building' : 'done');
-      p.tabEl.querySelector('.dot').className =
-        'dot ' + (p.running ? 'c-building' : 'c-done');
+    // a fresh pane loads the whole log, 512 KB per request (the server's
+    // cap); a later poll fetches what arrived since
+    if (p.offset < 0) p.offset = 0;
+    for (let n = 0; n < 400; n++) {
+      const url = p.fixed
+        ? `/api/buildlog?offset=${p.offset}${wsParam('&')}`
+        : p.ai
+          ? `/api/analysis/${encodeURIComponent(p.pkg)}?offset=${p.offset}` +
+            wsParam('&')
+          : `/api/log/${encodeURIComponent(p.name)}?offset=${p.offset}` +
+            `&file=${p.file}${wsParam('&')}`;
+      r = await (await fetch(url)).json();
+      if (p.ai) {
+        p.running = !!r.running;
+        const chip = p.el.querySelector('.chip');
+        chip.textContent = p.running ? 'thinking…' : (r.size ? 'answered' : 'ready');
+        chip.className = 'chip ' + (p.running ? 'building' : 'done');
+        p.tabEl.querySelector('.dot').className =
+          'dot ' + (p.running ? 'c-building' : 'c-done');
+      }
+      // the log restarted, or the server dropped the part we had
+      if (r.reset) p.view.reset();
+      p.offset = r.offset;
+      if (r.data) appendLog(p, r.data);
+      if (!r.data || !(r.offset < r.size)) break;
     }
-    if (r.reset) {
-      p.trimmed = false;
-      p.pre.textContent = '';
-      p.buf = '';
-      p.lines = 0;
-      p.sgr = newSgr();
-      p.lint = null;
-      p.lintBy = null;
-      p.grps = null;
-      p.noTrim = false;
-      p.start = r.start ?? 0;
-      updateEarlierBtn(p);
-    } else if (p.start == null) {
-      p.start = r.start ?? 0;
-      updateEarlierBtn(p);
-    }
-    p.offset = r.offset;
-    if (r.data) appendLog(p, r.data);
   } catch (e) { /* transient */ }
+  // nothing yet (the server still loads the build): stay a fresh pane,
+  // which pollAllPanes polls also in the background
+  if (!p.view.lines && !p.view.buf) p.offset = -1;
   p.fetching = false;
   if (r && !p.fixed && !p.ai) updateLogNote(p, r);
 }
 
 export function appendLog(p, data) {
-  p.buf += data;
-  const lines = p.buf.split('\n');
-  p.buf = lines.pop();
-  if (!lines.length) return;
-  const frag = document.createDocumentFragment();
-  const added = lines.map(line => renderLogLine(p, line, frag));
-  p.lines += lines.length;
-  p.pre.appendChild(frag);
-  const doLink = !!App.cfg?.editor_url;
-  if (p.query || doLink) {  // keep the search live as the log streams
-    for (const ln of added) {
-      if (doLink) linkifyLine(ln.lastElementChild);
-      if (p.query && matchesQuery(p, lineText(ln))) markHit(p, ln);
-    }
-    if (p.query) updateSearchCount(p);
+  p.view.append(data);
+  if (p.view.query) {  // the search stays live as the log streams
+    updateSearchCount(p);
     seekFirstHit(p);
-  }
-  let trimmed = false;
-  while (!p.noTrim && p.lines > 6000) {
-    const first = p.pre.querySelector('.ln');
-    if (!first) break;
-    const body = first.parentElement.classList.contains('lgrp-body') ? first.parentElement : null;
-    first.remove();
-    if (body) {
-      if (!body.firstChild) body.parentElement.remove();
-      else updateGroup(body.parentElement, body.childElementCount);
-    }
-    p.lines--;
-    trimmed = true;
-  }
-  if (trimmed && !p.trimmed) {
-    p.trimmed = true;  // the start of the log is gone: offer to load it again
-    updateEarlierBtn(p);
   }
   if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
   scheduleMarks(p);
@@ -600,8 +471,6 @@ export function appendLog(p, data) {
 /* ---- the error and warning marks beside the scrollbar: where the
    problems sit in a long log, and a click jumps to one ---- */
 
-const MAX_MARKS = 400;
-
 export function scheduleMarks(p) {
   if (p.marksTimer) return;
   p.marksTimer = setTimeout(() => { p.marksTimer = null; updateMarks(p); }, 400);
@@ -609,43 +478,13 @@ export function scheduleMarks(p) {
 
 export function updateMarks(p) {
   const box = p.el?.querySelector('.lmarks');
-  if (!box || !p.pre) return;
-  box.textContent = '';
-  const h = p.pre.scrollHeight;
-  if (!h || h <= p.pre.clientHeight) return;  // no scrollbar: nothing to find
-  // m-err and m-warn: the same lines in raw mode, where they keep no color
-  const lines = p.pre.querySelectorAll('.ln.l-err, .ln.l-warn, .ln.m-err, .ln.m-warn');
-  const step = Math.max(1, Math.ceil(lines.length / MAX_MARKS));
-  const frag = document.createDocumentFragment();
-  for (let i = 0; i < lines.length; i += step) {
-    const ln = lines[i];
-    if (!ln.offsetParent) continue;  // inside a closed group
-    const m = document.createElement('span');
-    const err = ln.classList.contains('l-err') || ln.classList.contains('m-err');
-    m.className = err ? 'mk err' : 'mk warn';
-    m.style.top = `${(100 * ln.offsetTop / h).toFixed(2)}%`;
-    m.title = lineText(ln).trim().slice(0, 160);
-    m.onclick = () => {
-      ln.scrollIntoView({ block: 'center' });
-      if (p.follow) {
-        p.follow = false;
-        p.el.querySelector('.follow').classList.remove('on');
-      }
-      ln.classList.remove('flash');
-      void ln.offsetWidth;  // restart the animation
-      ln.classList.add('flash');
-    };
-    frag.appendChild(m);
-  }
-  box.appendChild(frag);
-}
-
-function openGroupOf(ln) {
-  const g = ln.closest('.lgrp');
-  if (g?.classList.contains('folded')) {
-    g.classList.remove('folded');
-    g.dataset.user = '1';
-  }
+  if (!box || !p.view) return;
+  p.view.marks(box, () => {
+    if (p.follow) {  // a jump to a mark stops the follow
+      p.follow = false;
+      p.el.querySelector('.follow').classList.remove('on');
+    }
+  });
 }
 
 /* ---- failure summary: every failed package's stderr tail, in one
@@ -803,9 +642,8 @@ on('state', () => {
   if (relinked || !App.workspace || !App.cfg?.editor_url) return;
   relinked = true;
   for (const p of App.panes.values()) {
-    const pres = p.pre ? [p.pre] : [...p.el.querySelectorAll('.ftail')];
-    for (const pre of pres)
-      for (const ln of pre.querySelectorAll('.ln')) linkifyLine(ln.lastElementChild);
+    if (p.view) { p.view.refreshRich(); continue; }
+    for (const ln of p.el.querySelectorAll('.ftail .ln')) linkifyLine(ln.lastElementChild);
   }
 });
 
@@ -825,10 +663,9 @@ on('find-in-log', (name, q, re = null) => {
 });
 
 function seekFirstHit(p) {
-  if (!p.seekFirst || !p.hits?.length) return;
+  if (!p.seekFirst || !p.view.hits.length) return;
   p.seekFirst = false;
-  p.hitIdx = 0;
-  focusHit(p);
+  focusHit(p, 0);
   updateSearchCount(p);
 }
 

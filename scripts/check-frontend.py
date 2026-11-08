@@ -27,8 +27,8 @@ ALLOWED = {
     # camera/draw/force/graph/g3d/gsearch are one subsystem (the graph views)
     # and may import each other; only hoisted functions cross at load time
     'camera': ['bus', 'draw', 'force', 'graph', 'modes', 'state', 'util'],
-    'dock': ['ansi', 'bus', 'camera', 'graph', 'modes', 'state', 'toasts',
-             'util'],
+    'dock': ['ansi', 'bus', 'camera', 'graph', 'logview', 'modes', 'state',
+             'toasts', 'util'],
     'draw': ['bus', 'graph', 'gsearch', 'state', 'util'],
     'force': ['camera', 'draw', 'modes', 'state'],
     'g3d': ['bus', 'camera', 'force', 'graph', 'gsearch', 'modes', 'state',
@@ -42,6 +42,8 @@ ALLOWED = {
     # lint.js colors the recurring parts of colcon logs; it imports nothing
     'lint': [],
     'logo': [],
+    # logview.js keeps a whole log as data and shows it in chunks
+    'logview': ['ansi', 'lint'],
     'modes': ['state'],
     'notify': ['bus', 'logo', 'state', 'util'],
     'pickers': ['graph', 'header', 'state', 'toasts', 'util'],

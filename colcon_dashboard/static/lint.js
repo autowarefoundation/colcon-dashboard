@@ -9,17 +9,22 @@
    lintLine(text, st) returns { cls, fold, nodes }: the line classes, the
    fold kind or null, and the nodes that render the text. st carries what
    one line tells about the next ones (a CMake warning block, the
-   severity of the last GCC diagnostic) and belongs to one log. */
+   severity of the last GCC diagnostic) and belongs to one log.
+   lintLine(text, st, false) builds no nodes: the log view classifies
+   every line that way when it arrives, and renders it later. */
 
 export function newLintState() { return { block: null, diag: null }; }
 
+let building = true;  // false: classify only, build no nodes
+
 const sp = (cls, text) => {
+  if (!building) return null;
   const s = document.createElement('span');
   s.className = cls;
   s.textContent = text;
   return s;
 };
-const tx = text => document.createTextNode(text);
+const tx = text => (building ? document.createTextNode(text) : null);
 
 // a stable hue per package, so that the interleaved output of parallel
 // jobs in the build log separates by color
@@ -37,6 +42,7 @@ export function pkgHue(name) {
 }
 
 export function pkgTag(name) {
+  if (!building) return null;
   const s = sp('pk', name);
   s.style.setProperty('--h', pkgHue(name));
   s.title = `${name}: click to open its log`;
@@ -45,6 +51,7 @@ export function pkgTag(name) {
 
 // an absolute path: the directories dim, the file name plain
 function pathNodes(path, cls = 'pth') {
+  if (!building) return [];
   const i = path.lastIndexOf('/');
   if (i <= 0) return [sp(cls, path)];
   const s = document.createElement('span');
@@ -55,6 +62,7 @@ function pathNodes(path, cls = 'pth') {
 
 // a message: ‘quoted code’ and a trailing [-Wflag] stand out
 function msgNodes(msg) {
+  if (!building) return [];
   const out = [];
   let rest = msg;
   let flag = null;
@@ -73,6 +81,7 @@ function msgNodes(msg) {
 }
 
 function durNode(sec) {
+  if (!building) return null;
   const s = sp('dur', `${sec}s`);
   const v = parseFloat(sec);
   if (v >= 300) s.classList.add('slow2');
@@ -108,6 +117,7 @@ const ENV_RE = /^[A-Za-z_][A-Za-z0-9_]*=\S*$/;
 // the environment that colcon puts before each command: one chip that
 // opens on a click (dock.js), then the command itself
 function invokeNodes(m) {
+  if (!building) return [];
   const out = [sp('mut', `${m[1]} command in `), ...pathNodes(m[2])];
   if (m[3]) out.push(tx(' '), sp(m[4] === '0' ? 'rc ok' : 'rc bad', `returned ${m[4]}`));
   out.push(tx(': '));
@@ -131,13 +141,14 @@ function invokeNodes(m) {
 }
 
 function progressNodes(pct, rest) {
+  const sm = STEP_RE.exec(rest);
+  const step = sm?.[1];
+  const cls = !sm ? [] : step === 'Built target' ? ['l-built'] : step.startsWith('Linking') ? ['l-link'] : ['l-step'];
+  if (!building) return { cls, nodes: [] };
   const bar = sp('pct', `${pct}%`);
   bar.style.setProperty('--p', `${pct}%`);
   const out = [bar, tx(' ')];
-  const sm = STEP_RE.exec(rest);
-  if (!sm) return { cls: [], nodes: out.concat(tx(rest)) };
-  const step = sm[1];
-  const cls = step === 'Built target' ? ['l-built'] : step.startsWith('Linking') ? ['l-link'] : ['l-step'];
+  if (!sm) return { cls, nodes: out.concat(tx(rest)) };
   out.push(sp('verb', step));
   if (sm[3]) {
     out.push(tx(' '));
@@ -146,7 +157,16 @@ function progressNodes(pct, rest) {
   return { cls, nodes: out };
 }
 
-export function lintLine(text, st) {
+export function lintLine(text, st, build = true) {
+  building = build;
+  try {
+    return lint(text, st);
+  } finally {
+    building = true;
+  }
+}
+
+function lint(text, st) {
   let m;
   // a CMake message block: its indented lines and blank lines, and the
   // few unindented lines that CMake puts inside, until other output
@@ -254,7 +274,7 @@ export function lintLine(text, st) {
   if ((m = NINJA_RE.exec(text))) {
     const pct = Math.round(100 * m[1] / Math.max(1, m[2]));
     const r = progressNodes(pct, m[3]);
-    r.nodes[0].textContent = `${m[1]}/${m[2]}`;
+    if (building) r.nodes[0].textContent = `${m[1]}/${m[2]}`;
     return { cls: ['l-prog', ...r.cls], fold: null, nodes: r.nodes };
   }
   if ((m = STEP_RE.exec(text))) {

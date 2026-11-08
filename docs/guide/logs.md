@@ -12,7 +12,9 @@ The dock opens with a pinned **build log** tab: the whole build, as a terminal s
 ![The failure summary: the failed package, the step and the command that failed, and the end of its log](../assets/screens/failures.webp)
 
 - A pane follows new output until you scroll up. The **Follow** button re-engages.
-- Panes open at the tail for an instant start. **Load all** fetches the whole history in one click.
+- A pane loads the whole log, also a build log of 10 MB and 60,000 lines, and opens at the end. Scrolling, resizing, and the **Wrap** button stay fast at any log size, because the pane lays out only the part near the view.
+- A selection over more than one line copies whole lines, exactly as the log has them: also the lines inside folded groups. While the timestamps are hidden, the copy leaves them out. A selection inside one line copies just that part.
+- The browser's own find (++ctrl+f++) also reaches the lines inside folded groups, and it opens the group of a match.
 - Every line carries a timestamp: build-relative in the build log, job-relative in package panes. The **Time** button hides them.
 - The **Wrap** button soft-wraps long lines. The choice sticks for future panes. AI panes start wrapped, because prose reads badly on one line.
 - The **search** box filters as you type, and matching lines highlight. ++enter++ and ++shift+enter++ step through the matches. The search stays live while the log streams.
