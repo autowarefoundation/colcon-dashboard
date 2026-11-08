@@ -284,7 +284,7 @@ export function createPane(name) {
   });
   // a chunk that got or lost its highlight can change the height: a pane
   // that follows the end stays at the end
-  p.view.onLayout = () => { if (p.follow) p.pre.scrollTop = p.pre.scrollHeight; };
+  p.view.onLayout = () => { if (p.follow && !p.loading) p.pre.scrollTop = p.pre.scrollHeight; };
   p.restorePending = loadPos(p);  // where this pane was before a reload
   App.panes.set(name, p);
   updateCloseAll();
@@ -433,9 +433,15 @@ export async function pollPane(p) {
   if (p.summary || p.fetching) return;  // the summary refreshes on 'state'
   p.fetching = true;
   let r = null;
+  // a fresh pane loads the whole log, 512 KB per request (the server's
+  // cap), out of sight: it shows once it sits at its place, so that the
+  // load does not scroll through the log
+  const first = p.offset < 0;
+  if (first) {
+    p.loading = true;
+    p.pre.classList.add('loading');
+  }
   try {
-    // a fresh pane loads the whole log, 512 KB per request (the server's
-    // cap); a later poll fetches what arrived since
     if (p.offset < 0) p.offset = 0;
     for (let n = 0; n < 400; n++) {
       const url = p.fixed
@@ -466,6 +472,11 @@ export async function pollPane(p) {
   if (!p.view.lines && !p.view.buf) p.offset = -1;
   // the whole log is here: back to where the pane was before a reload
   else if (p.restorePending && r && !(r.offset < r.size)) restorePos(p);
+  if (first) {
+    p.loading = false;
+    if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
+    p.pre.classList.remove('loading');
+  }
   p.fetching = false;
   if (r && !p.fixed && !p.ai) updateLogNote(p, r);
 }
@@ -476,7 +487,7 @@ export function appendLog(p, data) {
     updateSearchCount(p);
     seekFirstHit(p);
   }
-  if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
+  if (p.follow && !p.loading) p.pre.scrollTop = p.pre.scrollHeight;
   scheduleMarks(p);
 }
 

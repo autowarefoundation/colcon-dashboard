@@ -654,6 +654,15 @@ body.offline #sysmeters { display: none; }
    up under the mouse, and indent when they wrap; the lint colors the
    parts of each line (lint.js) */
 .logwrap { position: relative; flex: 1; min-height: 0; display: flex; }
+/* the first load of a pane happens out of sight (dock.js pollPane) */
+.pane pre.loading { visibility: hidden; }
+.logwrap:has(pre.loading)::after {
+  content: "Loading…";
+  position: absolute;
+  inset: 12px auto auto 16px;
+  font: var(--fs-s) var(--sans);
+  color: var(--muted);
+}
 .pane pre {
   flex: 1;
   margin: 0;
