@@ -1,19 +1,27 @@
-{#- Every page: Open Graph and Twitter card tags, so that a shared link
-    shows a preview with the title, the description, and the card image
-    (WhatsApp, Slack, Telegram, LinkedIn, X). Crawlers need absolute URLs,
-    so the image URL starts from site_url. -#}
+{#- Every page: the <title>, and Open Graph and Twitter card tags, so that
+    a shared link shows a preview with the title, the description, and the
+    card image (WhatsApp, Slack, Telegram, LinkedIn, X). Crawlers need
+    absolute URLs, so the image URL starts from site_url. -#}
 {% extends "base.html" %}
 
+{%- if page.meta and page.meta.title %}
+  {%- set cd_title = page.meta.title %}
+{%- else %}
+  {%- set cd_title = page.title | striptags %}
+{%- endif %}
+{#- the home page has the site name as its title, and the 404 page has
+    no title: show the site name alone -#}
+{%- if not cd_title %}
+  {%- set cd_title = config.site_name %}
+{%- elif cd_title != config.site_name %}
+  {%- set cd_title = cd_title ~ " - " ~ config.site_name %}
+{%- endif %}
+
+{% block htmltitle %}
+  <title>{{ cd_title }}</title>
+{% endblock %}
+
 {% block extrahead %}
-  {%- if page.meta and page.meta.title %}
-    {%- set og_title = page.meta.title %}
-  {%- else %}
-    {%- set og_title = page.title | striptags %}
-  {%- endif %}
-  {#- the home page has the site name as its title: do not repeat it -#}
-  {%- if og_title != config.site_name %}
-    {%- set og_title = og_title ~ " - " ~ config.site_name %}
-  {%- endif %}
   {%- if page.meta and page.meta.description %}
     {%- set og_description = page.meta.description %}
   {%- else %}
@@ -22,7 +30,7 @@
   {%- set og_image = config.site_url ~ "assets/social-card.jpg" %}
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="{{ config.site_name | e }}">
-  <meta property="og:title" content="{{ og_title | e }}">
+  <meta property="og:title" content="{{ cd_title | e }}">
   <meta property="og:description" content="{{ og_description | e }}">
   {%- if page.canonical_url %}
   <meta property="og:url" content="{{ page.canonical_url }}">
@@ -33,7 +41,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="The Colcon Dashboard logo next to a screenshot of a live colcon build">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{{ og_title | e }}">
+  <meta name="twitter:title" content="{{ cd_title | e }}">
   <meta name="twitter:description" content="{{ og_description | e }}">
   <meta name="twitter:image" content="{{ og_image }}">
 {% endblock %}
