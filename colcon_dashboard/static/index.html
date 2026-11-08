@@ -17,6 +17,17 @@
      stay broken: a launch reloads a page that did not start, and the page
      reloads itself once after 8 s. app.js sets cdBooted and cdLaunch. -->
 <script>
+  // startup errors: shown below, and sent to the server's log
+  window.cdErrors = [];
+  const cdReport = msg => {
+    window.cdErrors.push(msg);
+    try { navigator.sendBeacon('/api/client-error', `${msg} | ${location.href} | ${navigator.userAgent}`); } catch (e) {}
+  };
+  // capture: a <script> that fails to load fires no bubbling error
+  addEventListener('error', e => cdReport(e.message
+    ? `${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno}:${e.colno})`
+    : `failed to load ${e.target?.src || e.target?.href || e.target?.tagName}`), true);
+  addEventListener('unhandledrejection', e => cdReport(`unhandled: ${e.reason?.stack || e.reason}`));
   window.launchQueue?.setConsumer(p => (window.cdLaunch ? window.cdLaunch(p) : location.reload()));
   setTimeout(() => {
     if (window.cdBooted) return;
@@ -24,7 +35,12 @@
     try { tried = sessionStorage.getItem('cd-boot-retry') === '1'; sessionStorage.setItem('cd-boot-retry', '1'); } catch (e) {}
     if (!tried) { location.reload(); return; }
     const box = document.getElementById('tsum');
-    if (box) box.innerHTML = '<span class="lead">The page did not start.</span> <button type="button" onclick="location.reload()">Reload</button>';
+    if (!box) return;
+    box.innerHTML = '<span class="lead">The page did not start.</span> <button type="button" onclick="location.reload()">Reload</button>';
+    const why = document.createElement('code');
+    why.style.cssText = 'display:block;width:100%;white-space:pre-wrap;font-size:12px;margin-top:6px';
+    why.textContent = window.cdErrors.join('\n') || 'No script error was reported.';
+    box.appendChild(why);
   }, 8000);
 </script>
 </head>

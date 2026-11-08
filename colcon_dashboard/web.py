@@ -4,6 +4,7 @@ import ipaddress
 import json
 import os
 import socket
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler
@@ -119,6 +120,16 @@ class Handler(BaseHTTPRequestHandler):
             stop = Handler.on_stop or self.server.shutdown
             threading.Thread(target=stop, daemon=True).start()
             return
+        if path == "/api/client-error":
+            # a page that failed to start reports why (index.html): the
+            # service log (journalctl --user -u colcon-dashboard) shows it
+            try:
+                n = min(int(self.headers.get("Content-Length") or 0), 4096)
+            except ValueError:
+                n = 0
+            text = self.rfile.read(n).decode("utf-8", "replace") if n else ""
+            print(f"page error: {text}", file=sys.stderr, flush=True)
+            return self._send(200, json.dumps({"ok": True}))
         if path == "/api/server/restart":
             if service.under_service():
                 # systemd ends this process and starts a new one

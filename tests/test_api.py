@@ -163,6 +163,17 @@ class ApiTest(unittest.TestCase):
         with urllib.request.urlopen(self.base + "/last", timeout=5) as r:
             self.assertEqual(r.geturl(), self.base + "/")
 
+    def test_a_page_error_reaches_the_log(self):
+        import contextlib
+        import io
+        buf = io.StringIO()
+        req = urllib.request.Request(self.base + "/api/client-error", method="POST",
+                                     data=b"failed to load app.js | http://x/ | UA")
+        with contextlib.redirect_stderr(buf):
+            with urllib.request.urlopen(req, timeout=5) as r:
+                self.assertEqual(r.status, 200)
+        self.assertIn("page error: failed to load app.js", buf.getvalue())
+
     def test_ping(self):
         st, body, _ = self.get("/api/ping")
         self.assertEqual(st, 200)

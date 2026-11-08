@@ -2,7 +2,7 @@ import { newSgr, renderLogLine } from './ansi.js';
 import { emit, on } from './bus.js';
 import { zoomToPkg } from './camera.js';
 import { label } from './graph.js';
-import { LogView } from './logview.js';
+import { LogView } from './logpane.js';
 import { mode } from './modes.js';
 import { App } from './state.js';
 import { toast } from './toasts.js';
@@ -162,7 +162,7 @@ export function createPane(name) {
     follow: true, fetching: false,
     raw: !ai && localStorage.getItem('cmc-raw') === '1',
   };
-  // the whole log, as data and chunks (logview.js)
+  // the whole log, as data and chunks (logpane.js)
   p.view = new LogView(p.pre, { fixed, ai, raw: p.raw, decorate: lc => linkifyLine(lc) });
   const tsBtn = pane.querySelector('.tsbtn');
   if (tsBtn && localStorage.getItem('cmc-ts') === '0') {

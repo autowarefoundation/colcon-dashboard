@@ -671,7 +671,7 @@ body.offline #sysmeters { display: none; }
 }
 .pane pre.wrap { white-space: pre-wrap; overflow-wrap: anywhere; grid-template-columns: 100%; }
 .pane pre .ln, .pane pre .lgrp, .pane pre .lgrp-head, .pane pre .lgrp-body { display: block; }
-/* a chunk of the log (logview.js): the browser skips the layout and the
+/* a chunk of the log (logpane.js): the browser skips the layout and the
    paint of the chunks out of view; containIntrinsicSize holds their size */
 .pane pre .chunk { display: block; content-visibility: auto; }
 .pane pre .ln { padding: 0 6px; border-radius: var(--r-xs); }
@@ -773,7 +773,7 @@ body.offline #sysmeters { display: none; }
 .pane pre .lgrp.folded .lgrp-head::before { transform: rotate(-90deg); }
 .pane pre .lgrp-head:hover { color: var(--ink2); background: var(--line-hover); }
 .pane pre .lgrp.short .lgrp-head { display: none; }
-/* a folded group hides its lines with hidden="until-found" (logview.js),
+/* a folded group hides its lines with hidden="until-found" (logpane.js),
    so the browser's find still reaches them */
 /* where the errors and warnings sit: a strip beside the scrollbar */
 .lmarks { position: relative; flex: none; width: 8px; background: var(--surface); border-left: 1px solid var(--grid); }
