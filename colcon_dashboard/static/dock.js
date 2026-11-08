@@ -170,7 +170,8 @@ export function createPane(name) {
     tsBtn.classList.remove('on');
   }
   if (tsBtn) tsBtn.onclick = () => {
-    const on = p.pre.classList.toggle('showts');
+    let on;
+    p.view.keepPosition(() => { on = p.pre.classList.toggle('showts'); });
     tsBtn.classList.toggle('on', on);
     localStorage.setItem('cmc-ts', on ? '1' : '0');
     scheduleMarks(p);
@@ -182,10 +183,13 @@ export function createPane(name) {
     wrapBtn.classList.add('on');
   }
   wrapBtn.onclick = () => {
-    const on = p.pre.classList.toggle('wrap');
+    let on;
+    p.view.keepPosition(() => {
+      on = p.pre.classList.toggle('wrap');
+      p.view.relayout();
+    });
     wrapBtn.classList.toggle('on', on);
     if (!ai) localStorage.setItem('cmc-wrap', on ? '1' : '0');
-    p.view.relayout();
     scheduleMarks(p);
     if (p.follow) p.pre.scrollTop = p.pre.scrollHeight;
   };

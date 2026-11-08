@@ -443,14 +443,60 @@ export class LogView {
   }
 
   setRaw(raw) {
-    const text = this.text, buf = this.buf, q = this.query, re = this.queryRe;
-    this.reset();
-    this.raw = raw;
-    this.pre.classList.toggle('raw', raw);
-    this.query = q;
-    this.queryRe = re;
-    if (text.length) this.append(text.join('\n') + '\n');
-    this.buf = buf;
+    this.keepPosition(() => {
+      const text = this.text, buf = this.buf, q = this.query, re = this.queryRe;
+      this.reset();
+      this.raw = raw;
+      this.pre.classList.toggle('raw', raw);
+      this.query = q;
+      this.queryRe = re;
+      if (text.length) this.append(text.join('\n') + '\n');
+      this.buf = buf;
+    });
+  }
+
+  // ---- the scroll position ------------------------------------------------
+
+  // run change (a new display, or a new line layout), and keep the line at
+  // the top of the view where it was
+  keepPosition(change) {
+    const anchor = this.topLine();
+    change();
+    if (anchor) this.restore(anchor);
+  }
+
+  // the first line in view, and how far below the top of the view it is.
+  // Rects, not offsetTop: a chunk's containment makes it the offsetParent
+  // of its lines, so their offsetTop counts from the chunk
+  topLine() {
+    const view = this.pre.getBoundingClientRect().top;
+    for (const c of this.chunks) {
+      const r = c.el.getBoundingClientRect();
+      if (r.bottom <= view) continue;
+      if (!c.rich) {  // plain text in view: its first item is close enough
+        const it = c.items[0];
+        if (!it) return null;
+        return { i: it.g ? it.members[0] : it.i, dy: r.top - view };
+      }
+      for (const el of c.el.querySelectorAll('.ln[data-i], .lgrp.folded')) {
+        const er = el.getBoundingClientRect();
+        if (er.bottom <= view) continue;
+        const i = el.dataset.i != null ? +el.dataset.i : el.item.members[0];
+        return { i, dy: er.top - view };
+      }
+    }
+    return null;
+  }
+
+  restore({ i, dy }) {
+    const it = this.itemOf[i];
+    if (!it) return;
+    const c = this.chunks[it.c];
+    this.hydrate(c, true);
+    // the line itself, or the group line when it folded away
+    const el = c.el.querySelector(`.ln[data-i="${i}"]`) || (it.g && it.el) || c.el;
+    const now = el.getBoundingClientRect().top - this.pre.getBoundingClientRect().top;
+    this.pre.scrollTop += now - dy;
   }
 
   // ---- search -------------------------------------------------------------
