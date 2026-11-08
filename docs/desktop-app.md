@@ -86,18 +86,3 @@ When the server does not answer, the page shows how to start it again, and it op
 If the page runs on the same machine as the server, the server shows the build notifications on your desktop. They arrive also when no dashboard is open. A click on a notification opens the dashboard. The bell button and the settings turn them on and off.
 
 On another machine, through an SSH tunnel, the browser shows the notifications while a dashboard page is open.
-
-## Upgrade from the WebKit window
-
-Version 0.10 and older had a separate window that used WebKitGTK. That window is gone, and the browser app replaces it. For a pipx or pip install, run these commands once after the upgrade:
-
-```bash
-colcon-dashboard --install-desktop     # the entry now opens the browser
-colcon-dashboard --restart-service
-```
-
-To free the disk space of the old window, delete its data directory:
-
-```bash
-rm -r ~/.local/share/colcon-dashboard
-```

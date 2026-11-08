@@ -130,7 +130,7 @@ colcon-dashboard --service-status
 3. To remove your settings and the list of recent workspaces too, delete these directories:
 
     ```bash
-    rm -r ~/.config/colcon-dashboard ~/.cache/colcon-dashboard ~/.local/share/colcon-dashboard
+    rm -r ~/.config/colcon-dashboard ~/.cache/colcon-dashboard
     ```
 
 The dashboard never changes your sources or your build results. Into the build log directories it writes only a small `.colcon-dashboard.json` file per run, and `claude-analysis.json` files for the AI failure analyses that you start. These files go away with the logs.
