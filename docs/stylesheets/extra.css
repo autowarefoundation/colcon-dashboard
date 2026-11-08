@@ -84,7 +84,9 @@
   border-bottom: 1px solid var(--cd-border);
 }
 .cd-hero__inner { padding: 3.2rem 0.8rem 2.6rem; display: flex; flex-direction: column; align-items: center; text-align: center; }
-.cd-hero__text { max-width: 40rem; }
+/* width 100%: without it, the long lines of the install commands set the
+   column's minimum width, and on a phone the column grows past the screen */
+.cd-hero__text { width: 100%; max-width: 40rem; }
 .cd-hero__logo { width: 72px; height: 72px; margin: 0 auto 0.8rem; }
 .cd-hero h1 {
   margin: 0 0 0.6rem;
