@@ -490,6 +490,8 @@ body.offline #sysmeters { display: none; }
 .gname { font: var(--fs-xs) var(--mono); fill: var(--ink2); }
 .gname.failed { fill: var(--critical); }
 .gtick line { stroke: var(--grid); }
+.gzebra { fill: var(--zebra); }
+.ghover { fill: var(--line-hover); }
 .gtick text { font: var(--fs-2xs) var(--sans); fill: var(--muted); }
 .gbar { rx: 3; cursor: pointer; }
 .gbar.done { fill: var(--good); }

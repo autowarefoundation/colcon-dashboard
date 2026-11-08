@@ -12,7 +12,8 @@ import { $, fmtDur, PINNED_BUILD, svgEl, WS } from './util.js';
 // the place in the timeline, kept for a reload of this tab (restorePos)
 const POS_KEY = `cmc-gpos:${WS || ''}|${PINNED_BUILD || ''}`;
 const G = { rows: new Map(), gT: null, aT: null, now: null, charW: 0,
-            order: [], gut: 0, gutAuto: 0, W: 0, restore: loadPos() };
+            order: [], gut: 0, gutAuto: 0, W: 0, restore: loadPos(),
+            ptrY: null };  // the pointer height over the rows, for the hover band
 // the width of the name column that the user dragged; 0 fits it to the names
 try { G.userGut = parseInt(localStorage.getItem('cmc-gname-w') || '0', 10) || 0; }
 catch (e) { G.userGut = 0; }
@@ -22,7 +23,7 @@ function clearGantt(svg, axis) {
   svg.innerHTML = '';
   axis.innerHTML = '';
   G.rows.clear();
-  G.gT = G.aT = G.now = null;
+  G.gT = G.aT = G.now = G.zb = G.hov = null;
 }
 
 export function drawGantt() {
@@ -88,7 +89,13 @@ export function drawGantt() {
     const defs = svgEl('defs', {}, svg);
     defs.innerHTML = '<pattern id="gHatch" patternUnits="userSpaceOnUse" width="6" height="6"'
       + ' patternTransform="rotate(45)"><rect class="gh-bg" width="6" height="6"/>'
-      + '<line class="gh-line" x1="0" y1="0" x2="0" y2="6"/></pattern>';
+      + '<line class="gh-line" x1="0" y1="0" x2="0" y2="6"/></pattern>'
+      // every other row is a little darker, so that each bar sits on a row
+      // with its name; one rect for all rows, not one per row
+      + `<pattern id="gZebra" patternUnits="userSpaceOnUse" width="8" height="${2 * ROW}"`
+      + ` y="${TOP}"><rect class="gzebra" y="${ROW}" width="8" height="${ROW}"/></pattern>`;
+    G.zb = svgEl('rect', { fill: 'url(#gZebra)', x: 0, y: 0 }, svg);
+    G.hov = svgEl('rect', { class: 'ghover', x: 0, height: ROW }, svg);
     G.gT = svgEl('g', { class: 'gtick' }, svg);
     G.aT = svgEl('g', { class: 'gtick' }, axis);
     // the edge of the name column: drag it to resize the column
@@ -100,6 +107,11 @@ export function drawGantt() {
     }
   }
   svg.prepend(G.gT);  // behind the bars
+  svg.prepend(G.hov);  // behind the grid lines
+  svg.prepend(G.zb);
+  G.zb.setAttribute('width', W);
+  G.zb.setAttribute('height', H);
+  G.hov.setAttribute('width', W);
   G.gT.innerHTML = '';
   G.aT.innerHTML = '';
   const steps = [10, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200];
@@ -165,14 +177,36 @@ export function drawGantt() {
   }
   if (G.restore !== null) restorePos(wrap);
   else if (App.ganttFollow) wrap.scrollTop = wrap.scrollHeight;
+  placeHover();  // the rows can change order under a still pointer
 
   // clicks are handled in initGanttPan, resolved at press time: the live
   // chart redraws every poll, and a mid-click redraw would eat the click
   svg.onpointermove = ev => {
+    G.ptrY = ev.clientY;
+    placeHover();
     const b = ev.target.closest('.gbar, .gname');
     if (b) showNodeTooltip(b.dataset.name, ev); else hideTooltip();
   };
-  svg.onpointerleave = hideTooltip;
+  svg.onpointerleave = () => {
+    G.ptrY = null;
+    placeHover();
+    hideTooltip();
+  };
+}
+
+// the band behind the row under the pointer, from its name to its bar
+function placeHover() {
+  if (!G.hov) return;
+  const wrap = $('#ganttwrap');
+  let i = -1;
+  if (G.ptrY !== null && !wrap.classList.contains('panning')
+      && !wrap.classList.contains('resizing')) {
+    const y = G.ptrY - $('#gantt').getBoundingClientRect().top;
+    i = Math.floor((y - TOP) / ROW);
+  }
+  const shown = i >= 0 && i < G.order.length;
+  G.hov.style.display = shown ? '' : 'none';
+  if (shown) G.hov.setAttribute('y', TOP + i * ROW);
 }
 
 export function initGanttPan() {
@@ -197,7 +231,10 @@ export function initGanttPan() {
     if (drag.moved > 4) {
       wrap.scrollLeft = drag.sl - dx;
       wrap.scrollTop = drag.st - dy;
-      wrap.classList.add('panning');
+      if (!wrap.classList.contains('panning')) {
+        wrap.classList.add('panning');
+        placeHover();
+      }
       wrap.setPointerCapture(ev.pointerId);
     }
   });
@@ -221,6 +258,7 @@ export function initGanttPan() {
   });
   let saveTimer = 0;
   wrap.addEventListener('scroll', () => {
+    placeHover();
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => savePos(wrap), 250);
   });
