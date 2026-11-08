@@ -1,19 +1,215 @@
-/* The colors of the logo, after Windows 7: the blue of the Harmony
-   wallpaper, and its deep navy for the dark scheme. */
+/* The docs use the palette of the app (colcon_dashboard/static/style.css):
+   the blue of the logo for links and buttons, a cool off-white page, and
+   the deep navy of the dark theme. */
 :root, [data-md-color-scheme="default"] {
   --md-primary-fg-color: #1e7fd9;
   --md-primary-fg-color--light: #4a9ae3;
   --md-primary-fg-color--dark: #155fa6;
-  --md-accent-fg-color: #1e7fd9;
+  --md-accent-fg-color: #155fa6;
+  --md-typeset-a-color: #1a6fc0;
+  --cd-ink: #0a1f3d;
+  --cd-page: #f2f6fb;
+  --cd-surface: #fbfdff;
+  --cd-ink2: #3b5170;
+  --cd-muted: #5d6f88;
+  --cd-border: rgba(10, 31, 61, 0.12);
+  --cd-glow: rgba(30, 127, 217, 0.16);
+  --cd-good: #06b025;
+  --cd-shot-shadow: 0 24px 60px rgba(10, 31, 61, 0.18), 0 4px 14px rgba(10, 31, 61, 0.08);
 }
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #0c1a2d;
-  --md-primary-fg-color--light: #17283f;
-  --md-primary-fg-color--dark: #06101e;
-  --md-accent-fg-color: #3a95ea;
+  --md-primary-fg-color: #3a95ea;
+  --md-primary-fg-color--light: #5aa8f0;
+  --md-primary-fg-color--dark: #1e7fd9;
+  --md-accent-fg-color: #6db3f2;
+  --md-typeset-a-color: #5aa8f0;
   --md-default-bg-color: #06101e;
+  --md-code-bg-color: #0c1a2d;
+  --cd-ink: #e8f1fb;
+  --cd-page: #0a1626;
+  --cd-surface: #0c1a2d;
+  --cd-ink2: #b0c2d8;
+  --cd-muted: #7489a4;
+  --cd-border: rgba(214, 232, 252, 0.12);
+  --cd-glow: rgba(58, 149, 234, 0.22);
+  --cd-good: #2bd14a;
+  --cd-shot-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.35);
 }
-/* The logo has a light version (navy tube) and a dark version (white tube). */
-[data-md-color-scheme="slate"] .md-logo img {
-  content: url("../assets/logo-dark.svg");
+
+/* the logo has a light version (navy tube) and a dark version (white tube) */
+[data-md-color-scheme="slate"] .md-logo img { content: url("../assets/logo-dark.svg"); }
+.only-dark-logo, .cd-img-dark { display: none; }
+[data-md-color-scheme="slate"] .only-light-logo,
+[data-md-color-scheme="slate"] .cd-img-light { display: none; }
+[data-md-color-scheme="slate"] .only-dark-logo,
+[data-md-color-scheme="slate"] .cd-img-dark { display: block; }
+
+/* each screenshot comes in a light and a dark version (#only-light and
+   #only-dark): the layout rules below must not show the hidden one */
+[data-md-color-scheme="default"] .md-typeset img[src$="#only-dark"],
+[data-md-color-scheme="slate"] .md-typeset img[src$="#only-light"] { display: none !important; }
+
+/* ---- screenshots: a soft frame and shadow, like a window ---- */
+.md-typeset img[src*="screens/"] {
+  border-radius: 10px;
+  border: 1px solid var(--cd-border);
+  box-shadow: var(--cd-shot-shadow);
 }
+.md-typeset figure { margin: 2em auto; }
+.md-typeset figcaption { max-width: 46rem; color: var(--cd-muted); font-size: 0.72rem; }
+/* a narrow screenshot, such as a dropdown, stays at its natural size */
+.md-typeset img.cd-narrow { max-width: min(100%, 560px); }
+
+/* ---- the landing page hero (overrides/home.html) ---- */
+.cd-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(60rem 30rem at 85% -10%, var(--cd-glow), transparent 70%),
+    radial-gradient(40rem 24rem at 0% 20%, var(--cd-glow), transparent 70%),
+    linear-gradient(180deg, var(--cd-page), var(--md-default-bg-color));
+  border-bottom: 1px solid var(--cd-border);
+}
+.cd-hero__inner { padding: 3.2rem 0.8rem 2.6rem; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.cd-hero__text { max-width: 40rem; }
+.cd-hero__logo { width: 72px; height: 72px; margin: 0 auto 0.8rem; }
+.cd-hero h1 {
+  margin: 0 0 0.6rem;
+  font-size: 2.6rem;
+  line-height: 1.1;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  color: var(--cd-ink);
+}
+.cd-hero__lead { font-size: 1.02rem; line-height: 1.6; color: var(--cd-ink2); margin: 0 0 0.6rem; }
+.cd-hero__sub { font-size: 0.86rem; color: var(--cd-muted); margin: 0 0 1.4rem; }
+.cd-hero code {
+  font-size: 0.92em;
+  padding: 0.1em 0.4em;
+  border-radius: 6px;
+  background: var(--md-code-bg-color);
+  color: var(--md-code-fg-color);
+}
+.cd-hero__buttons { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; }
+.cd-hero .md-button {
+  display: inline-block;
+  margin: 0;
+  border-radius: 999px;
+  padding: 0.55em 1.5em;
+  font-size: 0.8rem;
+  font-weight: 650;
+  border: 1px solid var(--cd-border);
+  background: var(--cd-surface);
+  color: var(--cd-ink);
+  transition: border-color 120ms, color 120ms, box-shadow 120ms, background-color 120ms;
+}
+.cd-hero .md-button:hover { border-color: var(--md-primary-fg-color); color: var(--md-primary-fg-color); }
+.cd-hero .md-button--primary {
+  background: var(--md-primary-fg-color);
+  border-color: var(--md-primary-fg-color);
+  color: #fff;
+  box-shadow: 0 6px 18px var(--cd-glow);
+}
+.cd-hero .md-button--primary:hover { background: var(--md-primary-fg-color--dark); border-color: var(--md-primary-fg-color--dark); color: #fff; }
+.cd-hero .cd-button--ghost { background: transparent; color: var(--cd-ink2); }
+.cd-hero__install { margin: 1.1rem 0 0; font-size: 0.78rem; color: var(--cd-muted); }
+.cd-hero__shot { margin: 2.4rem 0 0; width: 100%; max-width: 64rem; }
+.cd-hero__shot img {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--cd-border);
+  box-shadow: var(--cd-shot-shadow);
+}
+.cd-hero__shot figcaption { margin-top: 0.9rem; color: var(--cd-muted); font-size: 0.72rem; }
+@media screen and (max-width: 44.984375em) {
+  .cd-hero h1 { font-size: 1.9rem; }
+  .cd-hero__inner { padding-top: 2rem; }
+}
+
+/* the landing page body: the hero shows the title, so the page's own h1
+   is only for screen readers */
+.md-typeset h1.cd-sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.md-typeset .cd-section-title { text-align: center; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin: 2.4em 0 0.3em; }
+.md-typeset .cd-section-lead { text-align: center; color: var(--cd-muted); max-width: 38rem; margin: 0 auto 1.6em; }
+
+/* three short promises under the hero */
+.md-typeset .cd-pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 2em 0 1em; }
+.md-typeset .cd-pillars > div {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--cd-border);
+  border-radius: 12px;
+  background: var(--cd-surface);
+}
+.md-typeset .cd-pillars h3 { margin: 0.2em 0 0.4em; font-size: 0.86rem; }
+.md-typeset .cd-pillars p { margin: 0; font-size: 0.74rem; color: var(--cd-ink2); }
+.md-typeset .cd-pillars .twemoji, .md-typeset .cd-pillars svg { color: var(--md-primary-fg-color); }
+@media screen and (max-width: 59.984375em) {
+  .md-typeset .cd-pillars { grid-template-columns: 1fr; }
+}
+
+/* a feature: a screenshot beside its text, the sides alternating */
+.md-typeset .cd-feature {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 2rem;
+  align-items: center;
+  margin: 3rem 0;
+}
+.md-typeset .cd-feature:nth-of-type(even) { grid-template-columns: 1fr 1.35fr; }
+.md-typeset .cd-feature:nth-of-type(even) > :first-child { order: 2; }
+.md-typeset .cd-feature img { width: 100%; height: auto; display: block; }
+.md-typeset .cd-feature h3 { margin-top: 0; font-size: 1.05rem; letter-spacing: -0.01em; }
+.md-typeset .cd-feature p, .md-typeset .cd-feature li { font-size: 0.76rem; color: var(--cd-ink2); }
+.md-typeset .cd-feature .cd-kicker {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--md-primary-fg-color);
+  margin-bottom: 0.3rem;
+}
+@media screen and (max-width: 59.984375em) {
+  .md-typeset .cd-feature, .md-typeset .cd-feature:nth-of-type(even) { grid-template-columns: 1fr; gap: 1rem; }
+  .md-typeset .cd-feature:nth-of-type(even) > :first-child { order: 0; }
+}
+
+/* the small and the big build, side by side */
+.md-typeset .cd-scale { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin: 1.5em 0 2.5em; }
+.md-typeset .cd-scale figure { margin: 0; }
+.md-typeset .cd-scale img { width: 100%; height: auto; }
+.md-typeset .cd-scale figcaption { text-align: left; margin-top: 0.8rem; }
+.md-typeset .cd-scale figcaption strong { display: block; font-size: 0.86rem; color: var(--md-default-fg-color); }
+@media screen and (max-width: 59.984375em) {
+  .md-typeset .cd-scale { grid-template-columns: 1fr; }
+}
+
+/* the closing call to action */
+.md-typeset .cd-cta {
+  text-align: center;
+  margin: 3em 0 1em;
+  padding: 2rem 1rem;
+  border-radius: 16px;
+  border: 1px solid var(--cd-border);
+  background:
+    radial-gradient(30rem 12rem at 50% 0%, var(--cd-glow), transparent 70%),
+    var(--cd-surface);
+}
+.md-typeset .cd-cta h2 { margin: 0 0 0.4em; font-size: 1.3rem; }
+.md-typeset .cd-cta p { color: var(--cd-ink2); }
+.md-typeset .cd-cta .md-button { border-radius: 999px; margin: 0.3rem; }
+
+/* grid cards: a slightly softer card than the theme's */
+.md-typeset .grid.cards > ul > li, .md-typeset .grid > .card {
+  border-radius: 12px;
+  border-color: var(--cd-border);
+}
+.md-typeset .grid.cards > ul > li:hover { border-color: var(--md-primary-fg-color); box-shadow: 0 8px 24px var(--cd-glow); }
+
+/* a wider page: the screenshots carry small text, and they read better
+   with more room */
+.md-grid { max-width: 74rem; }

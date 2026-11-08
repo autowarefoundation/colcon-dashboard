@@ -35,5 +35,15 @@ Clients that send no `Origin` header, such as `curl` and the `colcon-dashboard` 
 | `/api/analyze/<pkg>?ws=&q=` (POST) | Starts an AI analysis of a failed package, or asks a follow-up |
 | `/api/analysis/<pkg>?ws=&offset=N` | The analysis transcript from byte `N`, plus a running flag |
 | `/api/stop` (POST) | Stops the server, like `colcon-dashboard --stop` |
+| `/api/ping` | The app name, the process id, the version, and the start time of the server |
+| `/api/live` | The live build of each watched workspace, for the tray icon |
+| `/api/server` | The service state: start at login, the tray icon, and how the server runs |
+| `/api/server/restart` (POST) | Restarts the server |
+| `/api/server/login?on=1` (POST) | Turns the start at login on or off |
+| `/api/server/tray?on=1` (POST) | Turns the tray icon on or off |
+| `/api/notify?mode=` (POST) | Sets the notifications: `off`, `on`, or `sound` |
+| `/api/notify/test` (POST) | Sends a test notification |
+| `/api/client-error` (POST) | A page that fails to start reports its error here. The server writes it to its log |
+| `/last` | Redirects to the page of the workspace that was open last |
 
 The server trusts the local workspace. Do not expose the port to an untrusted network.

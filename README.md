@@ -1,26 +1,47 @@
-# Colcon Dashboard
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/autowarefoundation/colcon-dashboard/main/docs/assets/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/autowarefoundation/colcon-dashboard/main/docs/assets/logo.svg" alt="" width="88">
+  </picture>
+</p>
 
-A live web dashboard for `colcon build`. It shows how many packages are done, building, ready, waiting, or failed. It draws the dependency graph and colors each node as the build moves through it. Each package gets its own log pane, so logs never mix.
+<h1 align="center">Colcon Dashboard</h1>
 
-**Documentation: <https://autowarefoundation.github.io/colcon-dashboard/>**
+<p align="center"><b>See your colcon build.</b><br>A live dashboard for <code>colcon build</code>: the dependency graph, a timeline, one log per package, and the load on your machine.</p>
 
-![The dashboard during a live Autoware build: the timeline, the dependency graph, and the log of a failed package](https://raw.githubusercontent.com/autowarefoundation/colcon-dashboard/main/docs/assets/screens/overview.webp)
+<p align="center">
+  <a href="https://autowarefoundation.github.io/colcon-dashboard/">Documentation</a> ·
+  <a href="https://autowarefoundation.github.io/colcon-dashboard/install/">Install</a> ·
+  <a href="https://autowarefoundation.github.io/colcon-dashboard/quick-start/">Quick start</a> ·
+  <a href="https://pypi.org/project/colcon-dashboard/">PyPI</a>
+</p>
 
-The server uses only the Python standard library, with zero dependencies. It works on any colcon workspace (ROS 2, Autoware, or anything else that colcon builds). It reads the log files that colcon already writes under `log/`, so any build appears, from any terminal, with any options.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/autowarefoundation/colcon-dashboard/main/docs/assets/screens/hero-dark.webp">
+  <img src="https://raw.githubusercontent.com/autowarefoundation/colcon-dashboard/main/docs/assets/screens/hero-light.webp" alt="Colcon Dashboard during a live Autoware build: the timeline, the dependency graph with the building packages in blue, and the build log">
+</picture>
 
-## Highlights
+## Why
 
-- **Dependency graph**: every package, laid out by dependency depth and recolored live as the build moves. The layouts are layered, force, and a 3D wavefront.
-- **Timeline**: a Gantt chart of every started package. It makes the parallelism and the long serial chains visible.
-- **Log panes**: one tab per package, with search, ANSI colors, timestamps, and editor links. Failed panes open by themselves.
-- **AI failure analysis**: one click starts a headless [claude](https://claude.com/claude-code) run on a failed package and streams the investigation live.
-- **System pressure**: a per-core heatmap plus CPU, RAM, and swap meters, because a colcon build can exhaust the machine.
-- **Build history**: every build and `colcon test` run, with outcomes, durations, and deltas against the previous run.
-- **Desktop app**: Chrome, Edge, and Brave install the dashboard as an app with its own window. An optional tray icon shows the builds and controls the server, and the server sends desktop notifications also with no page open.
+A long `colcon build` prints a wall of text. You cannot see what builds now, what waits, which package is slow, or where the first error is. Colcon Dashboard shows all of it on one page, while the build runs.
+
+- **Nothing changes in how you build.** The dashboard reads the logs that colcon already writes into `log/`. Every build shows up: from any terminal, with any options.
+- **No dependencies.** The server is plain Python 3.8 or newer, with only the standard library.
+- **One address for every workspace.** One server on `localhost:8642` serves all your workspaces, from a small package set to a 500-package Autoware build.
+
+## What you get
+
+- **Dependency graph**: every package, placed by its dependency depth. Packages turn blue while they build and green when they are done. Hover a package to see its whole dependency chain.
+- **Timeline**: a Gantt chart of every package. Sort it by duration to find the packages that slow the build.
+- **Log panes**: one tab per package, so parallel output never mixes. Errors and warnings stand out, install lines fold, and search stays fast also in a 10 MB log.
+- **Failures**: the log of a failed package opens by itself, and a Failures tab collects every error. One click asks [Claude](https://claude.com/claude-code) to find the cause.
+- **History**: every build and test run, with its outcome and its time against the previous run.
+- **System meters**: a per-core heatmap and the CPU, RAM, and swap meters, because a big build can run out of memory.
+- **Desktop app**: install the page as an app with its own window, get desktop notifications, and use the optional tray icon.
 
 ## Install
 
-On Ubuntu, install the apt package. It upgrades with the usual system updates:
+On Ubuntu, install the apt package. It upgrades with your system updates:
 
 ```bash
 sudo add-apt-repository ppa:xmfcx/colcon-dashboard
@@ -28,38 +49,21 @@ sudo apt install python3-colcon-dashboard
 colcon-dashboard --start-service
 ```
 
-The package enables the service for every user, so the server starts at each login.
-
-On any distribution, pipx does the same job.
+On any Linux distribution, use pipx:
 
 ```bash
 pipx install colcon-dashboard
 colcon-dashboard --install-service
-
-# upgrade later
-pipx upgrade colcon-dashboard
 ```
 
-Plain `pip install colcon-dashboard` also works in a virtual environment with Python 3.8 or newer.
+The service starts the server at every login. Open <http://localhost:8642/>, pick your workspace, and run `colcon build` as usual.
 
-The service starts the server at login. Open <http://localhost:8642/> and pick your workspace. That is the whole setup. After an upgrade, run `colcon-dashboard --restart-service` to load the new version.
+The [documentation](https://autowarefoundation.github.io/colcon-dashboard/) has the full tour, the desktop app, the configuration, and the command line.
 
-To use the dashboard in its own window, install it as an app from the address bar of Chrome, Edge, or Brave. The [desktop app page](https://autowarefoundation.github.io/colcon-dashboard/desktop-app/) covers the app, Firefox, and the tray icon.
+## Security
 
-The [install page](https://autowarefoundation.github.io/colcon-dashboard/install/) covers the install from a checkout and the service commands.
+The server binds to `127.0.0.1` by default. It trusts every caller, so expose its port only to a network that you trust. To watch a build on another machine, use an [SSH tunnel](https://autowarefoundation.github.io/colcon-dashboard/remote/).
 
-## Quick start
+## License
 
-Build as you always do, and open the page of your workspace:
-
-```text
-$ colcon build
-$ colcon-dashboard . --open
-already running: http://localhost:8642/?ws=%2Fhome%2Fuser%2Fws
-```
-
-This is the output when the service runs the server. Without the service, the same command starts the server in the terminal, in the foreground, until you press Ctrl+C.
-
-Expose the port only to a network that you trust. The server trusts every caller.
-
-The [documentation](https://autowarefoundation.github.io/colcon-dashboard/) covers the full page tour, the configuration file, the command line, and the HTTP API.
+Apache 2.0

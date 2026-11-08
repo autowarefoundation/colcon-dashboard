@@ -25,6 +25,16 @@ The picker scans your home directory and the [scan roots](configuration.md#extra
 
 An installed app brings its open window to the front on each launch, and it does not load the page again. A page whose scripts did not start (for example in the middle of an upgrade) reloads by itself once after 8 seconds, and a new launch also reloads it. If it still does not start, it says "The page did not start" and shows a **Reload** button. In the app window, ++ctrl+r++ always loads the page again.
 
+## The page says "The page did not start"
+
+The scripts of the page did not load. The page then shows the error, and the server writes it to its log as a `page error:` line:
+
+```bash
+journalctl --user -u colcon-dashboard | grep "page error"
+```
+
+An ad blocker can block a script of the page by its file name. If the page starts in a private window but not in a normal one, allow `localhost:8642` in your ad blocker, and reload the page.
+
 ## The page says "OFFLINE"
 
 The server does not answer.

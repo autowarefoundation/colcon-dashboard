@@ -1,58 +1,72 @@
 ---
 icon: lucide/waypoints
 description: >-
-  The live dependency graph of a colcon build: node states, edge colors,
-  search and filters, and the layered, force, and 3D layout modes.
+  The live dependency graph of a colcon build: what the colors mean, how to
+  find a package and its dependency chain, and the layered, force, and 3D
+  layouts.
 ---
 
 # Dependency graph
 
-Every package in the build, laid out left to right by dependency depth. An edge points from a dependency to the package that needs it.
+The graph shows every package of the build. Each package is a node, placed from left to right by its dependency depth. An edge points from a dependency to the package that needs it. The graph changes live as the build moves through it.
 
-![The dependency graph zoomed in during a build: done packages in green, building packages in blue with a halo](../assets/screens/graph-zoom.webp)
+![The dependency graph of Autoware zoomed in during a build: done packages in green, building packages in blue, ready packages with a dashed blue border, and waiting packages in gray](../assets/screens/graph-live-light.webp#only-light)
+![The dependency graph of Autoware zoomed in during a build, dark theme](../assets/screens/graph-live-dark.webp#only-dark)
 
-## Node states
+## What the colors mean
 
-Node states combine color, border, and motion:
+| Node | State |
+|---|---|
+| Green | **Done**. |
+| Blue, slowly breathing | **Building**. The box fills from left to right as make reports its progress, for example `[ 42%]`. |
+| Dashed blue border | **Ready**. All its dependencies are done, and it starts when a worker is free. |
+| Slow pulse | **Next up**. It starts as soon as the packages that build now finish. |
+| Gray | **Waiting** for its dependencies. A struck label means **skipped**. |
+| Red | **Failed**. Every package that depends on it gets a red dashed border, because it can no longer build. |
+| Orange | **Aborted**. It was building when the build stopped. |
 
-- **Done**: a green wash.
-- **Building**: a blue box that slowly breathes, each node in its own rhythm. The box fills left to right with a deeper blue as make reports `[ 42%]` progress. The label stays legible on top. A faint halo glows behind the node on the backmost layer, so the active zone shows even from far out.
-- **Ready**: a dashed blue border. All dependencies are done, and the package starts as soon as a worker becomes free.
-- **Next up**: a slow pulse. This waiting package starts when the packages that build now finish, because no deeper dependency blocks it.
-- **Waiting**: quiet gray. **Skipped**: gray with a struck label.
-- **Failed**: solid red. Everything downstream of a failure turns red-dashed with red edges. This blast radius looks different from the packages that the stop only abandoned, which stay gray.
-- **Aborted**: orange. The package was building when the build stopped.
+The edges take their color from the nodes at their ends. Light green edges connect finished packages. Blue edges, with small dots that flow along them, lead into a building package. Red edges follow a failure to the packages that depend on it.
 
-## Edges
+From far away, the whole build reads at a glance: green at the left, the blue front of the build in the middle, and the gray packages that wait at the right.
 
-Edges take color from their endpoints:
+![The whole Autoware graph during a build: green packages at the left, the building front in blue, and the waiting packages in gray at the right](../assets/screens/graph-overview-light.webp#only-light)
+![The whole Autoware graph during a build, dark theme](../assets/screens/graph-overview-dark.webp#only-dark)
 
-- Light green between two done packages: finished lineage.
-- Solid blue into a building package, with droplets that flow along the edge at constant speed: the package consumes its finished dependencies.
-- Dashed blue marching into a next-up package: what it waits for.
-- Red along the failure cascade.
+When you zoom out so far that the labels can no longer be read, each node becomes a plain colored box.
 
-## Interaction
+## Move around
 
-- Hover a node to see its state, phase, time, stderr count, and path. The hover also lights its full dependency chain while the rest dims. When the previous build has a duration for the package, the tooltip compares them, and marks a clear regression.
-- Click a node to select it, and to open its log. A selection keeps the dependency chain in focus after the mouse leaves. Ctrl+click or Shift+click adds a node to the selection, or takes it out again, and the focus then shows all the selected chains. To clear the selection, click empty space or press Esc.
-- Click a node to open its log pane.
-- The **find package** box highlights matching packages while the rest fades, in every layout and in the timeline. ++enter++ and ++shift+enter++ jump through the matches. The ++slash++ key jumps to the box.
-- The **state chips** (failed, building, waiting, done) filter the same way by state instead of by name, and combine with the find box. One click on **failed** shows the whole blast radius of a broken build.
-- Double-click a log tab in the dock to center the view on that package.
-- Drag to pan, scroll to zoom. **Fit** frames the whole graph.
-- When you zoom out so far that a label would be a mere smudge (under 1.5 pixels high), the labels hide and each node becomes a plain colored box. Until then, the labels stay, even when they are small.
-- **Follow** keeps the camera on the packages that build now, so the action stays framed as the build moves. If you pan or zoom by hand, the camera is yours again.
-- In the layered layout, a reload of the page keeps the view: the same part of the graph at the same zoom, or the build-follow camera when it was on. A new build, or a switch of the **show** setting, fits the whole graph.
-- The **show** switch picks what the graph draws: only the packages of this build, or the whole workspace.
-- When most package names share a prefix such as `autoware_`, the labels hide it. Tooltips keep the full name. To pick other prefixes, or to show the full names, open the settings (the gear button) and use **Package names**. The section suggests the common prefixes of the workspace, and you can hide more than one. The graph, the timeline, the log tabs, and the failures use the short names. The pane headers and the tooltips show the full names. The page saves the choice per workspace in this browser.
+- Drag to pan, and scroll to zoom.
+- **Fit** shows the whole graph.
+- **Follow** keeps the camera on the packages that build now. When you pan or zoom yourself, Follow turns off.
+- Double-click a log tab in the dock to center the graph on that package.
+- A reload of the page keeps the view. A new build fits the whole graph again.
 
-## Layout modes
+## Find a package and its chain
 
-The **layout** menu picks one of three modes, and the choice persists:
+![A selected package with its whole dependency chain in focus, and the rest of the graph dimmed](../assets/screens/graph-focus-light.webp#only-light)
+![A selected package with its dependency chain in focus, dark theme](../assets/screens/graph-focus-dark.webp#only-dark)
 
-- `layered`: the static left-to-right layout described above.
-- `force`: a live spring simulation with the same left-to-right anchoring. Drag nodes to rearrange. The simulation cools and stops by itself.
-- `3d`: the build as a wavefront. Building packages share one central plane, finished discs stack to its left, and waiting discs queue to the right by dependency depth. Packages glide through the blue plane as the build advances. Left-drag orbits. Shift-drag, right-drag, or middle-drag pans. The wheel zooms. The camera rotates by itself until the first grab.
+- Hold the mouse over a package to see its state, its build time, and its path. Its whole dependency chain lights up, and the rest of the graph dims. If the previous build has a time for the package, the tooltip compares the two times.
+- Click a package to select it and to open its log. The chain stays in focus after the mouse leaves. ++ctrl++ + click or ++shift++ + click adds packages to the selection. Click empty space or press ++esc++ to clear it.
+- Type in the **Find package** box to highlight the matching packages. ++enter++ and ++shift+enter++ jump through the matches. The ++slash++ key jumps to the box.
+- The state buttons (**Failed**, **Building**, **Waiting**, **Done**) highlight the packages in that state. One click on **Failed** shows every package that a failure blocks.
 
-Fit and Follow drive the camera in every mode. In the force and 3D modes, the camera keeps the whole graph in view while the nodes spread out. The first pan, zoom, or drag stops this, and Fit starts it again. In the force and 3D modes, a **Spread** slider in the corner scales how far the simulation spreads the nodes.
+## What the graph shows
+
+The **Show** switch picks the packages: only the packages of this build, or the whole workspace.
+
+When most package names start with the same prefix, such as `autoware_`, the labels leave it out, so the names stay short. The tooltips and the pane headers keep the full names. To choose the prefix yourself, open the settings and use **Package names**.
+
+## Layouts
+
+The **Layout** menu has three layouts. The page keeps your choice.
+
+- **Layered**: the left-to-right layout that this page shows. It is the clearest layout for a build.
+- **Force**: a live spring simulation with the same left-to-right order. You can drag the nodes. A **Spread** slider sets how far the nodes spread out.
+- **3D**: the build as a wave. The building packages share one plane in the middle, the finished packages stack at the left, and the waiting packages queue at the right. Drag to turn the view, ++shift++ + drag to pan, and scroll to zoom.
+
+![The 3D layout during a build: the building packages on a blue plane in the middle, the finished packages at the left, and the waiting packages at the right](../assets/screens/graph-3d-light.webp#only-light)
+![The 3D layout during a build, dark theme](../assets/screens/graph-3d-dark.webp#only-dark)
+
+In the force and 3D layouts, the camera keeps the whole graph in view until you pan, zoom, or drag. **Fit** starts this again.

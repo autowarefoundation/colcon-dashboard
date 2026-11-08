@@ -1,20 +1,45 @@
 ---
 icon: lucide/chart-gantt
 description: >-
-  The Gantt timeline of a colcon build: sort orders, auto-scroll, and the
-  side-by-side view that pairs the timeline with the dependency graph.
+  The Gantt timeline of a colcon build: find the slow packages and the long
+  serial chains, sort the rows, follow the newest packages, and pair the
+  timeline with the graph.
 ---
 
 # Timeline
 
-A Gantt chart of every started package, with a dashed now line. The time axis stays at the top while you scroll the rows. A long package name ends in "…", and its tooltip shows the full name. Drag the right edge of the name column to resize it. The width persists. A double-click on the edge fits the column to the names again. Bar colors match the graph states.
+The timeline is a Gantt chart of every package that started. Each row is one package, and its bar runs from the start to the end of its build. A dashed line marks the current time while the build runs. The bar colors match the graph: green for done, blue for building, striped red for failed, and orange for aborted.
 
-![The timeline of a parallel build, sorted by duration, with the longest packages on top](../assets/screens/timeline.webp)
+![The timeline of the full Autoware build, sorted by duration: the longest packages on top](../assets/screens/timeline-light.webp#only-light)
+![The timeline of the full Autoware build, sorted by duration, dark theme](../assets/screens/timeline-dark.webp#only-dark)
 
-The **order** menu sorts the rows: by start time, by duration with the longest build first, by end time, or by status with failures on top. The choice persists.
+## Find what slows the build
 
-The chart makes the parallelism and the long serial chains visible. It auto-scrolls to the newest bars as they start. Scroll up to release, or use the **Follow** toggle. Drag anywhere to pan, like the graph. A reload of the page keeps the place: the same package at the top, or the end when the chart followed it. A new build starts at its end.
+The timeline shows how well the build uses its workers. Many bars side by side mean a parallel build. One long bar alone means that the build waits for that package.
 
-Click a bar or a package name and its log pane opens while the graph flies to that package. From the pure timeline, this click switches to the side-by-side view, so the graph comes in without losing the timeline.
+The **Order** menu sorts the rows:
 
-**Side by side** shows the graph and the timeline together, over a drag bar. It is the default view, and the split ratio and the view choice persist.
+- **Start time**: the order in which the packages started. This is the default.
+- **Duration**: the longest package first. Use it to find the packages to speed up.
+- **End time**: the order in which the packages finished.
+- **Status**: the failed packages first.
+
+The page keeps your choice.
+
+## While the build runs
+
+![The timeline during a live build of ros2/examples: the building packages in blue up to the dashed line of the current time, and the finished packages in green](../assets/screens/timeline-live-light.webp#only-light)
+![The timeline during a live build of ros2/examples, dark theme](../assets/screens/timeline-live-dark.webp#only-dark)
+
+The timeline scrolls to the newest packages as they start. Scroll up to stop this, or click **Follow** to start it again. A reload of the page keeps your place.
+
+## Read and move
+
+- The time axis stays at the top while you scroll.
+- A long package name ends in "…", and its tooltip shows the full name. Drag the right edge of the name column to make it wider. Double-click the edge to fit the column to the names again.
+- Drag anywhere to pan, like in the graph.
+- Click a bar or a name to open the log of that package.
+
+## Side by side
+
+**Side by side** shows the timeline and the graph together, with a bar between them that you can drag. It is the default view. In this view, a click on a package also moves the graph to it. The page keeps the view and the split.

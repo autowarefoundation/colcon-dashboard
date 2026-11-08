@@ -83,7 +83,7 @@ When the server does not answer, the page shows how to start it again, and it op
 
 ## Desktop notifications
 
-If the page runs on the same machine as the server, the server shows the build notifications on your desktop. They arrive also when no dashboard is open. A click on a notification opens the dashboard. The bell button and the settings choose them, as before.
+If the page runs on the same machine as the server, the server shows the build notifications on your desktop. They arrive also when no dashboard is open. A click on a notification opens the dashboard. The bell button and the settings turn them on and off.
 
 On another machine, through an SSH tunnel, the browser shows the notifications while a dashboard page is open.
 

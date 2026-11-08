@@ -6,6 +6,7 @@ on:
     paths:
       - "docs/**"
       - "zensical.toml"
+      - "overrides/**"
       - ".github/workflows/docs.yaml"
   workflow_dispatch:
 
@@ -31,7 +32,7 @@ jobs:
           python-version: "3.12"
       - name: Build the site
         run: |
-          pip install zensical==0.0.54
+          pip install zensical==0.1.0
           zensical build --clean --strict
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5

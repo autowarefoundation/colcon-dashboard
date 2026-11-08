@@ -1,0 +1,29 @@
+{#- The landing page: the tabs, then a full-width hero with the tagline, the
+    buttons, and the live screenshot, then the page content. -#}
+{% extends "main.html" %}
+
+{% block tabs %}
+  {{ super() }}
+  <section class="cd-hero">
+    <div class="cd-hero__inner md-grid">
+      <div class="cd-hero__text">
+        <img class="cd-hero__logo only-light-logo" src="{{ 'assets/logo.svg' | url }}" alt="" width="72" height="72">
+        <img class="cd-hero__logo only-dark-logo" src="{{ 'assets/logo-dark.svg' | url }}" alt="" width="72" height="72">
+        <h1>See your colcon build</h1>
+        <p class="cd-hero__lead">A live dashboard for <code>colcon build</code>. Watch the dependency graph fill in, find the slow packages on the timeline, read each package's log on its own, and keep an eye on your CPU and RAM.</p>
+        <p class="cd-hero__sub">It reads the logs that colcon already writes. You keep building the way you do now.</p>
+        <div class="cd-hero__buttons">
+          <a href="{{ 'install/' | url }}" class="md-button md-button--primary">Get started</a>
+          <a href="{{ 'quick-start/' | url }}" class="md-button">Quick start</a>
+          <a href="{{ config.repo_url }}" class="md-button cd-button--ghost">GitHub</a>
+        </div>
+        <p class="cd-hero__install"><code>pipx install colcon-dashboard</code></p>
+      </div>
+      <figure class="cd-hero__shot">
+        <img class="cd-img-light" src="{{ 'assets/screens/hero-light.webp' | url }}" width="1440" height="900" alt="Colcon Dashboard during a live Autoware build: the timeline at the left, the dependency graph at the right with the building packages in blue, and the build log below">
+        <img class="cd-img-dark" src="{{ 'assets/screens/hero-dark.webp' | url }}" width="1440" height="900" alt="Colcon Dashboard during a live Autoware build, in the dark theme">
+        <figcaption>A live build of Autoware: 502 packages on 24 workers.</figcaption>
+      </figure>
+    </div>
+  </section>
+{% endblock %}

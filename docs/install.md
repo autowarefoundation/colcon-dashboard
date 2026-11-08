@@ -1,13 +1,15 @@
 ---
 icon: lucide/download
 description: >-
-  Install Colcon Dashboard with pipx, the Ubuntu PPA, or pip. One command
-  installs the systemd user service that keeps the dashboard running.
+  Install Colcon Dashboard from the Ubuntu PPA, with pipx, or with pip. A
+  systemd user service keeps the dashboard running from every login.
 ---
 
 # Install
 
-The server needs Python 3.8 or newer and nothing else. It has zero dependencies.
+The dashboard is one small Python program. It needs Python 3.8 or newer and nothing else. It works with every ROS 2 distribution and with any other workspace that colcon builds.
+
+Pick one way to install it. The Ubuntu PPA is the easiest on Ubuntu, and pipx works on every Linux distribution.
 
 === "Ubuntu PPA"
 
@@ -82,13 +84,17 @@ The server needs Python 3.8 or newer and nothing else. It has zero dependencies.
     pipx install --force ./colcon-dashboard
     ```
 
-The service starts the server at login and restarts it on failure. Open <http://localhost:8642/> and pick your workspace. That is the whole setup.
+The service starts the server at login and restarts it on failure.
+
+## Make sure that it works
+
+Open <http://localhost:8642/>. The page shows the workspace picker. Pick your workspace, and continue with the [quick start](quick-start.md).
 
 To use the dashboard in its own window, [install it as an app](desktop-app.md) from the browser.
 
-After an upgrade, run `colcon-dashboard --restart-service`. The running server stays on the old version until a restart.
+After an upgrade, run `colcon-dashboard --restart-service`. The running server keeps the old version until it restarts.
 
-Without the service, `colcon-dashboard` starts the server in the terminal. It runs in the foreground until you press Ctrl+C.
+Without the service, `colcon-dashboard` starts the server in the terminal. It runs in the foreground until you press ++ctrl+c++.
 
 ## Service commands
 

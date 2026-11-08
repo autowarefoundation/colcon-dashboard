@@ -1,7 +1,7 @@
 [project]
 site_name = "Colcon Dashboard"
 site_url = "https://autowarefoundation.github.io/colcon-dashboard/"
-site_description = "Live web dashboard for colcon builds: dependency graph, timeline, per-package logs, system pressure"
+site_description = "A live dashboard for colcon build: the dependency graph, a timeline, one log per package, and the load on your machine"
 site_author = "Mete Fatih Cırıt"
 
 copyright = "Copyright &copy; 2026 Autoware Foundation"
@@ -14,20 +14,23 @@ edit_uri = "edit/main/docs/"
 
 nav = [
   { "Home" = "index.md" },
-  { "Getting started" = [
+  { "Get started" = [
     { "Install" = "install.md" },
     { "Quick start" = "quick-start.md" },
     { "Desktop app" = "desktop-app.md" },
-    { "Configuration" = "configuration.md" },
-    { "Remote machine" = "remote.md" },
-    { "Troubleshooting" = "troubleshooting.md" },
   ] },
-  { "The dashboard" = [
+  { "Use the dashboard" = [
     "guide/index.md",
     { "Dependency graph" = "guide/graph.md" },
     { "Timeline" = "guide/timeline.md" },
     { "Log panes" = "guide/logs.md" },
-    { "AI failure analysis" = "guide/ai.md" },
+    { "When a build fails" = "guide/failures.md" },
+    { "Ask Claude" = "guide/ai.md" },
+  ] },
+  { "Set up" = [
+    { "Configuration" = "configuration.md" },
+    { "Remote machine" = "remote.md" },
+    { "Troubleshooting" = "troubleshooting.md" },
   ] },
   { "Reference" = [
     { "Command line" = "reference/cli.md" },
@@ -37,6 +40,7 @@ nav = [
 ]
 
 [project.theme]
+custom_dir = "overrides"
 language = "en"
 logo = "assets/logo.svg"
 favicon = "assets/logo.svg"
