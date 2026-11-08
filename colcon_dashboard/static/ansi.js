@@ -100,9 +100,12 @@ export function buildLine(line, o) {
   lc.className = 'lc';
   ln.appendChild(lc);
   if (line.includes('\x1b') || sgrActive(o.sgr)) {
-    // real terminal colors win over the lint
-    if (ERR_WORD.test(line)) ln.classList.add('l-err');
-    else if (WARN_WORD.test(line)) ln.classList.add('l-warn');
+    // real terminal colors win over the lint. The test reads the text
+    // without its color codes: GCC writes "\x1b[K" right before "error:",
+    // and \b finds no word boundary between the "K" and the "e".
+    const plain = stripAnsi(line);
+    if (ERR_WORD.test(plain)) ln.classList.add('l-err');
+    else if (WARN_WORD.test(plain)) ln.classList.add('l-warn');
     for (const part of line.split(SGR_SPLIT_RE)) {
       const m = /^\x1b\[([0-9;]*)m$/.exec(part);
       if (m) { applySgr(o.sgr, m[1]); continue; }
