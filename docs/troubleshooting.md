@@ -21,6 +21,10 @@ The picker scans your home directory and the [scan roots](configuration.md#extra
 - Paste the path of the workspace into the box of the picker, and press Enter.
 - Or add the parent directory of the workspace as a scan root: click "Scan roots…" in the picker.
 
+## The app window stays at "Loading…"
+
+An installed app brings its open window to the front on each launch, and it does not load the page again. A page whose scripts did not start (for example in the middle of an upgrade) reloads by itself once after 8 seconds, and a new launch also reloads it. If it still does not start, it says "The page did not start" and shows a **Reload** button. In the app window, ++ctrl+r++ always loads the page again.
+
 ## The page says "OFFLINE"
 
 The server does not answer.

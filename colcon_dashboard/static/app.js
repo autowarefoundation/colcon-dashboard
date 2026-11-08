@@ -51,8 +51,11 @@ addEventListener('resize', () => {
 // offer it only on localhost or https, where navigator.serviceWorker exists
 navigator.serviceWorker?.register('sw.js').catch(() => { /* not installable */ });
 // an installed app focuses its open window, not a new one (the manifest's
-// launch_handler): a workspace link that launched it arrives here
-window.launchQueue?.setConsumer(params => {
+// launch_handler): a workspace link that launched it arrives here, through
+// the launch consumer in index.html
+window.cdLaunch = params => {
   const target = params.targetURL && new URL(params.targetURL);
   if (target && target.search && target.search !== location.search) location.href = target.href;
-});
+};
+window.cdBooted = true;  // index.html's watchdog: the page started
+try { sessionStorage.removeItem('cd-boot-retry'); } catch (e) { /* not kept */ }
