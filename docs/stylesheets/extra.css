@@ -17,6 +17,7 @@
   --cd-good: #06b025;
   --cd-shot-shadow: 0 24px 60px rgba(10, 31, 61, 0.18), 0 4px 14px rgba(10, 31, 61, 0.08);
   /* shell colors, from the terminal palette of the app (style.css --t*) */
+  --cd-tab-ink: #155fa6;
   --cd-sh-prog: #1a7f37;
   --cd-sh-verb: #2a78d6;
   --cd-sh-flag: #0e7f86;
@@ -39,6 +40,7 @@
   --cd-glow: rgba(58, 149, 234, 0.22);
   --cd-good: #2bd14a;
   --cd-shot-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.35);
+  --cd-tab-ink: #8cc4f5;
   --cd-sh-prog: #57ce53;
   --cd-sh-verb: #6da7ec;
   --cd-sh-flag: #56c8d8;
@@ -236,3 +238,26 @@
 .md-typeset .cd-sh .c-flag { color: var(--cd-sh-flag); }
 .md-typeset .cd-sh .c-val { color: var(--cd-sh-val); }
 .md-typeset .cd-sh .c-dim { color: var(--cd-muted); }
+
+/* the top tabs as Material 3 pills: a tonal fill and the accent color on
+   the active tab, a light state layer on hover, no underline */
+.md-tabs__list { gap: 0.2rem; padding: 0.3rem 0; }
+.md-tabs__item { height: auto; padding: 0; display: flex; align-items: center; }
+.md-tabs__item--active, .md-tabs[hidden] .md-tabs__item--active { border-bottom: none; }
+.md-tabs__link {
+  margin-top: 0;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  opacity: 0.8;
+  transition: transform 0.4s cubic-bezier(0.1, 0.7, 0.1, 1), opacity 0.25s, background-color 0.2s, color 0.2s;
+}
+.md-tabs__link:hover, .md-tabs__link:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--md-primary-fg-color) 8%, transparent);
+}
+.md-tabs__item--active .md-tabs__link {
+  opacity: 1;
+  font-weight: 650;
+  color: var(--cd-tab-ink);
+  background: color-mix(in srgb, var(--md-primary-fg-color) 15%, transparent);
+}
