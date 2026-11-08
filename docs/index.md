@@ -134,9 +134,9 @@ Every build and test run stays one click away, with its outcome and its time aga
 <div class="cd-scale" markdown>
 
 <figure markdown>
-![The ros2/examples workspace during its build: 22 packages](assets/screens/small-light.webp#only-light)
-![The ros2/examples workspace during its build, dark theme](assets/screens/small-dark.webp#only-dark)
-<figcaption><strong>ros2/examples: 22 packages</strong>The whole build fits on the screen, and it is done in about 40 seconds.</figcaption>
+![The tf2 stack of ros2/geometry2 during its build: 15 packages, with tf2_ros building while the packages that need it wait](assets/screens/small-light.webp#only-light)
+![The tf2 stack of ros2/geometry2 during its build, dark theme](assets/screens/small-dark.webp#only-dark)
+<figcaption><strong>ros2/geometry2: 15 packages</strong>The whole graph fits on the screen. The timeline shows the chain: <code>tf2_ros</code> builds alone, and the packages after it wait.</figcaption>
 </figure>
 
 <figure markdown>

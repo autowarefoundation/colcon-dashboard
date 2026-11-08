@@ -40,8 +40,8 @@ colcon build --symlink-install
 
 The page follows the build live. Packages turn blue while they build and green when they are done. The summary line counts the packages and estimates the time left.
 
-![The ros2/examples workspace during its build: the timeline, the dependency graph, and the build log](assets/screens/small-light.webp#only-light)
-![The ros2/examples workspace during its build, dark theme](assets/screens/small-dark.webp#only-dark)
+![The tf2 stack of ros2/geometry2 during its build: the timeline, the dependency graph, and the build log](assets/screens/small-light.webp#only-light)
+![The tf2 stack of ros2/geometry2 during its build, dark theme](assets/screens/small-dark.webp#only-dark)
 
 The dashboard needs nothing from colcon. It reads the files that colcon writes into `log/` for every build. So a build shows up also when it started before you opened the page.
 
