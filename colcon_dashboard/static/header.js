@@ -1,10 +1,11 @@
 import { emit, on } from './bus.js';
 import { App } from './state.js';
-import { $, esc, fmtDur, fmtDurLong, fmtGB, PINNED_BUILD } from './util.js';
+import { $, copyText, esc, fmtDur, fmtDurLong, fmtGB, initPanel, PINNED_BUILD } from './util.js';
 
 /* ---------------- header + tiles ---------------- */
 
 export async function initHeaderMeta() {
+  initCommand();
   // one boot fetch: the server version and the editor-link template
   try {
     App.cfg = await (await fetch('/api/config')).json();
@@ -208,6 +209,59 @@ function setSwitchers(s) {
     : 'This page follows the latest build. Click to open an earlier one.');
 }
 
+/* ---- the build command: a button with the verb and the option count,
+   never cut short, and a dropdown with the whole command ---- */
+
+// a word as the shell reads it back: plain, or in single quotes
+const shWord = w => (/^[\w@%+=:,./-]+$/.test(w) ? w : `'${w.replace(/'/g, "'\\''")}'`);
+let cmdKey = '';
+
+function setCommand(s) {
+  const verb = s.verb || 'build';
+  const opts = s.options || [];
+  const btn = $('#bargs');
+  // a plain colcon build has nothing to tell
+  btn.hidden = verb === 'build' && !opts.length;
+  const key = JSON.stringify([verb, opts]);
+  if (key === cmdKey) return;
+  cmdKey = key;
+  btn.querySelector('.bverb').textContent = `colcon ${verb}`;
+  btn.querySelector('.bcount').textContent =
+    opts.length ? `${opts.length} option${opts.length === 1 ? '' : 's'}` : '';
+  // one option per line, with the shell's line continuations, so a
+  // selection of the text also pastes into a terminal
+  const pre = $('#cmdpanel .cmd');
+  pre.textContent = '';
+  const lines = [`colcon ${verb}`, ...opts.map(o => '  ' + o.map(shWord).join(' '))];
+  lines.forEach((line, i) => {
+    pre.append(line);
+    if (i < lines.length - 1) {
+      const c = document.createElement('span');
+      c.className = 'cont';
+      c.textContent = ' \\';
+      pre.append(c, '\n');
+    }
+  });
+  $('#cmdpanel .cmdnote').hidden = !opts.length;
+  $('#cmdpanel').dataset.line = [`colcon ${verb}`, ...opts.map(o => o.map(shWord).join(' '))].join(' ');
+}
+
+function initCommand() {
+  const panel = $('#cmdpanel');
+  const btn = $('#bargs');
+  btn.onclick = () => { panel.hidden = !panel.hidden; };
+  initPanel(panel, btn);
+  const copy = panel.querySelector('.cmdcopy');
+  copy.onclick = async () => {
+    const ok = await copyText(panel.dataset.line || '');
+    copy.lastChild.textContent = ok ? 'Copied' : 'Copy failed';
+    setTimeout(() => { copy.lastChild.textContent = 'Copy'; }, 1200);
+  };
+  document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && !panel.hidden) panel.hidden = true;
+  });
+}
+
 export function applyState(s) {
   const c = s.counts || {};
   const done = c.done || 0, failed = c.failed || 0, aborted = c.aborted || 0;
@@ -216,12 +270,7 @@ export function applyState(s) {
   setSwitchers(s);
   updateSysMeters(s.sys);
   $('#workers').textContent = s.workers ? `${s.workers} workers` : '';
-  // the options that make this build differ from a plain colcon build
-  const args = $('#bargs');
-  const verb = s.verb && s.verb !== 'build' ? `colcon ${s.verb} ` : '';
-  args.hidden = !(verb || s.args);
-  args.textContent = verb + (s.args || '');
-  args.title = `colcon ${s.verb || 'build'} ${s.args || ''}`.trim();
+  setCommand(s);
   if (s.active) setBadge('live', 'LIVE');
   else if (failed) setBadge('failed', 'FAILED');
   else if (done === s.total && s.total > 0) setBadge('complete', 'COMPLETE');

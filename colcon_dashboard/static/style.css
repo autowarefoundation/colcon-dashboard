@@ -346,8 +346,13 @@ body.offline #sysmeters { display: none; }
 .dot.c-none { background: transparent; }
 .dot.c-warn { background: var(--warning); }
 /* the build's options, shortened; the tooltip has all of them */
-#bargs { color: var(--muted); max-width: clamp(80px, 14vw, 260px); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); }
-#bargs[hidden] { display: none; }
+/* the build command: the verb and the option count, never cut short; a
+   click opens the whole command (header.js setCommand) */
+#bargs { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; font-size: var(--fs-xs); color: var(--ink2); white-space: nowrap; }
+#bargs .ic svg { width: 14px; height: 14px; }
+#bargs .bcount { color: var(--muted); }
+#bargs .bcount:empty { display: none; }
+#bargs .bcount::before { content: "· "; }
 .fitem .ftests { margin: 2px 0 4px; padding-left: 18px; font-size: var(--fs-s); color: var(--ink2); }
 .fitem .ftests li { margin: 1px 0; overflow-wrap: anywhere; }
 .fitem .fhead .chip.newfail { color: var(--critical); font-weight: 650; }
@@ -921,10 +926,10 @@ body.offline #sysmeters { display: none; }
    under their buttons, the settings slide in at the right. No backdrop:
    the wrapper covers the window but lets every click through, and only
    the box takes clicks. */
-#wspick, #bpick, #help, #settings { position: fixed; inset: 0; z-index: 47; pointer-events: none; }
+#wspick, #bpick, #help, #cmdpanel, #settings { position: fixed; inset: 0; z-index: 47; pointer-events: none; }
 #settings { z-index: 46; }  /* a dropdown opens over the side panel */
-#wspick[hidden], #bpick[hidden], #help[hidden], #settings[hidden] { display: none; }
-#wspick .wsbox, #bpick .wsbox, #help .wsbox, #settings .wsbox {
+#wspick[hidden], #bpick[hidden], #help[hidden], #cmdpanel[hidden], #settings[hidden] { display: none; }
+#wspick .wsbox, #bpick .wsbox, #help .wsbox, #cmdpanel .wsbox, #settings .wsbox {
   position: absolute;
   pointer-events: auto;
   overflow: auto;
@@ -932,7 +937,7 @@ body.offline #sysmeters { display: none; }
 }
 #wspick .wsbox { width: min(560px, calc(100vw - 16px)); }
 #bpick .wsbox { width: min(640px, calc(100vw - 16px)); }
-#wspick .wsbox, #bpick .wsbox, #help .wsbox { animation: drop-in 120ms ease-out; }
+#wspick .wsbox, #bpick .wsbox, #help .wsbox, #cmdpanel .wsbox { animation: drop-in 120ms ease-out; }
 @keyframes drop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
 /* the settings: a side panel below the top bar that stays open while you work */
 #settings .wsbox.setbox {
@@ -947,10 +952,10 @@ body.offline #sysmeters { display: none; }
 }
 @keyframes slide-in { from { opacity: 0; transform: translateX(24px); } }
 @media (prefers-reduced-motion: reduce) {
-  #wspick .wsbox, #bpick .wsbox, #help .wsbox, #settings .wsbox { animation: none; }
+  #wspick .wsbox, #bpick .wsbox, #help .wsbox, #cmdpanel .wsbox, #settings .wsbox { animation: none; }
 }
 /* the button of an open panel looks pressed */
-#topbar .switcher[aria-expanded="true"], #topbar .hbtns button[aria-expanded="true"] {
+#topbar .switcher[aria-expanded="true"], #topbar .hbtns button[aria-expanded="true"], #bargs[aria-expanded="true"] {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -980,6 +985,11 @@ body.offline #sysmeters { display: none; }
   .setbox dl { grid-template-columns: 1fr; }
 }
 #help .wsbox.helpbox { width: min(440px, calc(100vw - 16px)); }  /* outspecify .wsbox */
+#cmdpanel .wsbox.cmdbox { width: max-content; min-width: 280px; max-width: min(720px, calc(100vw - 16px)); }
+.cmdbox .cmdcopy { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; font-weight: 400; font-size: var(--fs-xs); }
+.cmdbox .cmd { margin: 0; padding: 10px 12px; background: var(--page); border: 1px solid var(--grid); border-radius: var(--r-s); font: var(--fs-s)/1.6 var(--mono); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.cmdbox .cmd .cont { color: var(--muted); }
+.cmdbox .cmdnote { margin: 8px 0 0; font-size: var(--fs-xs); color: var(--muted); }
 .helpbox table { width: 100%; border-collapse: collapse; font-size: var(--fs-s); }
 .helpbox td { padding: 5px 8px; border-top: 1px solid var(--grid); color: var(--ink2); }
 .helpbox td:first-child { white-space: nowrap; color: var(--ink); }
@@ -1108,6 +1118,7 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 #wspick .wsbox,
 #bpick .wsbox,
 #help .wsbox,
+#cmdpanel .wsbox,
 #settings .wsbox {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1119,6 +1130,7 @@ body.nows #wspick .wshero { display: block; text-align: center; margin-bottom: 2
 #wspick .wshead,
 #bpick .wshead,
 #help .wshead,
+#cmdpanel .wshead,
 #settings .wshead {
   display: flex;
   align-items: center;

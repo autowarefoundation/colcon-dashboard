@@ -17,7 +17,8 @@ from .config import CONFIG
 from .events import (
     BUILD_DIR_RE, EVENT_RE, EventLog, RC_RE, WARNING_RE, parse_build_id_time,
 )
-from .packages import PackageIndex, parse_namespace, read_test_results, summarize_args
+from .packages import (PackageIndex, arg_options, parse_namespace, read_test_results,
+                       summarize_args)
 
 LOG_FILES = {
     "combined": "stdout_stderr.log",
@@ -611,6 +612,7 @@ class BuildMonitor:
             "workers": (self.namespace or {}).get("parallel_workers"),
             "verb": (self.namespace or {}).get("verb_name"),
             "args": summarize_args(self.namespace),
+            "options": arg_options(self.namespace),
             "build_started": epoch0,
             "elapsed": round((now - epoch0) if active else ev.last_t, 1),
             "now": round(now, 2),

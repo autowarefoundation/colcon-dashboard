@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 from colcon_dashboard.packages import (
-    PackageIndex, parse_namespace, read_test_results, summarize_args,
+    PackageIndex, arg_options, parse_namespace, read_test_results, summarize_args,
 )
 
 
@@ -121,6 +121,14 @@ class SummarizeArgs(unittest.TestCase):
     def test_nothing_to_show(self):
         self.assertEqual(summarize_args(None), "")
         self.assertEqual(summarize_args({"verb_name": "build"}), "")
+
+    def test_one_word_list_per_option(self):
+        ns = {"symlink_install": True, "cmake_args": ["-DCMAKE_BUILD_TYPE=Release"],
+              "packages_select": ["a b"]}
+        self.assertEqual(arg_options(ns), [
+            ["--packages-select", "a b"], ["--symlink-install"],
+            ["--cmake-args", "-DCMAKE_BUILD_TYPE=Release"]])
+        self.assertEqual(arg_options(None), [])
 
 
 JUNIT = """<?xml version="1.0"?>

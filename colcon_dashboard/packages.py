@@ -111,24 +111,29 @@ SHOWN_ARGS = (
 )
 
 
-def summarize_args(ns):
-    """The command line options that differ from colcon's defaults, as one
-    short string: "--packages-up-to foo --mixin release ccache"."""
-    if not ns:
-        return ""
+def arg_options(ns):
+    """The command line options that differ from colcon's defaults, one
+    list of words per option: [["--symlink-install"], ["--mixin", "release",
+    "ccache"]]."""
     out = []
-    for key, default in SHOWN_ARGS:
+    for key, default in SHOWN_ARGS if ns else ():
         value = ns.get(key, default)
         if value == default or value in (None, [], ()):
             continue
         flag = "--" + key.replace("_", "-")
         if value is True:
-            out.append(flag)
+            out.append([flag])
         elif isinstance(value, (list, tuple)):
-            out.append(flag + " " + " ".join(str(v) for v in value))
+            out.append([flag] + [str(v) for v in value])
         else:
-            out.append(f"{flag} {value}")
-    return " ".join(out)
+            out.append([flag, str(value)])
+    return out
+
+
+def summarize_args(ns):
+    """The options of arg_options as one short string:
+    "--packages-up-to foo --mixin release ccache"."""
+    return " ".join(" ".join(words) for words in arg_options(ns))
 
 
 def parse_namespace(logger_path):
