@@ -43,6 +43,7 @@ Edges take color from their endpoints:
 - Drag to pan, scroll to zoom. **Fit** frames the whole graph.
 - When you zoom out so far that a label would be a mere smudge (under 1.5 pixels high), the labels hide and each node becomes a plain colored box. Until then, the labels stay, even when they are small.
 - **Follow** keeps the camera on the packages that build now, so the action stays framed as the build moves. If you pan or zoom by hand, the camera is yours again.
+- In the layered layout, a reload of the page keeps the view: the same part of the graph at the same zoom, or the build-follow camera when it was on. A new build, or a switch of the **show** setting, fits the whole graph.
 - The **show** switch picks what the graph draws: only the packages of this build, or the whole workspace.
 - When most package names share a prefix such as `autoware_`, the labels hide it. Tooltips keep the full name. To pick other prefixes, or to show the full names, open the settings (the gear button) and use **Package names**. The section suggests the common prefixes of the workspace, and you can hide more than one. The graph, the timeline, the log tabs, and the failures use the short names. The pane headers and the tooltips show the full names. The page saves the choice per workspace in this browser.
 

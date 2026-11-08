@@ -2,14 +2,21 @@ import { emit, on } from './bus.js';
 import { hideTooltip, label, showNodeTooltip } from './graph.js';
 import { GS } from './gsearch.js';
 import { App } from './state.js';
-import { $, fmtDur, svgEl } from './util.js';
+import { $, fmtDur, PINNED_BUILD, svgEl, WS } from './util.js';
 
 /* ---------------- gantt ---------------- */
 
 // The live chart redraws every other poll. Its row elements are kept by
 // package name, and a redraw only moves and resizes them: rebuilding
 // three elements per package each time cost real work on big builds.
-const G = { rows: new Map(), gT: null, aT: null, now: null, charW: 0 };
+// the place in the timeline, kept for a reload of this tab (restorePos)
+const POS_KEY = `cmc-gpos:${WS || ''}|${PINNED_BUILD || ''}`;
+const G = { rows: new Map(), gT: null, aT: null, now: null, charW: 0,
+            order: [], gut: 0, gutAuto: 0, W: 0, restore: loadPos() };
+// the width of the name column that the user dragged; 0 fits it to the names
+try { G.userGut = parseInt(localStorage.getItem('cmc-gname-w') || '0', 10) || 0; }
+catch (e) { G.userGut = 0; }
+const ROW = 16, AXIS = 22, TOP = 4;
 
 function clearGantt(svg, axis) {
   svg.innerHTML = '';
@@ -37,6 +44,7 @@ export function drawGantt() {
     .sort(cmp);
   if (!rows.length || !App.buildStarted) {
     clearGantt(svg, axis);
+    G.order = [];
     return;
   }
   if (G.gT && !G.gT.isConnected) clearGantt(svg, axis);  // someone emptied the svg
@@ -47,10 +55,10 @@ export function drawGantt() {
   for (const [, p] of rows) tMax = Math.max(tMax, p.t1 || (App.active ? nowS : p.t0));
   const span = Math.max(30, tMax - t0);
 
-  const ROW = 16, AXIS = 22, TOP = 4;
   const W = Math.max(640, wrap.clientWidth - 16);
-  // the name gutter fits the longest name, up to a third of the width;
-  // a longer name ends in "…" (the tooltip still shows all of it)
+  // the name gutter fits the longest name, up to a third of the width, or
+  // takes the width that the user dragged it to; a longer name ends in "…"
+  // (the tooltip still shows all of it)
   if (!G.charW) {  // measure once: it forces a layout
     const probe = svgEl('text', { class: 'gname' }, svg);
     probe.textContent = 'M'.repeat(20);
@@ -59,8 +67,12 @@ export function drawGantt() {
   }
   const cw = G.charW || 6.3;
   const longest = Math.max(...rows.map(([name]) => label(name).length));
-  const GUT = Math.round(Math.min(Math.max(160, W / 3),
+  G.gutAuto = Math.round(Math.min(Math.max(160, W / 3),
                                   Math.max(90, longest * cw + 16)));
+  const GUT = G.userGut ? Math.round(Math.min(Math.max(60, G.userGut), W - 160))
+                        : G.gutAuto;
+  G.gut = GUT;
+  G.W = W;
   const fit = Math.floor((GUT - 16) / cw);
   const H = TOP + rows.length * ROW + 10;
   svg.setAttribute('width', W);
@@ -79,6 +91,13 @@ export function drawGantt() {
       + '<line class="gh-line" x1="0" y1="0" x2="0" y2="6"/></pattern>';
     G.gT = svgEl('g', { class: 'gtick' }, svg);
     G.aT = svgEl('g', { class: 'gtick' }, axis);
+    // the edge of the name column: drag it to resize the column
+    G.hs = svgEl('rect', { class: 'gsplit', width: 7 }, svg);
+    G.ha = svgEl('rect', { class: 'gsplit', width: 7 }, axis);
+    for (const h of [G.hs, G.ha]) {
+      svgEl('title', {}, h).textContent =
+        'drag to resize the name column, double-click to fit it to the names';
+    }
   }
   svg.prepend(G.gT);  // behind the bars
   G.gT.innerHTML = '';
@@ -128,6 +147,12 @@ export function drawGantt() {
   for (const [name, r] of G.rows) {
     if (!seen.has(name)) { r.tn.remove(); r.bar.remove(); G.rows.delete(name); }
   }
+  G.order = rows.map(([name]) => name);
+  for (const [h, hh] of [[G.hs, H], [G.ha, AXIS]]) {
+    h.setAttribute('x', GUT - 5);
+    h.setAttribute('height', hh);
+    h.parentNode.appendChild(h);  // above the bars
+  }
 
   if (App.active) {
     const x = GUT + (nowS - t0) * k;
@@ -138,7 +163,8 @@ export function drawGantt() {
     G.now.remove();
     G.now = null;
   }
-  if (App.ganttFollow) wrap.scrollTop = wrap.scrollHeight;
+  if (G.restore !== null) restorePos(wrap);
+  else if (App.ganttFollow) wrap.scrollTop = wrap.scrollHeight;
 
   // clicks are handled in initGanttPan, resolved at press time: the live
   // chart redraws every poll, and a mid-click redraw would eat the click
@@ -155,6 +181,10 @@ export function initGanttPan() {
   let drag = null;
   wrap.addEventListener('pointerdown', ev => {
     if (ev.button !== 0) return;
+    if (ev.target.classList?.contains('gsplit')) {
+      startResize(ev, wrap);
+      return;
+    }
     drag = { x: ev.clientX, y: ev.clientY,
              sl: wrap.scrollLeft, st: wrap.scrollTop, moved: 0,
              name: ev.target.closest?.('.gbar, .gname')?.dataset?.name
@@ -184,6 +214,89 @@ export function initGanttPan() {
   };
   wrap.addEventListener('pointerup', end);
   wrap.addEventListener('pointercancel', end);
+  wrap.addEventListener('dblclick', ev => {
+    if (!ev.target.classList?.contains('gsplit')) return;
+    setUserGut(0);
+    drawGantt();
+  });
+  let saveTimer = 0;
+  wrap.addEventListener('scroll', () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => savePos(wrap), 250);
+  });
+  addEventListener('pagehide', () => savePos(wrap));
+}
+
+function setUserGut(w) {
+  G.userGut = w;
+  try {
+    if (w) localStorage.setItem('cmc-gname-w', String(w));
+    else localStorage.removeItem('cmc-gname-w');
+  } catch (e) { /* not kept */ }
+}
+
+// drag the edge of the name column; one redraw per frame
+function startResize(ev, wrap) {
+  ev.preventDefault();
+  const x0 = ev.clientX, g0 = G.gut;
+  let raf = 0;
+  wrap.classList.add('resizing');
+  wrap.setPointerCapture(ev.pointerId);
+  hideTooltip();
+  const move = e => {
+    const w = Math.round(Math.min(Math.max(60, g0 + e.clientX - x0), G.W - 160));
+    if (w === G.userGut) return;
+    G.userGut = w;
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; drawGantt(); });
+  };
+  const up = () => {
+    wrap.removeEventListener('pointermove', move);
+    wrap.removeEventListener('pointerup', up);
+    wrap.removeEventListener('pointercancel', up);
+    wrap.classList.remove('resizing');
+    // a drag back to the fitted width fits the names again
+    setUserGut(Math.abs(G.userGut - G.gutAuto) <= 3 ? 0 : G.userGut);
+    drawGantt();
+  };
+  wrap.addEventListener('pointermove', move);
+  wrap.addEventListener('pointerup', up);
+  wrap.addEventListener('pointercancel', up);
+}
+
+/* ---- the place in the timeline, kept for a reload of this tab: the
+   package at the top of the view, or the end while it follows ---- */
+
+function loadPos() {
+  try { return JSON.parse(sessionStorage.getItem(POS_KEY) || 'null'); }
+  catch (e) { return null; }
+}
+
+function savePos(wrap) {
+  // not before the restore, and not while the timeline is hidden or empty
+  if (G.restore !== null || !G.order.length || !wrap.clientHeight) return;
+  const i = Math.max(0, Math.min(G.order.length - 1,
+                                 Math.floor((wrap.scrollTop - TOP) / ROW)));
+  try {
+    sessionStorage.setItem(POS_KEY, JSON.stringify({
+      build: App.buildId, follow: App.ganttFollow, name: G.order[i],
+      dy: wrap.scrollTop - (TOP + i * ROW), left: wrap.scrollLeft,
+    }));
+  } catch (e) { /* not kept */ }
+}
+
+function restorePos(wrap) {
+  const s = G.restore;
+  G.restore = null;
+  const i = s ? G.order.indexOf(s.name) : -1;
+  // a new build, a following timeline, or a package gone: the end
+  if (!s || s.follow || i < 0 || (s.build && s.build !== App.buildId)) {
+    if (App.ganttFollow) wrap.scrollTop = wrap.scrollHeight;
+    return;
+  }
+  App.ganttFollow = false;
+  $('#gfollowBtn').classList.remove('on');
+  wrap.scrollTop = TOP + i * ROW + s.dy;
+  wrap.scrollLeft = s.left || 0;
 }
 
 on('state', () => {

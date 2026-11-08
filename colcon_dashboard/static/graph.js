@@ -217,7 +217,7 @@ export function renderGraph() {
   edgeFocus = nodeFocus = null;
   focusSelection();
   if (App.vb) setViewBox(App.vb);
-  else fitGraph();
+  else if (!mode().restoreView?.()) fitGraph();
   mode().onLayout?.();
   requestDraw();
 }

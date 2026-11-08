@@ -5,7 +5,7 @@ import { buildGraphView, clearFocus, clearSelection, hideTooltip, hoverFocus,
          selectPkg, showNodeTooltip } from './graph.js';
 import { mode, registerMode } from './modes.js';
 import { App } from './state.js';
-import { $ } from './util.js';
+import { $, PINNED_BUILD, WS } from './util.js';
 
 export function svgCoords(ev) {
   return clientToWorld(ev.clientX, ev.clientY);
@@ -201,8 +201,54 @@ export function initPanZoom() {
   cv.addEventListener('pointercancel', end);
 }
 
+/* ---- the view of the layered graph, kept for a reload of this tab: the
+   world rect in view, and the build-follow camera ---- */
+
+const VIEW_KEY = `cmc-gview:${WS || ''}|${PINNED_BUILD || ''}`;
+let viewSaved = loadView();  // until the first layout restores it
+let viewTimer = 0;
+
+function loadView() {
+  try { return JSON.parse(sessionStorage.getItem(VIEW_KEY) || 'null'); }
+  catch (e) { return null; }
+}
+
+function saveView() {
+  if (viewSaved || !App.vb || App.layoutMode !== 'layered') return;
+  try {
+    sessionStorage.setItem(VIEW_KEY, JSON.stringify({
+      build: App.buildId, scope: App.scope, follow: !!App.followBuild, vb: App.vb,
+    }));
+  } catch (e) { /* not kept */ }
+}
+
+// the first layout of the page: the saved view, if it still fits; false
+// lets the caller fit the graph
+function restoreView() {
+  const s = viewSaved;
+  viewSaved = null;
+  if (!s || s.build !== App.buildId || s.scope !== App.scope) return false;
+  if (s.follow) {
+    App.followBuild = true;
+    $('#followBuildBtn').classList.add('on');
+    frontierView();
+    return true;
+  }
+  const { x, y, w, h } = s.vb || {};
+  if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return false;
+  setViewBox({ x, y, w, h });
+  return true;
+}
+
+addEventListener('pagehide', saveView);
+
 registerMode('layered', {
   activate: () => { stopForce(); App.vb = null; buildGraphView(); },
   fit: fitGraph,
   followFrontier: frontierView,
+  restoreView,
+  onViewBox: () => {
+    clearTimeout(viewTimer);
+    viewTimer = setTimeout(saveView, 250);
+  },
 });

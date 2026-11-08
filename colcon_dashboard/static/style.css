@@ -456,6 +456,10 @@ body.offline #sysmeters { display: none; }
 #ganttwrap svg { display: block; }
 #gaxis { position: sticky; top: 0; z-index: 1; background: var(--page); }
 #gantt .gbar { cursor: pointer; }
+/* the edge of the name column: drag it to resize the column */
+#ganttwrap .gsplit { fill: transparent; cursor: col-resize; }
+#ganttwrap .gsplit:hover, #ganttwrap.resizing .gsplit { fill: color-mix(in srgb, var(--accent) 35%, transparent); }
+#ganttwrap.resizing, #ganttwrap.resizing * { cursor: col-resize; }
 
 /* side-by-side: timeline left, graph right, over a drag bar */
 #viz.split { display: flex; }

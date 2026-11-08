@@ -12,7 +12,9 @@ import { App } from './state.js';
      followFrontier()  frame the packages that build now
      focusPkg(name)    fly to one package; absent: the SVG camera handles it
      resize()          the canvas size changed
-     onViewBox(vb)     the SVG camera moved to the view box vb */
+     onViewBox(vb)     the SVG camera moved to the view box vb
+     restoreView()     the first layout of the page: show the view from
+                       before a reload; false when there is none */
 
 const modes = {};
 
