@@ -79,6 +79,23 @@ class Scan(unittest.TestCase):
         idx.scan(["."])
         self.assertEqual(idx.dep_closure("a"), {"b", "c", "a"})
 
+    def test_container_base_paths_map_into_the_workspace(self):
+        # colcon ran in a container that mounts this workspace at /ws
+        write_pkg(self.ws, "src/core/a", "a")
+        write_pkg(self.ws, "src/extra/b", "b")
+        write_pkg(self.ws, "tools/c", "c")
+        for base_paths, found in (
+                (["/ws/src"], {"a", "b"}),
+                (["/ws/src/core"], {"a"}),
+                (["src/core", "/ws/tools"], {"a", "c"}),
+                (["/no/such/dir"], {"a", "b", "c"}),  # no match: everything
+                (["missing"], set()),  # a relative path does not fall back
+        ):
+            with self.subTest(base_paths=base_paths):
+                idx = PackageIndex(self.ws)
+                idx.scan(base_paths)
+                self.assertEqual(set(idx.packages), found)
+
 
 class Namespace(unittest.TestCase):
     def test_fields(self):

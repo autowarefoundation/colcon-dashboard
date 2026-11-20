@@ -26,8 +26,20 @@ class PackageIndex:
 
     def scan(self, base_paths):
         pkgs = {}
+        roots = []
         for base in base_paths or ["."]:
             root = os.path.normpath(os.path.join(self.workspace, base))
+            if not os.path.isdir(root) and os.path.isabs(base):
+                # a path from inside a container, such as /ws/src when the
+                # workspace is mounted at /ws: drop leading parts until the
+                # rest exists here (src), down to the workspace itself
+                parts = os.path.normpath(base).split(os.sep)[1:]
+                for i in range(1, len(parts) + 1):
+                    root = os.path.join(self.workspace, *parts[i:])
+                    if os.path.isdir(root):
+                        break
+            roots.append(os.path.normpath(root))
+        for root in roots:
             if not os.path.isdir(root):
                 continue
             for dirpath, dirnames, filenames in os.walk(root):
