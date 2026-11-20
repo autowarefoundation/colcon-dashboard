@@ -9,12 +9,13 @@ import unittest
 from unittest import mock
 
 from colcon_dashboard.config import CONFIG
+from colcon_dashboard.events import parse_build_id_time
 from colcon_dashboard.monitor import (
     BuildMonitor, prune_builds, remove_build_dir,
 )
 from tests.helpers import (
     ended, event_line, make_build, queued, started, stderr_line,
-    stdout_line, test_failure,
+    stdout_line, test_failure, time_zone,
 )
 
 BUILD_ID = "build_2026-08-09_10-00-00"
@@ -706,6 +707,29 @@ class ScanOnce(unittest.TestCase):
         a = state["packages"]["a"]
         self.assertAlmostEqual(a["t0"], epoch0 + 0.2, places=1)
         self.assertAlmostEqual(a["t1"], epoch0 + 1.0, places=1)
+
+    def test_a_container_run_named_in_utc(self):
+        # Docker runs on UTC: on a host 3 h east, the name is 3 h behind
+        with time_zone("XYZ-3"):
+            utc = parse_build_id_time(BUILD_ID, utc=True)
+            # 2 s to read the workspace, then the events up to t=1.3
+            mon, state, _ = self.scan(mtime=utc + 3.3)
+            self.assertEqual(state["build_started"], utc)
+            self.assertAlmostEqual(state["packages"]["a"]["t0"], utc + 0.2, places=1)
+            # a later host run started before the container run, but the
+            # list keeps the name order, as the prune and the stats do
+            make_build(mon.workspace, "build_2026-08-09_11-00-00", [SHUTDOWN])
+            # wait out the background outcome worker, which writes into
+            # the run folders, before the tempdir cleanup
+            deadline = time.time() + 8
+            while time.time() < deadline:
+                builds = mon.list_builds()["builds"]
+                if all(b.get("outcome") for b in builds):
+                    break
+                time.sleep(0.05)
+            self.assertEqual([b["id"] for b in builds],
+                             ["build_2026-08-09_11-00-00", BUILD_ID])
+            self.assertEqual(builds[1]["time"], utc)
 
 
 class ReadLog(unittest.TestCase):

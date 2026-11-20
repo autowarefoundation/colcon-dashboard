@@ -16,6 +16,7 @@ from .ai import AIAnalysis, CLAUDE_BIN
 from .config import CONFIG
 from .events import (
     BUILD_DIR_RE, EVENT_RE, EventLog, RC_RE, WARNING_RE, parse_build_id_time,
+    run_start_time,
 )
 from .packages import (PackageIndex, arg_options, junit_report, parse_namespace,
                        read_test_results, summarize_args)
@@ -403,7 +404,7 @@ class BuildMonitor:
         pending = []
         for name in names:
             bdir = os.path.join(self.log_base, name)
-            entry = {"id": name, "time": parse_build_id_time(name),
+            entry = {"id": name, "time": run_start_time(bdir),
                      "size": dir_size(bdir)}
             info = self._read_outcome(bdir)
             if info:
@@ -503,10 +504,10 @@ class BuildMonitor:
                 if pkg in bad:  # a test run fails a package with rc 0 too
                     streak["n"] += 1
                     streak["since"] = name
-                    streak["since_t"] = parse_build_id_time(name)
+                    streak["since_t"] = run_start_time(bdir)
                 elif pkg in passed:
                     streak["ok"] = name
-                    streak["ok_t"] = parse_build_id_time(name)
+                    streak["ok_t"] = run_start_time(bdir)
                     todo.discard(pkg)
         return {pkg: s for pkg, s in streaks.items() if s["n"]}
 
@@ -521,7 +522,7 @@ class BuildMonitor:
         info = self._read_outcome(bdir) or self._compute_outcome(bdir)
         if not info:
             return None
-        return {"id": run_id, "at": parse_build_id_time(run_id),
+        return {"id": run_id, "at": run_start_time(bdir),
                 **{k: info.get(k) for k in ("outcome", "duration", "total",
                                             "failed_names", "pkg_durations",
                                             "unfinished_names", "complete",
@@ -627,7 +628,7 @@ class BuildMonitor:
             self._build_ended = True  # notify once the counts are known
         self._was_active = bool(active)
         self.active_flag = bool(active)
-        epoch0 = parse_build_id_time(build_id) or (ev.mtime() - ev.last_t)
+        epoch0 = run_start_time(build_dir) or (ev.mtime() - ev.last_t)
 
         jobs = ev.jobs
         # The package table changes only with new events or when the build
@@ -762,7 +763,8 @@ class BuildMonitor:
             if self.prev_info:
                 info = self.prev_info
                 prev = {"id": info.get("id"),
-                        "at": parse_build_id_time(info.get("id") or ""),
+                        "at": (run_start_time(os.path.join(self.log_base, info["id"]))
+                               if info.get("id") else None),
                         "duration": info.get("duration"),
                         "args": info.get("args") or "",
                         # the median of the last runs: the usual time

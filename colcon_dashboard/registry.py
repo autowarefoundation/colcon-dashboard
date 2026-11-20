@@ -17,7 +17,7 @@ from urllib.parse import quote
 
 from . import __version__, browser, notify
 from .config import CONFIG
-from .events import BUILD_DIR_RE, parse_build_id_time
+from .events import BUILD_DIR_RE, parse_build_id_time, run_start_time
 from .monitor import BuildMonitor
 
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache",
@@ -98,8 +98,10 @@ class Registry:
                         newest, newest_name = t, name
         except OSError:
             pass
-        out["last_build"] = newest
         if newest_name:
+            # the newest name, as in the run list, but its real start:
+            # a container run names itself in its own time zone
+            out["last_build"] = run_start_time(os.path.join(log_dir, newest_name))
             # only the outcome the monitor already cached: a cold
             # events.log pass per listed workspace costs too much here
             try:

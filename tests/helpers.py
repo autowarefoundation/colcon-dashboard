@@ -1,6 +1,8 @@
 """Shared fixture builders: colcon-shaped log files in temp workspaces."""
 
+import contextlib
 import os
+import time
 
 from colcon_dashboard.config import CONFIG
 
@@ -68,3 +70,36 @@ def make_build(ws, build_id, events, mtime=None):
     if mtime is not None:
         os.utime(path, (mtime, mtime))
     return bdir
+
+
+def logger_line(t, text):
+    """One logger_all.log record in colcon's format: the seconds since
+    Python loaded the logging module, then the message."""
+    return "[{:.3f}s] {}\n".format(t, text).encode()
+
+
+def write_logger_all(bdir, lines, mtime=None):
+    """Create bdir/logger_all.log with the given bytes."""
+    path = os.path.join(bdir, "logger_all.log")
+    with open(path, "wb") as f:
+        f.write(b"".join(lines))
+    if mtime is not None:
+        os.utime(path, (mtime, mtime))
+    return path
+
+
+@contextlib.contextmanager
+def time_zone(tz):
+    """Run the block in the time zone tz, for example "XYZ-3" (POSIX: 3 h
+    east of UTC). CI runs on UTC, where a UTC name and a local name match."""
+    old = os.environ.get("TZ")
+    os.environ["TZ"] = tz
+    time.tzset()
+    try:
+        yield
+    finally:
+        if old is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = old
+        time.tzset()

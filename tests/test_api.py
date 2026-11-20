@@ -23,7 +23,10 @@ from colcon_dashboard.config import CONFIG, Config
 from colcon_dashboard.monitor import BuildMonitor
 from colcon_dashboard.registry import Registry
 from colcon_dashboard.web import Handler
-from tests.helpers import ended, event_line, make_build, queued, started
+from colcon_dashboard.events import parse_build_id_time
+from tests.helpers import (
+    ended, event_line, make_build, queued, started, time_zone,
+)
 
 # pybuild blocks network during deb builds by exporting
 # http_proxy=http://127.0.0.1:9/, and urllib proxies even loopback
@@ -400,6 +403,13 @@ class WorkspaceStats(unittest.TestCase):
                     json.dump({"v": BuildMonitor.OUTCOME_V, "outcome": outcome}, f)
             reg.stats_cache.clear()
             self.assertEqual(reg.stats(ws)["last_outcome"], "failed")
+
+    def test_last_build_of_a_container_run_named_in_utc(self):
+        with tempfile.TemporaryDirectory() as ws, time_zone("XYZ-3"):
+            utc = parse_build_id_time(BUILD_ID, utc=True)
+            make_build(ws, BUILD_ID, [queued(0.1, "a"), started(0.2, "a"),
+                                      ended(9.0, "a")], mtime=utc + 10.0)
+            self.assertEqual(Registry().stats(ws)["last_build"], utc)
 
 
 class DiscoverAll(unittest.TestCase):

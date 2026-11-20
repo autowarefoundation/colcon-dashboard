@@ -5,11 +5,13 @@ import tempfile
 import unittest
 
 from colcon_dashboard.events import (
-    BuildLogBuffer, EventLog, parse_build_id_time, payload_line,
+    BuildLogBuffer, EventLog, last_event_time, parse_build_id_time,
+    EVENTS_DELAY, LOGGER_DELAY, file_start, payload_line, run_start,
+    run_start_time,
 )
 from tests.helpers import (
-    command, command_ended, ended, event_line, queued, started, stderr_line,
-    stdout_line,
+    command, command_ended, ended, event_line, logger_line, make_build, queued,
+    started, stderr_line, stdout_line, time_zone, write_logger_all,
 )
 
 
@@ -23,6 +25,145 @@ class ParseBuildIdTime(unittest.TestCase):
     def test_invalid(self):
         self.assertIsNone(parse_build_id_time("build_nonsense"))
         self.assertIsNone(parse_build_id_time("build_2026-13-99_09-56-51"))
+
+    def test_a_time_out_of_range(self):
+        # east of UTC, Python also looks at the next day: year 10000
+        with time_zone("XYZ-3"):
+            self.assertIsNone(parse_build_id_time("build_9999-12-31_23-59-59"))
+            with tempfile.TemporaryDirectory() as ws:
+                bdir = make_build(ws, "build_9999-12-31_23-59-59", [])
+                self.assertIsNone(run_start_time(bdir))
+
+
+class RunStart(unittest.TestCase):
+    """A host 3 h east of UTC, and runs from a container on UTC."""
+
+    NAME = "build_2026-08-09_10-00-00"
+
+    def setUp(self):
+        tz = time_zone("XYZ-3")
+        tz.__enter__()
+        self.addCleanup(tz.__exit__, None, None, None)
+        self.local = parse_build_id_time(self.NAME)
+        self.utc = parse_build_id_time(self.NAME, utc=True)
+
+    def test_the_utc_reading_is_3_hours_later(self):
+        self.assertEqual(self.utc - self.local, 3 * 3600)
+
+    def test_a_host_run_keeps_the_local_reading(self):
+        # logger_all.log starts its clock before colcon names the run,
+        # events.log after colcon reads the workspace
+        self.assertEqual(run_start(self.NAME, self.local - 0.1, LOGGER_DELAY),
+                         self.local)
+        self.assertEqual(run_start(self.NAME, self.local + 12.0, EVENTS_DELAY),
+                         self.local)
+
+    def test_a_container_run_gets_the_utc_reading(self):
+        self.assertEqual(run_start(self.NAME, self.utc - 0.1, LOGGER_DELAY), self.utc)
+        self.assertEqual(run_start(self.NAME, self.utc + 12.0, EVENTS_DELAY), self.utc)
+
+    def test_a_copied_file_keeps_the_local_reading(self):
+        # the copy gave the log a new time that fits no reading
+        self.assertEqual(run_start(self.NAME, self.local + 7200, EVENTS_DELAY),
+                         self.local)
+        # a copy 3 h after the run: logger_all.log fits the UTC reading
+        # only within its own, narrow range
+        self.assertEqual(run_start(self.NAME, self.utc + 120, LOGGER_DELAY),
+                         self.local)
+
+    def test_without_a_start(self):
+        self.assertEqual(run_start(self.NAME, None, None), self.local)
+        self.assertIsNone(run_start("build_nonsense", self.utc, EVENTS_DELAY))
+
+    def build(self, ws, events=(), mtime=None):
+        return make_build(ws, self.NAME, list(events), mtime=mtime)
+
+    def test_run_start_time_reads_events_log(self):
+        with tempfile.TemporaryDirectory() as ws:
+            bdir = self.build(ws, [
+                event_line(0.0, "-", "TimerEvent"),
+                event_line(60.0, "-", "EventReactorShutdown"),
+            ], mtime=self.utc + 61)
+            self.assertEqual(run_start_time(bdir), self.utc)
+            # a run without logs: the local reading of its name
+            os.makedirs(os.path.join(ws, "log", "test_2026-08-09_11-00-00"))
+            self.assertEqual(
+                run_start_time(os.path.join(ws, "log", "test_2026-08-09_11-00-00")),
+                parse_build_id_time("test_2026-08-09_11-00-00"))
+
+    def test_logger_all_log_comes_first(self):
+        # the computer slept for 50 minutes in a container build. The
+        # events.log clock stopped, the logger_all.log clock did not.
+        end = self.utc + 3600
+        with tempfile.TemporaryDirectory() as ws:
+            bdir = self.build(ws, [event_line(600.0, "-", "EventReactorShutdown")],
+                              mtime=end)
+            self.assertEqual(file_start(bdir), (self.utc + 3000, EVENTS_DELAY))
+            write_logger_all(bdir, [
+                logger_line(0.1, "DEBUG:colcon:Command line arguments: x"),
+                # the last record has more than one line
+                logger_line(3599.9, "ERROR:colcon:Duplicate package names:"),
+                b"- a:\n  - src/a\n",
+            ], mtime=end)
+            self.assertAlmostEqual(file_start(bdir)[0], self.utc + 0.1, places=3)
+            self.assertEqual(run_start_time(bdir), self.utc)
+
+    def test_a_run_with_logger_all_log_only(self):
+        # colcon stopped before the first event
+        with tempfile.TemporaryDirectory() as ws:
+            bdir = os.path.join(ws, "log", self.NAME)
+            os.makedirs(bdir)
+            write_logger_all(bdir, [logger_line(0.4, "ERROR:colcon:x")],
+                             mtime=self.utc + 0.5)
+            self.assertEqual(run_start_time(bdir), self.utc)
+
+    def test_python_3_13_logger_times(self):
+        # From Python 3.13, colcon writes record.created minus
+        # logging._startTime in nanoseconds: the start, negated
+        load_ns = int((self.utc + 0.1) * 1e9)
+        stamp = (load_ns + 3600 * 10**9) / 1e9 - load_ns  # 1 h later
+        with tempfile.TemporaryDirectory() as ws:
+            bdir = self.build(ws, [event_line(60.0, "-", "EventReactorShutdown")],
+                              mtime=self.local + 7200)
+            # a copy gave the files new times: the stamp needs none
+            write_logger_all(bdir, ["[{:.3f}s] DEBUG:colcon:x\n".format(stamp).encode()],
+                             mtime=self.local + 7200)
+            self.assertAlmostEqual(file_start(bdir)[0], self.utc + 0.1, places=3)
+            self.assertEqual(run_start_time(bdir), self.utc)
+
+
+    def test_a_clock_that_went_back(self):
+        # Python 3.12: the wall clock went back 3.1 s during the run, so
+        # the last record came 3 s before the start of the logging clock
+        start = self.utc + 0.1
+        with tempfile.TemporaryDirectory() as ws:
+            bdir = os.path.join(ws, "log", self.NAME)
+            os.makedirs(bdir)
+            write_logger_all(bdir, [logger_line(-3.0, "DEBUG:colcon:x")],
+                             mtime=start - 3.0)
+            self.assertAlmostEqual(file_start(bdir)[0], start, places=3)
+            self.assertEqual(run_start_time(bdir), self.utc)
+
+
+class LastEventTime(unittest.TestCase):
+    def path(self, *events):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        return os.path.join(make_build(tmp.name, "build_x", events), "events.log")
+
+    def test_the_last_line(self):
+        self.assertEqual(last_event_time(self.path(
+            started(1.0, "a"), ended(2.5, "a"))), 2.5)
+
+    def test_a_last_line_longer_than_4_kib(self):
+        # a Command event carries the whole environment
+        env = "{'env': '" + "x" * 10000 + "'}"
+        self.assertEqual(last_event_time(self.path(
+            started(1.0, "a"), event_line(2.5, "a", "Command", env))), 2.5)
+
+    def test_no_events(self):
+        self.assertIsNone(last_event_time(self.path(b"not an event\n")))
+        self.assertIsNone(last_event_time("/nonexistent/events.log"))
 
 
 class PayloadLine(unittest.TestCase):

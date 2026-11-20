@@ -9,7 +9,7 @@ import ast
 import os
 import re
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 
 EVENT_RE = re.compile(rb"^\[\s*([0-9.]+)\] \(([^)]*)\) (\w+): (.*)$")
 RC_RE = re.compile(rb"'rc': (?:'([^']+)'|(-?\d+))")
@@ -28,15 +28,133 @@ WARNING_RE = re.compile(rb"warning:|CMake Warning")
 BUILD_DIR_RE = re.compile(r"(?:build|test)_[\w.-]+")
 
 
-def parse_build_id_time(build_id):
-    """build_2026-08-09_09-56-51 -> epoch seconds (local time), or None."""
+def parse_build_id_time(build_id, utc=False):
+    """build_2026-08-09_09-56-51 -> epoch seconds, or None. The name holds
+    the local time of the machine that ran colcon: this machine's time
+    zone by default, UTC with utc=True."""
     m = re.search(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})", build_id)
     if not m:
         return None
     try:
-        return datetime.strptime(m.group(1), "%Y-%m-%d_%H-%M-%S").timestamp()
-    except ValueError:
+        dt = datetime.strptime(m.group(1), "%Y-%m-%d_%H-%M-%S")
+        if utc:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.timestamp()
+    except (ValueError, OverflowError, OSError):  # build_9999-12-31_...
         return None
+
+
+# The seconds from the time in a run name to the start that a log
+# gives. logger_all.log counts wall-clock time from when Python loads the
+# logging module, about 0.1 s before colcon names the run. events.log
+# counts from the first event, after colcon reads the workspace (up to
+# 13 s on a 500-package workspace). It counts monotonic time, which
+# stops while the computer sleeps.
+LOGGER_DELAY = (-60.0, 60.0)
+EVENTS_DELAY = (-5.0, 300.0)
+
+# the time at the start of each logger_all.log record: the seconds since
+# Python loaded the logging module. From Python 3.13, colcon subtracts
+# that load time in nanoseconds from the record time in seconds. The
+# negative result holds the load time itself.
+LOGGER_TIME_RE = re.compile(rb"^\[(-?\d+\.\d+)s\] ")
+
+# the logs that give the start of a run, the most exact first
+START_LOGS = (("logger_all.log", LOGGER_TIME_RE, LOGGER_DELAY),
+              ("events.log", EVENT_RE, EVENTS_DELAY))
+
+
+def run_start(build_id, start, delay):
+    """When a run started, in epoch seconds, or None.
+
+    colcon names a run with the local time of the machine that runs it.
+    A container usually runs on UTC (the Docker default), so on a host in
+    another time zone the name of a container run is hours off. start is
+    the real start from a log (file_start), or None, and delay the range
+    of start minus the name time for that log. When the name read as
+    local time does not fit start, but read as UTC it does, the run came
+    from a UTC machine."""
+    local = parse_build_id_time(build_id)
+    if local is None or start is None:
+        return local
+    lo, hi = delay
+    if lo <= start - local <= hi:
+        return local
+    utc = parse_build_id_time(build_id, utc=True)
+    if lo <= start - utc <= hi:
+        return utc
+    return local  # a copied or touched file: its time tells nothing
+
+
+def last_time(path, line_re):
+    """The time in the last line of a log that matches line_re, from the
+    last 4 MiB of the file, or None."""
+    try:
+        with open(path, "rb") as f:
+            size = f.seek(0, os.SEEK_END)
+            # the last line can be long, for example a Command event with
+            # the whole environment: read more when the end holds no match
+            for chunk in (4096, 256 * 1024, 4 * 1024 * 1024):
+                f.seek(max(0, size - chunk))
+                lines = f.read().split(b"\n")
+                if size > chunk:
+                    lines = lines[1:]  # the first line can start mid-line
+                for line in reversed(lines):
+                    m = line_re.match(line)
+                    if m:
+                        return float(m.group(1))
+                if size <= chunk:
+                    break
+    except OSError:
+        pass
+    return None
+
+
+def last_event_time(path):
+    """The time of the last event in an events.log, or None."""
+    return last_time(path, EVENT_RE)
+
+
+def _mtime(path):
+    try:
+        return os.stat(path).st_mtime
+    except OSError:
+        return None
+
+
+def file_start(build_dir, mtimes=None):
+    """When colcon started a run: the time of the last write to a log of
+    the run minus the time of its last line in that log. Returns (start,
+    delay) from the first log of START_LOGS that gives a time, or
+    (None, None)."""
+    for i, (name, line_re, delay) in enumerate(START_LOGS):
+        path = os.path.join(build_dir, name)
+        mtime = mtimes[i] if mtimes else _mtime(path)
+        t = last_time(path, line_re) if mtime else None
+        if t is None:
+            continue
+        # Python 3.13 and newer: about -1.8e18, the start (LOGGER_TIME_RE).
+        # A small negative time is a wall clock that went back in the run.
+        if t < -1e9:
+            return -t / (1 - 1e-9) / 1e9, delay
+        return mtime - t, delay
+    return None, None
+
+
+_starts = {}  # run folder -> (mtimes of START_LOGS, start)
+
+
+def run_start_time(build_dir):
+    """run_start for a run folder, cached until its logs change."""
+    mtimes = tuple(_mtime(os.path.join(build_dir, log[0])) for log in START_LOGS)
+    hit = _starts.get(build_dir)
+    if hit and hit[0] == mtimes:
+        return hit[1]
+    start = run_start(os.path.basename(build_dir), *file_start(build_dir, mtimes))
+    if len(_starts) > 4096:  # pruned runs leave their entries behind
+        _starts.clear()
+    _starts[build_dir] = (mtimes, start)
+    return start
 
 
 # ---------------------------------------------------------------------------
