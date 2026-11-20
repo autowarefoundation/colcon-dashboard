@@ -5,8 +5,8 @@ import tempfile
 import unittest
 
 from colcon_dashboard.packages import (
-    PackageIndex, arg_options, junit_report, parse_namespace, read_test_results,
-    summarize_args,
+    PackageIndex, arg_options, find_run_root, junit_report, parse_crawl_paths,
+    parse_namespace, read_test_results, split_foreign, summarize_args,
 )
 
 
@@ -95,6 +95,120 @@ class Scan(unittest.TestCase):
                 idx = PackageIndex(self.ws)
                 idx.scan(base_paths)
                 self.assertEqual(set(idx.packages), found)
+
+
+class RunRoot(unittest.TestCase):
+    """Where colcon ran: /nonexistent-ws stands for a container path."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.ws = tmp.name
+        os.makedirs(os.path.join(self.ws, "src"))
+        os.makedirs(os.path.join(self.ws, "log", "build_x"))
+        self.log = os.path.join(self.ws, "log", "build_x", "logger_all.log")
+
+    def write_log(self, base_paths, *crawled, log_base=None):
+        """A log as colcon writes it: the base paths as the user gave them,
+        then all crawled paths on one line."""
+        with open(self.log, "w") as f:
+            f.write("[0.1s] DEBUG:colcon:Parsed command line arguments: "
+                    "Namespace(log_base={!r}, verb_name='build', base_paths={!r})\n"
+                    .format(log_base, base_paths))
+            if crawled:
+                f.write("[0.2s] INFO:colcon.colcon_core.package_discovery:"
+                        "Crawling recursively for packages in {}\n".format(
+                            ", ".join("'{}'".format(p) for p in crawled)))
+
+    def root(self):
+        return find_run_root(self.log, self.ws, parse_namespace(self.log))
+
+    def test_split_foreign(self):
+        self.assertEqual(split_foreign(self.ws, "/nonexistent-ws/src"),
+                         ("/nonexistent-ws", "src"))
+        self.assertEqual(split_foreign(self.ws, "/nonexistent-ws"),
+                         ("/nonexistent-ws", ""))
+        self.assertEqual(split_foreign(self.ws, "/home/u/aw/src"),
+                         ("/home/u/aw", "src"))
+
+    def test_a_container_run_with_the_default_base_path(self):
+        self.write_log(["."], "/nonexistent-ws")  # colcon build in /nonexistent-ws
+        self.assertEqual(self.root(), "/nonexistent-ws")
+
+    def test_a_container_run_with_base_path_src(self):
+        self.write_log(["src"], "/nonexistent-ws/src")
+        self.assertEqual(self.root(), "/nonexistent-ws")
+
+    def test_several_base_paths(self):
+        self.write_log(["src", "tools"], "/nonexistent-ws/src", "/nonexistent-ws/tools")
+        self.assertEqual(parse_crawl_paths(self.log),
+                         ["/nonexistent-ws/src", "/nonexistent-ws/tools"])
+        self.assertEqual(self.root(), "/nonexistent-ws")
+
+    def test_a_folder_with_the_name_of_the_workspace(self):
+        # a devcontainer has the repo at /workspaces/repo, and the repo
+        # has a package folder with its own name
+        os.makedirs(os.path.join(self.ws, "repo"))
+        self.write_log(["."], "/nonexistent-root/repo")
+        self.assertEqual(self.root(), "/nonexistent-root/repo")
+
+    def test_an_absolute_base_path(self):
+        self.write_log(["/nonexistent-ws/src"], "/nonexistent-ws/src")
+        self.assertEqual(self.root(), "/nonexistent-ws")
+
+    def test_a_wildcard_base_path(self):
+        # colcon expands src/* after it logs the Namespace line
+        os.makedirs(os.path.join(self.ws, "src", "a"))
+        os.makedirs(os.path.join(self.ws, "src", "b"))
+        self.write_log(["src/*"], "/nonexistent-ws/src/a", "/nonexistent-ws/src/b")
+        self.assertEqual(self.root(), "/nonexistent-ws")
+
+    def test_a_mixed_list_with_a_shared_absolute_path(self):
+        # the container mounts a shared folder at the same path
+        with tempfile.TemporaryDirectory() as shared:
+            self.write_log(["src", shared], "/nonexistent-ws/src", shared)
+            self.assertEqual(self.root(), "/nonexistent-ws")
+
+    def test_a_quote_in_a_path(self):
+        self.write_log([".", "/nonexistent-o'brien"], "/nonexistent-ws/o'brien",
+                       "/nonexistent-o'brien")
+        self.assertEqual(parse_crawl_paths(self.log),
+                         ["/nonexistent-ws/o'brien", "/nonexistent-o'brien"])
+        self.assertEqual(self.root(), "/nonexistent-ws/o'brien")
+
+    def test_a_run_on_this_machine(self):
+        self.write_log(["src"], os.path.join(self.ws, "src"))
+        self.assertEqual(self.root(), "")
+
+    def test_a_base_path_that_was_deleted_later(self):
+        gone = os.path.join(self.ws, "src", "gone")
+        self.write_log(["src/gone"], gone)
+        self.assertEqual(self.root(), "")
+        self.write_log([gone], gone)
+        self.assertEqual(self.root(), "")
+
+    def test_a_deleted_base_path_through_a_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            link = os.path.join(tmp, "wslink")
+            os.symlink(self.ws, link)
+            gone = os.path.join(link, "src", "gone")
+            self.write_log([gone], gone)
+            self.assertEqual(self.root(), "")
+
+    def test_a_run_from_another_folder_that_logged_here(self):
+        # colcon build --log-base <this workspace>/log in a scratch
+        # workspace that was deleted later
+        log_base = os.path.join(self.ws, "log")
+        self.write_log(["."], "/nonexistent-scratch/ws", log_base=log_base)
+        self.assertEqual(self.root(), "")
+        # a container with an absolute log base keeps its root
+        self.write_log(["."], "/nonexistent-ws", log_base="/nonexistent-ws/log")
+        self.assertEqual(self.root(), "/nonexistent-ws")
+
+    def test_no_crawl_line_yet(self):
+        self.write_log(["."])
+        self.assertIsNone(self.root())
+        self.assertIsNone(find_run_root("/nonexistent/logger_all.log", self.ws))
 
 
 class Namespace(unittest.TestCase):

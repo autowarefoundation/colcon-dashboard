@@ -18,8 +18,8 @@ from .events import (
     BUILD_DIR_RE, EVENT_RE, EventLog, RC_RE, WARNING_RE, parse_build_id_time,
     run_start_time,
 )
-from .packages import (PackageIndex, arg_options, junit_report, parse_namespace,
-                       read_test_results, summarize_args)
+from .packages import (PackageIndex, arg_options, find_run_root, junit_report,
+                       parse_namespace, read_test_results, summarize_args)
 
 LOG_FILES = {
     "combined": "stdout_stderr.log",
@@ -97,6 +97,9 @@ class BuildMonitor:
         self.build_dir = None
         self.events = None
         self.namespace = None
+        # where colcon ran, when that path does not exist here: /ws for a
+        # container. "" when colcon ran here, None until the log tells.
+        self.run_root = None
         self.direct_deps = {}  # transitive reduction of the job dep closures
         self.seq = 0
         self.last_request = time.time()
@@ -332,13 +335,26 @@ class BuildMonitor:
                 pass
         threading.Thread(target=run, daemon=True).start()
 
+    def host_path(self, path):
+        """path on this machine: a path below run_root moves into the
+        workspace (/ws/build/a -> <workspace>/build/a)."""
+        root = self.run_root
+        if root:
+            norm = os.path.normpath(path)
+            if norm == root or norm.startswith(root + os.sep):
+                return self.workspace + norm[len(root):]
+        return path
+
     def _test_paths(self, name):
         """Where a package's JUnit files are, as `colcon test-result` looks."""
         ns = self.namespace or {}
+        # an absolute base path can be a path in a container
         if ns.get("test_result_base"):  # everything goes there, per package
-            return [os.path.join(self.workspace, ns["test_result_base"], name)]
+            return [os.path.join(self.workspace,
+                                 self.host_path(ns["test_result_base"]), name)]
         # ament_cmake: test_results/; pytest: pytest.xml
-        root = os.path.join(self.workspace, ns.get("build_base") or "build", name)
+        root = os.path.join(self.workspace,
+                            self.host_path(ns.get("build_base") or "build"), name)
         return [os.path.join(root, "test_results"), os.path.join(root, "pytest.xml")]
 
     def _test_results(self, name, ended):
@@ -587,6 +603,7 @@ class BuildMonitor:
             self.build_dir = build_dir
             self.events = EventLog(os.path.join(build_dir, "events.log"))
             self.namespace = None
+            self.run_root = None
             self.direct_deps = {}
             self.active_flag = False
             self.prev_info = None
@@ -607,6 +624,12 @@ class BuildMonitor:
             ev.poll()
         if ev.graph_dirty:
             self.reduce_graph()
+        if self.run_root is None:
+            root = find_run_root(os.path.join(build_dir, "logger_all.log"),
+                                 self.workspace, self.namespace)
+            # colcon logs where it searches before its first event
+            if root is not None or ev.offset:
+                self.run_root = root or ""
 
         if not os.path.exists(ev.path):
             with self.lock:
@@ -712,6 +735,7 @@ class BuildMonitor:
             "args": summarize_args(self.namespace),
             "options": arg_options(self.namespace),
             "build_started": epoch0,
+            "run_root": self.run_root or None,
             "elapsed": round((now - epoch0) if active else ev.last_t, 1),
             "now": round(now, 2),
             "counts": counts,
@@ -893,9 +917,17 @@ class BuildMonitor:
                 continue
             if tail.strip():
                 break
+        if os.path.basename(build_dir) == self.build_id:
+            root = self.run_root
+        else:  # an earlier run
+            log = os.path.join(build_dir, "logger_all.log")
+            root = find_run_root(log, self.workspace, parse_namespace(log))
         return (
             f"The colcon build of the package '{pkg}' failed in this"
             " workspace.\n"
+            + (f"The build ran with this workspace at {root}, for example"
+               f" in a container. A path in the log that starts with {root}"
+               " is in this workspace.\n" if root else "")
             + (f"The package source is in {src}.\n" if src else "")
             + "Find the reason and answer briefly:\n"
               "1. The exact error, with the file and line it points to.\n"

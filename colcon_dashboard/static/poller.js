@@ -78,6 +78,7 @@ export async function pollState() {
   }
   // set before build-changed: its handlers open panes that render paths
   App.workspace = s.workspace || App.workspace;
+  App.runRoot = s.run_root || '';
   if (s.build_id !== App.buildId) {
     const first = App.buildId === null;
     App.buildId = s.build_id;

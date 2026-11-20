@@ -9,6 +9,7 @@ export const App = {
   active: false,
   total: 0,
   workspace: '',        // absolute path, from /api/state
+  runRoot: '',          // where colcon ran, when not here: /ws in a container
   cfg: null,            // /api/config: version, editor_url
   scope: 'build',       // 'build' | 'all'
   view: 'graph',

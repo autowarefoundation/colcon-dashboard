@@ -63,6 +63,16 @@ function setFile(p, file) {
 export const FILE_LINE_RE =
   /(\/?[\w.+~-]+(?:\/[\w.+~-]+)+\.[A-Za-z]\w{0,3}):(\d+)/;
 
+// a path from a log, on this machine: relative to the workspace, or
+// /ws/src/a.cpp from a container that has the workspace at /ws
+function hostPath(p) {
+  if (!p.startsWith('/')) return `${App.workspace}/${p}`;
+  const root = App.runRoot;
+  if (root && (p === root || p.startsWith(root + '/')))
+    return App.workspace + p.slice(root.length);
+  return p;
+}
+
 // node: the text part of a log line (.lc)
 export function linkifyLine(node) {
   const tmpl = App.cfg?.editor_url;
@@ -70,8 +80,9 @@ export function linkifyLine(node) {
   if (node.nodeType !== 3 && node.querySelector?.('.elink')) return;
   const m = FILE_LINE_RE.exec(node.textContent);
   if (!m) return;
-  if (!m[1].startsWith('/') && !App.workspace) return;  // no anchor yet
-  if (tmpl.includes('{project}') && !App.workspace) return;
+  // no anchor yet: the first state names the workspace and the run root,
+  // and then the relink pass at the bottom links these lines
+  if (!App.workspace) return;
   let el = node;
   if (el.nodeType === 3) {  // bare text line: wrap it to hold the link
     const s = document.createElement('span');
@@ -79,13 +90,13 @@ export function linkifyLine(node) {
     s.appendChild(el);
     el = s;
   }
-  const path = m[1].startsWith('/') ? m[1] : `${App.workspace}/${m[1]}`;
+  const path = hostPath(m[1]);
   const a = document.createElement('a');
   a.className = 'elink';
   a.href = tmpl.replace('{path}', path).replace('{line}', m[2])
     .replace('{line0}', m[2] - 1)  // JetBrains URLs count lines from 0
     .replace('{project}', (App.workspace || '').split('/').pop());
-  a.title = `open ${m[1]}:${m[2]} in your editor`;
+  a.title = `open ${path}:${m[2]} in your editor`;
   // wrap the file:line text itself; a Range survives the match
   // crossing ANSI span boundaries, where plain splitText cannot
   const start = m.index, end = m.index + m[0].length;

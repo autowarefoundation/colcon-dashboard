@@ -544,6 +544,7 @@ class ScanOnce(unittest.TestCase):
     def test_live_states(self):
         mon, state, graph = self.scan(mtime=time.time())
         self.assertTrue(state["active"])
+        self.assertIsNone(state["run_root"])  # no logger_all.log: ran here
         s = {name: p["s"] for name, p in state["packages"].items()}
         self.assertEqual(s, {
             "a": "done",
@@ -617,6 +618,37 @@ class ScanOnce(unittest.TestCase):
         r = mon.read_log("a", "tests", 0)
         self.assertTrue(r["missing"])
         self.assertIn("no JUnit test results", r["why"])
+
+    def test_a_container_run_maps_its_paths(self):
+        # colcon test ran in a container that had this workspace at
+        # /nonexistent-ws, with an absolute --build-base
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        ws = self.tmp.name
+        tdir = make_build(ws, "test_2026-08-09_11-00-00", [
+            queued(0.1, "a"), started(0.2, "a"), ended(1.0, "a"), SHUTDOWN])
+        with open(os.path.join(tdir, "logger_all.log"), "w") as f:
+            f.write("[0.1s] DEBUG:colcon:Parsed command line arguments: Namespace("
+                    "verb_name='test', base_paths=['.'],"
+                    " build_base='/nonexistent-ws/build', test_result_base=None)\n"
+                    "[0.2s] INFO:colcon.colcon_core.package_discovery:Crawling"
+                    " recursively for packages in '/nonexistent-ws'\n")
+        os.symlink("test_2026-08-09_11-00-00", os.path.join(ws, "log", "latest_test"))
+        os.makedirs(os.path.join(ws, "build", "a"))
+        with open(os.path.join(ws, "build", "a", "pytest.xml"), "w") as f:
+            f.write('<testsuite><testcase name="x"><failure message="boom"/></testcase></testsuite>')
+        mon = BuildMonitor(ws)
+        mon.scan_once()
+        state = json.loads(mon.state_json)
+        self.assertEqual(state["run_root"], "/nonexistent-ws")
+        self.assertEqual(state["packages"]["a"]["tr"]["f"], 1)
+        self.assertEqual(mon.host_path("/nonexistent-ws/src/a/x.cpp"),
+                         os.path.join(mon.workspace, "src", "a", "x.cpp"))
+        self.assertEqual(mon.host_path("/nonexistent-wsx/a"), "/nonexistent-wsx/a")
+        self.assertEqual(mon.host_path("/nonexistent-ws/build/../src/a.cpp"),
+                         os.path.join(mon.workspace, "src", "a.cpp"))
+        self.assertEqual(mon.host_path("/nonexistent-ws/../x"), "/nonexistent-ws/../x")
+        self.assertIn("this workspace at /nonexistent-ws", mon.ai_prompt("a", tdir))
 
     def test_a_build_run_has_no_test_report(self):
         mon, _, _ = self.scan(mtime=time.time() - 600)

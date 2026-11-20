@@ -10,6 +10,9 @@ import xml.etree.ElementTree as ET
 
 NAMESPACE_RE = re.compile(r"Parsed command line arguments: Namespace\((?P<body>.*)\)\s*$")
 NS_FIELD_RE = re.compile(r"(\w+)=(\[[^\]]*\]|'(?:[^'\\]|\\.)*'|True|False|None|-?\d+)")
+# colcon-recursive-crawl logs all base paths on one line:
+# Crawling recursively for packages in '/ws/src', '/ws/tools'
+CRAWL_RE = re.compile(r"Crawling recursively for packages in (?P<paths>'.*')\s*$")
 
 DEP_TAGS = ("buildtool_depend", "build_depend", "depend", "exec_depend", "run_depend")
 
@@ -31,13 +34,9 @@ class PackageIndex:
             root = os.path.normpath(os.path.join(self.workspace, base))
             if not os.path.isdir(root) and os.path.isabs(base):
                 # a path from inside a container, such as /ws/src when the
-                # workspace is mounted at /ws: drop leading parts until the
-                # rest exists here (src), down to the workspace itself
-                parts = os.path.normpath(base).split(os.sep)[1:]
-                for i in range(1, len(parts) + 1):
-                    root = os.path.join(self.workspace, *parts[i:])
-                    if os.path.isdir(root):
-                        break
+                # workspace is mounted at /ws
+                root = os.path.join(self.workspace,
+                                    split_foreign(self.workspace, base)[1])
             roots.append(os.path.normpath(root))
         for root in roots:
             if not os.path.isdir(root):
@@ -168,6 +167,92 @@ def parse_namespace(logger_path):
                 pass
         return fields
     return None
+
+
+def parse_crawl_paths(logger_path):
+    """The folders that colcon searched for packages, as absolute paths on
+    the machine that ran colcon: its 'Crawling recursively for packages
+    in' line, which follows the Namespace line."""
+    try:
+        with open(logger_path, "r", errors="replace") as f:
+            head = f.read(512 * 1024)
+    except OSError:
+        return []
+    for line in head.splitlines():
+        m = CRAWL_RE.search(line)
+        if m:
+            # a path can hold a quote: only "', '" ends one
+            return re.findall(r"'(.*?)'(?=, '|$)", m.group("paths"))
+    return []
+
+
+def split_foreign(workspace, path):
+    """Split an absolute path from another machine into the workspace
+    path of that machine and the part that exists in workspace here:
+    ("/ws", "src") for /ws/src from a container that mounts this
+    workspace at /ws. Drops leading parts of path until the rest exists
+    in workspace, down to the workspace itself."""
+    parts = os.path.normpath(path).split(os.sep)[1:]
+    for i in range(1, len(parts) + 1):
+        rest = os.path.join("", *parts[i:])
+        if os.path.isdir(os.path.join(workspace, rest)):
+            break
+    return os.sep + os.path.join("", *parts[:i]), rest
+
+
+def _strip_base(path, base):
+    """The folder that colcon ran in, from a crawled path and the base
+    path that the user gave: /ws for /ws/src and src, /ws for /ws and
+    the default base path ".". None for an absolute base path, or when
+    path does not end with base."""
+    tail = os.path.normpath(base)
+    if os.path.isabs(tail) or tail.split(os.sep)[0] == os.pardir:
+        return None
+    path = os.path.normpath(path)
+    if tail == os.curdir:
+        return path
+    if path.endswith(os.sep + tail):
+        return path[:-len(tail) - 1] or os.sep
+    return None
+
+
+def find_run_root(logger_path, workspace, ns=None):
+    """The workspace path where colcon ran, when that path does not exist
+    here: /ws for a container that mounts this workspace at /ws. "" when
+    colcon ran here, None while its log does not tell yet. ns holds the
+    fields of the Namespace line of the run (parse_namespace)."""
+    paths = parse_crawl_paths(logger_path)
+    if not paths:
+        return None
+    ns = ns or {}
+    log_base = ns.get("log_base")
+    if (log_base and os.path.isabs(log_base)
+            and os.path.realpath(log_base) == os.path.realpath(
+                os.path.dirname(os.path.dirname(logger_path)))):
+        return ""  # colcon ran on this machine in another folder
+    base_paths = ns.get("base_paths") or []
+    root = None
+    # colcon makes a relative base path absolute from the folder it runs
+    # in. A wildcard can change the number of paths: then the two lists
+    # do not match.
+    if (len(base_paths) == len(paths)
+            and not any(c in b for b in base_paths for c in "*?[")):
+        root = next((r for r in map(_strip_base, paths, base_paths) if r), None)
+    if root is None:
+        # no relative base path to remove: a crawled path that exists
+        # here, or else the longest match in this workspace
+        if any(os.path.isdir(p) for p in paths):
+            return ""
+        root = split_foreign(workspace, paths[0])[0]
+    elif os.path.isdir(root):
+        return ""  # colcon ran here, or in a mount at the same path
+    # a path in this workspace or above it is not a container path, for
+    # example a base path that was deleted after the run
+    real, ws = os.path.realpath(root), os.path.realpath(workspace)
+    if (real == os.sep or real == ws or real.startswith(ws + os.sep)
+            or ws.startswith(real + os.sep)):
+        return ""
+    return root
 
 
 def _xml_files(paths):
