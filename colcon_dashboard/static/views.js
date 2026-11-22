@@ -1,7 +1,7 @@
 import { emit, on } from './bus.js';
 import { breakFollow, zoomToPkg } from './camera.js';
 import { applySpread } from './force.js';
-import { drawGantt } from './gantt.js';
+import { drawGantt, revealInTimeline } from './gantt.js';
 import { buildGraphView, initPrefixMenu } from './graph.js';
 import { mode } from './modes.js';
 import { App } from './state.js';
@@ -165,6 +165,8 @@ export function initViews() {
     markScope();
     App.vb = null;  // refit to the new extent
     buildGraphView();
+    // the dependency chains changed: the timeline marks them again
+    if (App.view !== 'graph') drawGantt();
   };
   if (localStorage.getItem('cmc-scope') === 'all') {  // before the first graph
     App.scope = 'all';
@@ -225,7 +227,13 @@ on('state', () => mode().onState?.());
 
 on('pane-changed', syncHash);
 
-on('focus-pkg', name => {
-  if (App.view === 'gantt') setView('split');  // bring the graph in
-  zoomToPkg(name);
+// A request to show one package: every visible view moves to it, except
+// the view that asked (source 'graph' or 'timeline'), so that nothing
+// moves under the pointer.
+on('focus-pkg', (name, source) => {
+  // source 'failures': the failure summary offers to find the package in
+  // the graph, so from the Timeline-only view, bring the graph in
+  if (source === 'failures' && App.view === 'gantt') setView('split');
+  if (App.view !== 'gantt' && source !== 'graph') zoomToPkg(name);
+  if (App.view !== 'graph' && source !== 'timeline') revealInTimeline(name);
 });

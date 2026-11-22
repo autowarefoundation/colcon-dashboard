@@ -44,15 +44,15 @@ After a build, the [progress line](index.md#progress-line) shows how much slower
 ![The timeline during a live build of ros2/examples: the building packages in blue up to the dashed line of the current time, and the finished packages in green](../assets/screens/timeline-live-light.webp#only-light)
 ![The timeline during a live build of ros2/examples, dark theme](../assets/screens/timeline-live-dark.webp#only-dark)
 
-The timeline scrolls to the newest packages as they start. Scroll up to stop this, or click **Follow** to start it again. A reload of the page keeps your place.
+The timeline scrolls to the newest packages as they start. Scroll up to stop this, or click **Follow** to start it again. A jump to a package that is not at the end, for example from a click in the graph, also stops it. A reload of the page keeps your place.
 
 ## Read and move
 
 - The time axis stays at the top while you scroll.
 - A long package name ends in "…", and its tooltip shows the full name. Drag the right edge of the name column to make it wider. Double-click the edge to fit the column to the names again.
 - Drag anywhere to pan, like in the graph.
-- Click a bar or a name to open the log of that package.
+- Click a bar or a name to select the package and to open its log. The bars of its dependency chain stay clear, and the other bars fade. ++ctrl++ + click or ++shift++ + click adds packages to the selection. Click empty space or press ++esc++ to clear it. The [graph](graph.md#find-a-package-and-its-chain) shows the same selection.
 
 ## Side by side
 
-**Side by side** shows the timeline and the graph together, with a bar between them that you can drag. It is the default view. In this view, a click on a package also moves the graph to it. The page keeps the view and the split.
+**Side by side** shows the timeline and the graph together, with a bar between them that you can drag. It is the default view. In this view, a click on a package in one view also moves the other view to it. A jump of the **Find package** box, a double-click on a log tab, and **Locate** in a log pane move both views. The page keeps the view and the split.

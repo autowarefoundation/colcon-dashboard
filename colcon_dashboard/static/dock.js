@@ -1,9 +1,9 @@
 import { newSgr, renderLogLine } from './ansi.js';
 import { emit, on } from './bus.js';
-import { zoomToPkg } from './camera.js';
 import { label } from './graph.js';
 import { LogView } from './logpane.js';
 import { mode } from './modes.js';
+import { pickPkg, selectPkg } from './selection.js';
 import { App } from './state.js';
 import { toast } from './toasts.js';
 import { $, copyText, esc, failNote, failStreak, fmtDur, fmtWhen, icon, newFailure, PINNED_BUILD, WS, wsParam } from './util.js';
@@ -18,6 +18,22 @@ export const BUILD_PANE = '\0build';  // the pinned whole-build terminal view
 
 export const FAIL_PANE = '\0failures';  // the aggregated failure summary
 
+// A pane that the user asked for makes its package the selection, in
+// every view (selection.js). The build log and the failure summary belong
+// to no package. A pane that the page opens by itself, for example for a
+// new failure, does not come through here: the selection must not jump
+// while the user reads.
+function selectPane(name) {
+  const p = App.panes.get(name);
+  if (p && !p.fixed && !p.summary) selectPkg(p.pkg);
+}
+
+// a click or a key on a tab
+function pickTab(name) {
+  activatePane(name);
+  selectPane(name);
+}
+
 // The log tabs work from the keyboard: Enter or Space opens a tab,
 // Delete closes it, and the arrow keys move between tabs.
 function tabKeys(tab, name, closable) {
@@ -27,7 +43,7 @@ function tabKeys(tab, name, closable) {
     if (ev.target !== tab) return;  // the close button handles its own keys
     if (ev.key === 'Enter' || ev.key === ' ') {
       ev.preventDefault();
-      activatePane(name);
+      pickTab(name);
     } else if (ev.key === 'Delete' && closable) {
       const next = tab.previousElementSibling?.matches('.ltab')
         ? tab.previousElementSibling : tab.nextElementSibling;
@@ -135,14 +151,14 @@ export function createPane(name, file = null) {
   tab.onclick = ev => {
     // the click lands on the icon inside the button
     if (ev.target.closest('.x')) closePane(name);
-    else activatePane(name);
+    else pickTab(name);
   };
   tab.ondblclick = () => {
     if (fixed) mode().fit();
-    else zoomToPkg(pkg);
+    else pickPkg(pkg, { open: false });
   };
   tab.title = fixed ? 'double-click to fit the whole graph'
-                    : 'double-click to find this package in the graph';
+                    : 'double-click to find this package in the graph or the timeline';
   tabKeys(tab, name, !fixed);
   $('#logtabs').appendChild(tab);
 
@@ -223,7 +239,7 @@ export function createPane(name, file = null) {
   p.pre.addEventListener('click', ev => {
     if (getSelection().type === 'Range') return;  // the user selects text
     const pk = ev.target.closest('.pk');
-    if (pk) { emit('open-pkg', pk.textContent); return; }
+    if (pk) { pickPkg(pk.textContent, { reveal: false }); return; }
     const head = ev.target.closest('.lgrp-head');
     if (head) {
       p.view.toggleGroup(head);
@@ -247,7 +263,8 @@ export function createPane(name, file = null) {
   }).observe(p.pre);
   pane.querySelector('.askai')?.addEventListener('click',
     () => emit('analyze-pkg', name));
-  pane.querySelector('.locate')?.addEventListener('click', () => zoomToPkg(pkg));
+  pane.querySelector('.locate')?.addEventListener('click',
+    () => pickPkg(pkg, { open: false }));
   pane.querySelector('.cpath')?.addEventListener('click', async () => {
     const abs = pkgAbsPath(name);
     if (!abs) return;
@@ -637,7 +654,7 @@ export function buildFailItem(name, st) {
   const moreTests = st.tr ? Math.max(0, st.tr.f + st.tr.e - (st.tr.fail || []).length) : 0;
   el.innerHTML = `
     <div class="fhead">
-      <button class="fjump mono" title="find this package in the graph">${esc(label(name))}</button>
+      <button class="fjump mono" title="find this package in the graph and the timeline">${esc(label(name))}</button>
       <span class="chip failed">${esc(failNote(st))}</span>
       ${dur ? `<span class="fmeta">failed after ${dur}</span>` : ''}
       ${st.warn ? `<span class="fmeta">${st.warn} warning${st.warn === 1 ? '' : 's'}</span>` : ''}
@@ -657,13 +674,10 @@ export function buildFailItem(name, st) {
     + (st.cmd ? `\n$ ${st.cmd}` : '')
     + (st.tr?.fail || []).map(f => `\nFAILED ${f.n}${f.m ? `: ${f.m}` : ''}`).join('');
   el.querySelector('.fcopy').onclick = () => copyFailures([el], name);
-  el.querySelector('.fjump').onclick = () => {
-    emit('open-pkg', name);
-    emit('focus-pkg', name);
-  };
-  el.querySelector('.flog').onclick = () => openPane(name);
+  el.querySelector('.fjump').onclick = () => pickPkg(name, { source: 'failures' });
+  el.querySelector('.flog').onclick = () => pickPkg(name, { reveal: false });
   const tr = el.querySelector('.ftr');
-  if (tr) tr.onclick = () => openPane(name, 'tests');
+  if (tr) tr.onclick = () => { openPane(name, 'tests'); selectPane(name); };
   for (const b of el.querySelectorAll('.ftest'))
     b.onclick = () => emit('find-in-log', name, b.dataset.n, null, 'tests');
   el.querySelector('.askai').onclick = () => emit('analyze-pkg', name);
@@ -768,6 +782,7 @@ on('open-pkg', openPane);
 // streams in takes the focus.
 on('find-in-log', (name, q, re = null, file = null) => {
   openPane(name, file);
+  selectPane(name);
   const p = App.panes.get(name);
   p.el.querySelector('.search').value = q;
   p.el.querySelector('.sclear').hidden = false;
@@ -825,7 +840,7 @@ on('pkg-failed', name => {
   liveFails++;
   if (liveFails <= TOAST_EACH) {
     toast(`<b>${name}</b> failed (${failNote(App.pkgs[name])}) - click to open its log`, '',
-          () => openPane(name));
+          () => pickPkg(name, { reveal: false }));
   } else {
     moreToast?.remove();
     const more = liveFails - TOAST_EACH;

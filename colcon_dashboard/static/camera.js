@@ -1,9 +1,8 @@
-import { emit } from './bus.js';
 import { Force, forceTick, stopForce } from './force.js';
 import { requestDraw, View } from './draw.js';
-import { buildGraphView, clearFocus, clearSelection, hideTooltip, hoverFocus,
-         selectPkg, showNodeTooltip } from './graph.js';
+import { buildGraphView, clearFocus, hideTooltip, hoverFocus, showNodeTooltip } from './graph.js';
 import { mode, registerMode } from './modes.js';
+import { clearSelection, pickPkg, selectPkg } from './selection.js';
 import { App } from './state.js';
 import { $, PINNED_BUILD, WS } from './util.js';
 
@@ -79,21 +78,12 @@ export function breakFollow() {
   $('#followBuildBtn').classList.remove('on');
 }
 
-/* double-click a dock tab: fly the selected view to that package */
+/* fly the graph to one package: the graph half of a 'focus-pkg' request
+   (views.js). The timeline has its own half (gantt.js revealInTimeline). */
 export function zoomToPkg(name) {
+  if (!App.lay?.nodes.has(name)) return;  // not in the graph: nothing moves
   breakFollow();
   Force.autoFit = false;  // stay on the package while the layout settles
-  if (App.view === 'gantt') {
-    const wrap = $('#ganttwrap');
-    const bar = $('#gantt').querySelector(
-      `.gbar[data-name="${CSS.escape(name)}"]`);
-    if (!bar) return;
-    wrap.scrollTop = Math.max(0, bar.y.baseVal.value - wrap.clientHeight / 2);
-    wrap.scrollLeft = Math.max(0, bar.x.baseVal.value - wrap.clientWidth / 2);
-    bar.classList.add('flash');
-    setTimeout(() => bar.classList.remove('flash'), 2000);
-    return;
-  }
   const focus = mode().focusPkg;
   if (focus) return focus(name);
   const nd = App.lay?.nodes.get(name);
@@ -118,10 +108,12 @@ export function initPanZoom() {
   };
   cv.addEventListener('click', ev => {
     if (moved > 4) return;  // the end of a drag, not a click
-    if (!downNode) return clearSelection();  // a click on empty space
-    if (ev.ctrlKey || ev.metaKey || ev.shiftKey) return selectPkg(downNode, true);
-    selectPkg(downNode);
-    emit('open-pkg', downNode);
+    const add = ev.ctrlKey || ev.metaKey || ev.shiftKey;
+    // a click on empty space clears the selection. With the key down it
+    // was a miss, and the selection that the user builds stays.
+    if (!downNode) { if (!add) clearSelection(); return; }
+    if (add) return selectPkg(downNode, true);
+    pickPkg(downNode, { source: 'graph' });
   });
   cv.addEventListener('pointerleave', () => { setHover(null); hideTooltip(); clearFocus(); });
   const wrapRect = () => cv.getBoundingClientRect();

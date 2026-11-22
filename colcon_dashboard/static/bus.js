@@ -9,7 +9,9 @@
      build-changed (s, first) the page follows a new build id
      pkg-failed (name)        a package newly turned failed
      open-pkg (name)          request: open this package's log pane
-     focus-pkg (name)         request: fly the view to this package
+     focus-pkg (name, source) request: move every visible view to this
+                              package, except the view that asked (source)
+     selection-changed        the selected packages changed (selection.js)
      analyze-pkg (pkg, q?)    request: start or continue an AI analysis
      pane-changed (name)      another log pane became active (or null)
      theme-changed            the color theme was applied

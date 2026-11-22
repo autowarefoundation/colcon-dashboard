@@ -8,7 +8,7 @@ description: >-
 
 # Log panes
 
-The dock at the bottom of the page holds the logs. It opens with the **Build log** tab: the whole build as a terminal shows it, with a `Starting >>>` and a `Finished <<<` line around the output of each package. Click a package in the graph or the timeline, and its own log opens in a new tab. Each tab has its own log, so the output of parallel jobs never mixes.
+The dock at the bottom of the page holds the logs. It opens with the **Build log** tab: the whole build as a terminal shows it, with a `Starting >>>` and a `Finished <<<` line around the output of each package. Click a package in the graph or the timeline, and its own log opens in a new tab. Each tab has its own log, so the output of parallel jobs never mixes. A click on a tab selects its package in the graph and the timeline. A double-click on the tab, or **Locate** in the pane, also moves these views to the package.
 
 ![The log pane of one package: a compiler warning with its file position, the code excerpt, and the warning flag, and the marks beside the scrollbar](../assets/screens/logs-light.webp#only-light)
 ![The log pane of one package, dark theme](../assets/screens/logs-dark.webp#only-dark)
@@ -60,4 +60,4 @@ The ✕ on a tab closes it. **Close all** closes every tab except the build log.
 
 ## Links to a pane
 
-The address follows the open pane, for example `#pkg=autoware_planning_msgs`. Copy the address, and a colleague opens the same package. The `ws` and `build` parameters pick the workspace and the build.
+The address follows the open pane, for example `#pkg=autoware_planning_msgs`. Copy the address, and a colleague opens the same package. The link also selects the package in the graph and the timeline. The `ws` and `build` parameters pick the workspace and the build.

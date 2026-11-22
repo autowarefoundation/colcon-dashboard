@@ -15,7 +15,7 @@ const ROWS = [
   ['click a package', 'open its log pane, and select it: its chain stays in focus'],
   ['Ctrl+click / Shift+click', 'add a package to the selection, or take it out'],
   ['click empty space / Esc', 'clear the selection'],
-  ['double-click a log tab', 'center the view on that package'],
+  ['double-click a log tab', 'center the graph and the timeline on that package'],
   ['drag', 'pan the graph or the timeline'],
   ['scroll', 'zoom the graph'],
   ['3D: drag / shift-drag / wheel', 'orbit / pan / zoom'],
