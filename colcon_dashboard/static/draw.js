@@ -222,6 +222,9 @@ function draw(now, dt) {
   const far = View.far;
   const searching = !!GS.set;
   const efocus = edgeFocus !== null, nfocus = nodeFocus !== null;
+  // the focus is the selection (not a hover, graph.js), and a step of
+  // this search made that selection
+  const stepFocus = searching && App.selStep && nfocus && nodeFocus.startsWith('s:');
   let ambient = false, fading = false;
 
   // halos behind the building packages, backmost
@@ -321,9 +324,12 @@ function draw(now, dt) {
   for (const [name, n] of nodes) {
     if (n.x + n.w + pad < X0 || n.x - pad > X1 || n.y + H / 2 + pad < Y0 || n.y - H / 2 - pad > Y1)
       continue;
-    // the fade target: a search hides the rest most, a focus less
+    // the fade target: a search hides the rest most, a focus less. Each
+    // step of a search selects its match: the focus of that selection must
+    // not fade the other matches. A click on a package still shows its chain.
     const target = searching && !GS.set.has(name) ? 0.15
-      : nfocus && !n.hl ? 0.35 : n.st === 'excluded' ? 0.35 : 1;
+      : nfocus && !n.hl && !stepFocus ? 0.35
+      : n.st === 'excluded' ? 0.35 : 1;
     if (n.alpha == null || !motion) n.alpha = target;
     else if (n.alpha !== target) {
       n.alpha += (target - n.alpha) * (1 - Math.exp(-dt / 0.12));

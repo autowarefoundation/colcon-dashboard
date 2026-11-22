@@ -39,7 +39,7 @@ When you zoom out so far that the labels can no longer be read, each node become
 - Drag to pan, and scroll to zoom.
 - **Fit** shows the whole graph.
 - **Follow** keeps the camera on the packages that build now. When you pan or zoom yourself, Follow turns off.
-- Double-click a log tab in the dock to center the graph on that package.
+- Double-click a log tab in the dock, or click **Locate** in a log pane, to center the graph on that package.
 - A reload of the page keeps the view. A new build fits the whole graph again.
 
 ## Find a package and its chain
@@ -48,8 +48,8 @@ When you zoom out so far that the labels can no longer be read, each node become
 ![A selected package with its dependency chain in focus, dark theme](../assets/screens/graph-focus-dark.webp#only-dark)
 
 - Hold the mouse over a package to see its state, its build time, and its path. Its whole dependency chain lights up, and the rest of the graph dims. If the previous build has a time for the package, the tooltip compares the two times. For a failed package, the tooltip also says how many runs in a row it failed, and when it last passed.
-- Click a package to select it and to open its log. The chain stays in focus after the mouse leaves. ++ctrl++ + click or ++shift++ + click adds packages to the selection. Click empty space or press ++esc++ to clear it.
-- Type in the **Find package** box to highlight the matching packages. ++enter++ and ++shift+enter++ jump through the matches, and the two arrow buttons beside the box do the same. The ++slash++ key jumps to the box.
+- Click a package to select it and to open its log. The chain stays in focus after the mouse leaves. ++ctrl++ + click or ++shift++ + click adds packages to the selection. Click empty space or press ++esc++ to clear it. The [timeline](timeline.md#read-and-move) shows the same selection, and a click on a log tab selects the package of that tab.
+- Type in the **Find package** box to highlight the matching packages. ++enter++ and ++shift+enter++ jump through the matches, and the two arrow buttons beside the box do the same. Each jump selects its match. The ++slash++ key jumps to the box.
 - The state buttons (**Failed**, **Building**, **Waiting**, **Done**) highlight the packages in that state. One click on **Failed** shows every package that a failure blocks. The arrow buttons also jump through these packages, with an empty box too.
 
 ## What the graph shows

@@ -1,6 +1,5 @@
-import { emit } from './bus.js';
-import { zoomToPkg } from './camera.js';
 import { requestDraw } from './draw.js';
+import { endStep, pickPkg } from './selection.js';
 import { App } from './state.js';
 import { $ } from './util.js';
 
@@ -51,6 +50,7 @@ export function runGraphSearch(refresh = false) {
     : GS.idx >= 0 ? `${GS.idx + 1}/${GS.matches.length}` : `${GS.matches.length} found`;
   // the arrows step through matches, so without one they do nothing
   $('#gsprev').disabled = $('#gsnext').disabled = !GS.matches.length;
+  if (!filtering) endStep();  // no search: a selection of a step shows its chain
 }
 
 export function stepGraphSearch(dir) {
@@ -59,7 +59,8 @@ export function stepGraphSearch(dir) {
   // before the first step: forward starts at the first match, back at the last
   GS.idx = GS.idx < 0 ? (dir > 0 ? 0 : n - 1) : (GS.idx + dir + n) % n;
   $('#gscount').textContent = `${GS.idx + 1}/${n}`;
-  zoomToPkg(GS.matches[GS.idx]);
+  // a step selects its match, and every visible view moves to it
+  pickPkg(GS.matches[GS.idx], { open: false, step: true });
 }
 
 export function initGraphSearch() {
@@ -74,11 +75,17 @@ export function initGraphSearch() {
   };
   input.onkeydown = ev => {
     if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
-      // Ctrl+Enter opens the log of the current match (the first one
-      // before any stepping), so the keyboard alone reaches a package log
+      // Ctrl+Enter opens the log of the current match, so the keyboard
+      // alone reaches a package log. Before any step, the first match
+      // becomes the current one.
       ev.preventDefault();
-      const name = GS.matches[Math.max(0, GS.idx)];
-      if (name) emit('open-pkg', name);
+      const n = GS.matches.length;
+      if (!n) return;
+      if (GS.idx < 0) {
+        GS.idx = 0;
+        $('#gscount').textContent = `1/${n}`;
+      }
+      pickPkg(GS.matches[GS.idx], { step: true });
     } else if (ev.key === 'Enter') {
       ev.preventDefault();
       stepGraphSearch(ev.shiftKey ? -1 : 1);

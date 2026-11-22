@@ -1153,14 +1153,25 @@ body.offline #sysmeters { display: none; }
   cursor: pointer;
 }
 .searchwrap .sclear:hover { color: var(--critical); }
+/* the selection in the timeline (gantt.js): the bars outside its dependency
+   chains fade, less than for a search, as in the graph. Not for a selection
+   that a step of the search made (stepsel) while that search is on: the
+   other matches must stay clear. The search rule comes later, so it wins
+   for a bar that does not match: :where() keeps this rule at the same
+   specificity. */
+#gantt.focused:where(:not(.stepsel), :not(.searching)) .gbar:not(.chain) { opacity: 0.4; }
+#gantt .gname.sel { font-weight: 700; }
+#gantt .gname.sel:not(.failed):not(:hover) { fill: var(--ink); }
 #gantt.searching .gbar:not(.smatch) { opacity: 0.18; }
 #gantt .gbar.smatch { stroke: var(--accent); stroke-width: 2; }
+/* after the search rule: a selected match keeps the wider outline */
+#gantt .gbar.sel { stroke: var(--accent); stroke-width: 3; }
 
-/* a double-clicked tab flashes its package in the timeline (the graph
-   flashes it in draw.js) */
+/* a reveal flashes the package in the timeline (gantt.js
+   revealInTimeline); the graph flashes it in draw.js */
 .gbar.flash { animation: pkgflash 0.5s ease-in-out 4; }
 @keyframes pkgflash {
-  50% { stroke: var(--accent); stroke-width: 3.5; }
+  50% { stroke: var(--accent); stroke-width: 6; }  /* past the outline of a selected bar */
 }
 
 /* AI failure analysis */

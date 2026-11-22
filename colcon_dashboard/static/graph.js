@@ -3,6 +3,7 @@ import { fitGraph, setViewBox } from './camera.js';
 import { requestDraw } from './draw.js';
 import { GS, runGraphSearch } from './gsearch.js';
 import { mode } from './modes.js';
+import { clearSelection } from './selection.js';
 import { App } from './state.js';
 import { $, esc, failNote, failStreak, fmtDur, fmtWhen, newFailure, WS } from './util.js';
 
@@ -149,6 +150,9 @@ export function buildGraphView() {
     }
   }
   App.adjIn = adjIn; App.adjOut = adjOut;
+  // the chains follow the new edges
+  chainCache = { name: null, set: null };
+  selChain = { key: null, set: null };
 
   // --- layering: longest path from the dependency roots (Kahn) ---
   const layer = new Map();
@@ -329,6 +333,7 @@ export let edgeFocus = null;
 export let nodeFocus = null;
 export let nodeFocusPending = null;
 export let chainCache = { name: null, set: null };
+let selChain = { key: null, set: null };  // selectionChain: the chains of the selection
 
 export function chainSetFor(name) {
   if (chainCache.name !== name) chainCache = { name, set: chainOf(name) };
@@ -377,10 +382,9 @@ export function hoverFocus(name) {
 
 // the selection's focus, at once: a click is a deliberate choice
 function focusSelection() {
-  const names = [...App.selected].filter(n => App.lay?.nodes.has(n));
-  if (!names.length) return false;
-  const key = 's:' + names.sort().join(',');
-  const chain = chainOfAll(names);
+  const chain = selectionChain();
+  if (!chain) return false;
+  const key = 's:' + selChain.key;
   focusEdges(key, chain);
   focusNodes(key, chain);
   return true;
@@ -401,21 +405,16 @@ export function clearFocus() {
   requestDraw();
 }
 
-// click: select only this package; additive (Ctrl/Cmd/Shift+click): add
-// it to the selection, or take it out again
-export function selectPkg(name, additive = false) {
-  if (!additive) App.selected = new Set([name]);
-  else if (App.selected.has(name)) App.selected.delete(name);
-  else App.selected.add(name);
-  clearFocus();  // shows the selection, or clears the focus when it is empty
-  emit('selection-changed');
-}
-
-export function clearSelection() {
-  if (!App.selected.size) return;
-  App.selected = new Set();
-  clearFocus();
-  emit('selection-changed');
+// The chains of all selected packages, or null when no selected package
+// is in the graph. The 3D view and the timeline mark the packages that the
+// 2D graph keeps in focus. Kept until the selection or the edges change:
+// the 3D view asks in every frame.
+export function selectionChain() {
+  const names = [...App.selected].filter(n => App.lay?.nodes.has(n));
+  if (!names.length) return null;
+  const key = names.sort().join(',');
+  if (selChain.key !== key) selChain = { key, set: chainOfAll(names) };
+  return selChain.set;
 }
 
 
@@ -489,11 +488,16 @@ on('state', () => updateNodes());
 
 on('labels-changed', () => buildGraphView());
 
+// the selection changed (selection.js), from any view: show it at once, or
+// clear the focus when it is empty
+on('selection-changed', clearFocus);
+
 // Esc clears the selection, unless an overlay or a text box takes it
 document.addEventListener('keydown', ev => {
   if (ev.key !== 'Escape' || !App.selected.size) return;
   if (ev.target.closest?.('input, textarea, select')) return;
-  if (document.querySelector('#bpick:not([hidden]), #confirm:not([hidden]), #help:not([hidden])')) return;
+  if (document.querySelector('#bpick:not([hidden]), #wspick:not([hidden]), #confirm:not([hidden]),'
+      + ' #help:not([hidden]), #cmdpanel:not([hidden]), #settings:not([hidden])')) return;
   clearSelection();
 });
 

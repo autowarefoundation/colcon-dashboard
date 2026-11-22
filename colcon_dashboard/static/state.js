@@ -27,6 +27,7 @@ export const App = {
   adjOut: new Map(),
   vb: null,             // graph viewBox
   selected: new Set(),  // selected packages: their chains stay in focus
+  selStep: false,       // a step of the find-package box made the selection
   elapsedBase: 0, elapsedAt: 0, buildStarted: 0,
   failedSeen: new Set(),
   panes: new Map(),

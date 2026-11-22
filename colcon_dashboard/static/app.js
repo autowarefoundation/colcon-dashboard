@@ -1,6 +1,5 @@
 import './g3d.js';  // registers the 3d layout mode
 import { pollAllPanes } from './ai.js';
-import { emit } from './bus.js';
 import { initPanZoom } from './camera.js';
 import { activatePane, BUILD_PANE, closePane, openPane } from './dock.js';
 import { drawGantt, initGanttPan } from './gantt.js';
@@ -11,6 +10,7 @@ import { mode } from './modes.js';
 import { initNotify } from './notify.js';
 import { initBuildPicker, initStop, initWsPicker } from './pickers.js';
 import { startStatePolling, tickElapsed } from './poller.js';
+import { pickPkg } from './selection.js';
 import { initSettings } from './settings.js';
 import { App } from './state.js';
 import { initTheme } from './theme.js';
@@ -39,7 +39,16 @@ $('#sysBtn').onclick = () => { $('#sysmeters').hidden = !$('#sysmeters').hidden;
 initPanel($('#sysmeters'), $('#sysBtn'), { align: 'right' });
 await initHeaderMeta();  // App.cfg must land before the first log render
 openPane(BUILD_PANE);  // the pinned whole-build terminal view
-if (deepPkg) emit('open-pkg', deepPkg);
+// A #pkg link opens the log of its package. A new visit also selects the
+// package, in every view. A reload does not: the page writes #pkg for the
+// log in front, also for a log that it opened by itself for a failure, so
+// a reload must select nothing. No view moves to the package: no view has
+// its packages yet, and a reload keeps its places.
+if (deepPkg) {
+  const nav = performance.getEntriesByType('navigation')[0];
+  if (!nav || nav.type === 'navigate') pickPkg(deepPkg, { reveal: false });
+  else openPane(deepPkg);
+}
 startStatePolling();
 setInterval(pollAllPanes, 1200);
 setInterval(tickElapsed, 1000);

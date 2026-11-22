@@ -1,7 +1,8 @@
-import { emit, on } from './bus.js';
-import { hideTooltip, label, showNodeTooltip } from './graph.js';
+import { on } from './bus.js';
+import { hideTooltip, label, selectionChain, showNodeTooltip } from './graph.js';
 import { GS } from './gsearch.js';
 import { cutRanges, fitNames } from './namefit.js';
+import { clearSelection, pickPkg, selectPkg } from './selection.js';
 import { App } from './state.js';
 import { $, esc, fmtDur, fmtWhen, PINNED_BUILD, svgEl, WS, wsParam } from './util.js';
 
@@ -267,6 +268,8 @@ export function drawGantt() {
 
   const fitted = fitNames(rows.map(([name]) => label(name)), fit);
   const seen = new Set();
+  const chain = selectionChain();
+  markFocus(svg, chain);
   rows.forEach(([name, p], i) => {
     seen.add(name);
     let r = G.rows.get(name);
@@ -298,6 +301,7 @@ export function drawGantt() {
     r.bar.setAttribute('width', Math.max(2, (end - p.t0) * k));
     r.bar.setAttribute('height', ROW - 5);
     r.bar.classList.toggle('smatch', !!GS.set?.has(name));
+    markRow(name, r, chain);
     // compare: the time in the other run as an outline behind the bar, and
     // the change after the longer of the two
     const ref = App.cmp?.dur[name];
@@ -367,6 +371,64 @@ export function drawGantt() {
   };
 }
 
+/* ---- the selection (selection.js) in the timeline: the selected rows
+   get an outline and a strong name, the bars of their dependency chains
+   stay clear, and the other bars fade (style.css), as in the graph ---- */
+
+// focused: the selection has chains, and the bars outside them fade.
+// stepsel: a step of the find-package box made the selection. Then no
+// bar fades for the selection while that search is on (style.css).
+function markFocus(svg, chain) {
+  svg.classList.toggle('focused', !!chain);
+  svg.classList.toggle('stepsel', App.selStep);
+}
+
+function markRow(name, r, chain) {
+  const sel = App.selected.has(name);
+  r.bar.classList.toggle('sel', sel);
+  r.tn.classList.toggle('sel', sel);
+  // a selected row counts as a part of the chains, also when the graph
+  // does not know its package
+  r.bar.classList.toggle('chain', sel || !!chain?.has(name));
+}
+
+// the rows keep their places: only the marks change
+function markSelection() {
+  const chain = selectionChain();
+  markFocus($('#gantt'), chain);
+  for (const [name, r] of G.rows) markRow(name, r, chain);
+}
+
+/* The timeline half of a 'focus-pkg' request (views.js): bring the row of
+   one package to the middle of the view, and flash its bar. A package that
+   never started has no row, and then nothing moves. */
+export function revealInTimeline(name) {
+  const r = G.rows.get(name);
+  if (!r) return;
+  const wrap = $('#ganttwrap');
+  const end = wrap.scrollHeight - wrap.clientHeight;
+  const top = Math.max(0, Math.min(end, r.bar.y.baseVal.value - wrap.clientHeight / 2));
+  // Follow means that the timeline sits at its end: the scroll listener
+  // (views.js) keeps the two the same, with this 30 px rule. A row before
+  // the end turns Follow off here too, because a redraw before the scroll
+  // event would go back to the end. A row at the end: when the timeline
+  // moves to its end, the listener turns Follow on, as after a scroll to
+  // the end by hand.
+  if (App.ganttFollow && top < end - 30) {
+    App.ganttFollow = false;
+    $('#gfollowBtn').classList.remove('on');
+  }
+  wrap.scrollTop = top;
+  // sideways, move only for a bar that starts out of view, and only as far
+  // as it needs: in a narrow pane, each step pushes the names out
+  const x = r.bar.x.baseVal.value;
+  if (x < wrap.scrollLeft) wrap.scrollLeft = Math.max(0, x - 24);
+  else if (x > wrap.scrollLeft + wrap.clientWidth - 48)
+    wrap.scrollLeft = x - wrap.clientWidth + 48;
+  r.bar.classList.add('flash');
+  setTimeout(() => r.bar.classList.remove('flash'), 2000);
+}
+
 // the band behind the row under the pointer, from its name to its bar
 function placeHover() {
   if (!G.hov) return;
@@ -411,10 +473,19 @@ export function initGanttPan() {
   let drag = null;
   wrap.addEventListener('pointerdown', ev => {
     if (ev.button !== 0) return;
+    // a press starts fresh: a drag that lost its release must not act now
+    if (drag) {
+      drag = null;
+      wrap.classList.remove('panning');
+    }
     if (ev.target.classList?.contains('gsplit')) {
       startResize(ev, wrap);
       return;
     }
+    // a press on a scrollbar of the timeline is not a press on its rows
+    const box = wrap.getBoundingClientRect();
+    if (ev.clientX >= box.left + wrap.clientLeft + wrap.clientWidth
+        || ev.clientY >= box.top + wrap.clientTop + wrap.clientHeight) return;
     drag = { x: ev.clientX, y: ev.clientY,
              sl: wrap.scrollLeft, st: wrap.scrollTop, moved: 0,
              name: ev.target.closest?.('.gbar, .gname, .gref, .gdelta')?.dataset?.name
@@ -436,11 +507,17 @@ export function initGanttPan() {
   });
   const end = ev => {
     if (!drag) return;
-    if (drag.moved <= 4 && drag.name && ev.type === 'pointerup') {
-      emit('open-pkg', drag.name);
-      // in the side-by-side view, the graph flies to the package too; the
-      // Timeline-only view stays where the user put it
-      if (App.view !== 'gantt') emit('focus-pkg', drag.name);
+    if (drag.moved <= 4 && ev.type === 'pointerup') {
+      // the same rules as the graph: a click selects the package and opens
+      // its log, and the graph flies to it in the side-by-side view (the
+      // timeline stays where the user put it). Ctrl/Cmd/Shift+click adds
+      // the package to the selection or takes it out. A click on empty
+      // space clears the selection. With the key down it was a miss, and
+      // the selection that the user builds stays.
+      const add = ev.ctrlKey || ev.metaKey || ev.shiftKey;
+      if (!drag.name) { if (!add) clearSelection(); }
+      else if (add) selectPkg(drag.name, true);
+      else pickPkg(drag.name, { source: 'timeline' });
     }
     drag = null;
     wrap.classList.remove('panning');
@@ -544,5 +621,7 @@ on('labels-changed', () => { if (App.view !== 'graph') drawGantt(); });
 on('graph', () => {
   resolveCmp();
   fillCompareRuns();
+  markSelection();  // the graph brought new dependency chains
 });
+on('selection-changed', markSelection);
 on('compare', key => setCompare(key));
