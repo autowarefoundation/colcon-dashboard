@@ -1114,7 +1114,9 @@ body.offline #sysmeters { display: none; }
   padding: 1px 5px;
 }
 
-/* graph search: matches keep their color, the rest fades */
+/* graph search: matches keep their color, the rest fades. The box, its
+   arrows, and the counter stay on one row when the view bar wraps */
+#gsfind { display: inline-flex; align-items: center; gap: 8px; }
 #gsearch {
   font: var(--fs-xs) var(--mono);
   color: var(--ink);
@@ -1126,6 +1128,11 @@ body.offline #sysmeters { display: none; }
 }
 #gsearch:focus { outline: none; border-color: var(--accent); }
 #gscount { font-size: var(--fs-xs); color: var(--muted); min-width: 40px; }
+/* the arrows step through the matches, like the arrows of a log search.
+   They sit before the counter: its text changes from "12 found" to "1/12",
+   and the arrows must not move under the pointer */
+#gsnav { display: inline-flex; gap: 4px; }
+#gsnav button { padding: 2px 5px; }
 /* state chips: filter by state like search filters by name */
 #stateChips { display: inline-flex; gap: 4px; }
 /* filters are toggle buttons with a state dot; on, they look pressed */

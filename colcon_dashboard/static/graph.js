@@ -227,7 +227,9 @@ export function renderGraph() {
   App.edgeList = App.lay.edges.map(([a, b], i) =>
     ({ a, b, idx: i, kind: '', cls: 'edge', hl: false }));
   updateNodes();
-  if (GS.q) runGraphSearch();  // recompute matches for the new node set
+  // recompute the matches for the new node set; the same set keeps the
+  // step position
+  if (GS.q) runGraphSearch(true);
   // the new nodes carry no focus yet: show the selection on them again
   edgeFocus = nodeFocus = null;
   focusSelection();

@@ -103,12 +103,18 @@
     <button data-filter="waiting"><span class="dot c-waiting"></span>Waiting</button>
     <button data-filter="done"><span class="dot c-done"></span>Done</button>
   </span>
-  <span class="searchwrap">
-    <input id="gsearch" type="text" placeholder="Find package" spellcheck="false"
-           title="highlight matching packages; Enter jumps through them">
-    <button id="gsclear" class="sclear" hidden title="clear the search" aria-label="clear the search"><span class="ic" data-icon="close"></span></button>
+  <span id="gsfind">
+    <span class="searchwrap">
+      <input id="gsearch" type="text" placeholder="Find package" spellcheck="false"
+             title="highlight matching packages; Enter jumps through them">
+      <button id="gsclear" class="sclear" hidden title="clear the search" aria-label="clear the search"><span class="ic" data-icon="close"></span></button>
+    </span>
+    <span id="gsnav">
+      <button id="gsprev" title="previous match (Shift+Enter)" aria-label="previous match" disabled><span class="ic" data-icon="up"></span></button>
+      <button id="gsnext" title="next match (Enter)" aria-label="next match" disabled><span class="ic" data-icon="down"></span></button>
+    </span>
+    <span id="gscount"></span>
   </span>
-  <span id="gscount"></span>
   <span id="viewslot"></span>
 </nav>
 
