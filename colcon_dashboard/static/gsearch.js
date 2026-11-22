@@ -37,20 +37,28 @@ export function runGraphSearch(refresh = false) {
       && matches.every((m, i) => m === GS.matches[i])) {
     return;
   }
+  // a refresh with a changed set (a live build moves the states under a
+  // chip) keeps the step position on its package while it still matches
+  const cur = refresh ? GS.matches[GS.idx] : undefined;
   GS.matches = matches;
-  GS.idx = -1;
+  GS.idx = cur === undefined ? -1 : matches.indexOf(cur);
   GS.set = filtering ? new Set(GS.matches) : null;
   requestDraw();  // the graph reads GS.set
   $('#gantt').classList.toggle('searching', filtering);
   for (const bar of $('#gantt').querySelectorAll('.gbar'))
     bar.classList.toggle('smatch', !!GS.set?.has(bar.dataset.name));
-  $('#gscount').textContent = filtering ? `${GS.matches.length} found` : '';
+  $('#gscount').textContent = !filtering ? ''
+    : GS.idx >= 0 ? `${GS.idx + 1}/${GS.matches.length}` : `${GS.matches.length} found`;
+  // the arrows step through matches, so without one they do nothing
+  $('#gsprev').disabled = $('#gsnext').disabled = !GS.matches.length;
 }
 
 export function stepGraphSearch(dir) {
-  if (!GS.matches.length) return;
-  GS.idx = (GS.idx + dir + GS.matches.length) % GS.matches.length;
-  $('#gscount').textContent = `${GS.idx + 1}/${GS.matches.length}`;
+  const n = GS.matches.length;
+  if (!n) return;
+  // before the first step: forward starts at the first match, back at the last
+  GS.idx = GS.idx < 0 ? (dir > 0 ? 0 : n - 1) : (GS.idx + dir + n) % n;
+  $('#gscount').textContent = `${GS.idx + 1}/${n}`;
   zoomToPkg(GS.matches[GS.idx]);
 }
 
@@ -86,6 +94,22 @@ export function initGraphSearch() {
     sync();
     runGraphSearch();
   };
+  // the arrows do what Shift+Enter and Enter do in the box. They also step
+  // through the packages of a state chip while the box is empty.
+  // A mouse click on an arrow puts the keyboard focus in the box, so that
+  // the keys of the box (Enter, Shift+Enter, Ctrl+Enter, Esc) work after
+  // it. Left on the arrow, or on the chip that was clicked before, Enter
+  // would press that button again. A touch leaves the focus alone: in the
+  // box, it would open the screen keyboard. A click from the keyboard
+  // (ev.detail is 0) keeps the focus on its arrow.
+  let byMouse = false;
+  $('#gsnav').addEventListener('pointerdown', ev => { byMouse = ev.pointerType === 'mouse'; });
+  const arrow = dir => ev => {
+    stepGraphSearch(dir);
+    if (ev.detail && byMouse) input.focus({ preventScroll: true });
+  };
+  $('#gsprev').onclick = arrow(-1);
+  $('#gsnext').onclick = arrow(1);
   for (const chip of document.querySelectorAll('#stateChips button')) {
     chip.onclick = () => {
       const states = CHIP_STATES[chip.dataset.filter] || [];
@@ -94,4 +118,8 @@ export function initGraphSearch() {
       runGraphSearch();
     };
   }
+  // a reload can bring back the text of the box, and Firefox also brings
+  // back the enabled state of the arrows: start from what the box holds
+  sync();
+  runGraphSearch();
 }
