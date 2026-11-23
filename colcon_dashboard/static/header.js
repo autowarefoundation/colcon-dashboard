@@ -219,7 +219,9 @@ function timeChange(s) {
 function setSwitchers(s) {
   const ws = s.workspace || '';
   $('#ws .sw-val').textContent = ws.replace(/\/+$/, '').split('/').pop() || ws || '…';
-  $('#ws').title = `${ws}\nClick to switch the workspace`;
+  const remote = s.remote
+    ? `\nRemote: ${s.remote.host}${s.remote.container ? ` / ${s.remote.container}` : ''}` : '';
+  $('#ws').title = `${ws}${remote}\nClick to switch the workspace`;
   const id = s.build_id || '';
   const test = id.startsWith('test_');
   $('#buildid .sw-cap').textContent = `${test ? 'Test run' : 'Build'} · ${PINNED_BUILD ? 'pinned' : 'latest'}`;
@@ -306,7 +308,11 @@ export function applyState(s) {
   updateSysMeters(s.sys);
   $('#workers').textContent = s.workers ? `${s.workers} workers` : '';
   setCommand(s);
-  if (s.active) setBadge('live', 'LIVE');
+  $('#livebadge').title = '';
+  if (s.remote && !s.remote.connected) {
+    setBadge('idle', 'REMOTE OFFLINE');
+    $('#livebadge').title = s.remote.error || 'the remote workspace does not answer';
+  } else if (s.active) setBadge('live', 'LIVE');
   else if (failed) setBadge('failed', 'FAILED');
   else if (done === s.total && s.total > 0) setBadge('complete', 'COMPLETE');
   else setBadge('idle', 'STOPPED');

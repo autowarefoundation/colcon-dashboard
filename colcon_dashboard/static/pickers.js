@@ -48,7 +48,7 @@ export function tildePath(p) {
 }
 
 const parentDir = p => p.slice(0, p.lastIndexOf('/')) || '/';
-const looksLikePath = q => /^[/~]/.test(q);
+const looksLikePath = q => /^[/~]/.test(q) || /^(?:docker\+)?ssh:\/\//.test(q);
 
 function wsRow(w, inGroup) {
   const a = document.createElement('a');
@@ -596,6 +596,9 @@ export async function openBuildPicker(retry) {
   }
   list.innerHTML = '';
   const builds = d.builds || [];
+  const canDelete = d.capabilities?.delete !== false;
+  const canPrune = d.capabilities?.prune !== false;
+  $('#bprune').hidden = !canPrune;
   // what the live view follows: the newest entry can be a test run,
   // and a pinned monitor reports no latest at all
   const latest = d.latest
@@ -657,7 +660,8 @@ export async function openBuildPicker(retry) {
     del.title = "delete this build's logs";
     del.setAttribute('aria-label', `delete the logs of ${b.id}`);
     del.innerHTML = icon('delete');
-    item.append(a, del);
+    if (canDelete) item.append(a, del);
+    else item.append(a);
     del.onclick = async ev => {
       ev.preventDefault();
       ev.stopPropagation();
