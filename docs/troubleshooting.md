@@ -45,6 +45,17 @@ The server does not answer.
 
 Then reload the page.
 
+## A remote workspace does not connect
+
+Run the same target through SSH in a terminal first, for example
+`ssh build-machine`. Accept its host key there and configure key or SSH-agent
+authentication; the dashboard service uses `BatchMode=yes` and cannot ask for
+a password. Make sure `python3 --version` reports 3.8 or newer remotely.
+
+For a `docker+ssh://` workspace, also verify that
+`ssh build-machine docker exec ros2 python3 --version` works, replacing `ros2`
+with the container name from the URI.
+
 ## I cannot find the address of the server
 
 When port 8642 is taken, the server uses another port. To print the address of the running server, run:

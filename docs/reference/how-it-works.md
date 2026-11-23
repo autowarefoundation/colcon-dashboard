@@ -13,8 +13,17 @@ The graph shows direct edges, not the full closure. The server computes the tran
 
 Per-package logs come from `log/<build>/<package>/`. The server serves them incrementally by byte offset, so an open pane costs one small request per second.
 
+For an `ssh://` or `docker+ssh://` workspace, the server keeps one OpenSSH
+connection to a temporary standard-library Python agent. The agent runs from
+memory and exposes read-only, workspace-scoped operations. Package metadata,
+event files, and test results are mirrored into a sparse local cache; large
+package logs stay remote and are read by byte offset. A dropped connection
+reconnects automatically.
+
 ## Limits
 
 - One server per machine, and a lock enforces it. It serves any number of workspaces.
 - A page follows the latest build of its workspace, unless its address pins an older one. Finished builds stay readable until their logs get deleted.
 - The server trusts the local workspace. Do not expose the port to an untrusted network.
+- Remote workspaces require non-interactive OpenSSH authentication and Python
+  3.8 or newer on the target. They are read-only.
