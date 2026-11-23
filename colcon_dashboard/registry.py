@@ -19,6 +19,8 @@ from . import __version__, browser, notify
 from .config import CONFIG
 from .events import BUILD_DIR_RE, parse_build_id_time, run_start_time
 from .monitor import BuildMonitor
+from .remote import (RemoteBuildMonitor, canonical_workspace,
+                     parse_remote_workspace)
 
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache",
                          "colcon-dashboard")
@@ -124,11 +126,13 @@ class Registry:
         return out
 
     def monitor(self, ws, build=None, touch=True):
+        remote = None
         try:
-            ws = os.path.realpath(os.path.expanduser(ws))
-        except (OSError, ValueError):
+            remote = parse_remote_workspace(ws)
+            ws = remote.uri if remote else canonical_workspace(ws)
+        except (OSError, ValueError, TypeError):
             return None
-        if not os.path.isdir(ws):
+        if remote is None and not os.path.isdir(ws):
             return None
         if build and not BUILD_DIR_RE.fullmatch(build):
             return None
@@ -137,7 +141,9 @@ class Registry:
             self._stop_idle_pinned()
             mon = self.monitors.get(key)
             if mon is None:
-                mon = BuildMonitor(ws, self.log_base, pin_build=build)
+                mon = (RemoteBuildMonitor(remote, self.log_base, pin_build=build)
+                       if remote else
+                       BuildMonitor(ws, self.log_base, pin_build=build))
                 if build is None:
                     mon.on_prune = (lambda deleted, ws=ws:
                                     self._auto_pruned(ws, deleted))
@@ -159,7 +165,7 @@ class Registry:
         for key, mon in list(self.monitors.items()):
             if key[1] is not None and now - mon.last_request > self.PINNED_IDLE:
                 del self.monitors[key]
-                mon.stopped = True
+                mon.stop()
 
     def _auto_pruned(self, ws, deleted):
         """After a monitor auto-prunes: mirror the manual-prune cleanup."""
@@ -171,7 +177,7 @@ class Registry:
         with self.lock:
             mon = self.monitors.pop((ws, build), None)
         if mon is not None:
-            mon.stopped = True  # its scan thread ends on the next tick
+            mon.stop()  # its scan thread ends on the next tick
         return mon is not None
 
     # -- desktop notifications from the server ----------------------------
@@ -212,7 +218,8 @@ class Registry:
         """Watch every recent workspace, also with no page open: auto-prune,
         the [notify] command, and the desktop notifications need it."""
         for entry in list(self.recents):
-            if os.path.isdir(entry.get("path", "")):
+            path = entry.get("path", "")
+            if parse_remote_workspace(path) or os.path.isdir(path):
                 self.monitor(entry["path"], touch=False)
 
     def _build_event(self, ws, kind, data):
@@ -261,8 +268,9 @@ class Registry:
                 return True
             if not w["build_id"]:
                 continue
-            log = os.path.join(w["path"], self.log_base, w["build_id"],
-                               "events.log")
+            if parse_remote_workspace(w["path"]):
+                continue
+            log = os.path.join(w["path"], self.log_base, w["build_id"], "events.log")
             try:
                 if now - os.stat(log).st_mtime < grace:
                     return True
@@ -295,7 +303,8 @@ class Registry:
         with self.lock:
             recents = list(self.recents)
         for entry in recents:
-            if os.path.isdir(entry.get("path", "")):
+            path = entry.get("path", "")
+            if parse_remote_workspace(path) or os.path.isdir(path):
                 return entry["path"]
         return None
 
@@ -305,10 +314,16 @@ class Registry:
             monitors = dict(self.monitors)
         out = []
         for r in recents:
+            remote = parse_remote_workspace(r["path"])
             entry = {"path": r["path"], "last_used": r.get("last_used"),
                      "fav": bool(r.get("fav")),
-                     "exists": os.path.isdir(r["path"])}
-            if entry["exists"]:
+                     "exists": True if remote else os.path.isdir(r["path"])}
+            if remote:
+                entry["remote"] = {
+                    "scheme": remote.scheme, "host": remote.host,
+                    "container": remote.container, "path": remote.path,
+                }
+            elif entry["exists"]:
                 entry.update(self.stats(r["path"]))
             mon = monitors.get((r["path"], None))
             if mon is not None:

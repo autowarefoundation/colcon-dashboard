@@ -87,6 +87,8 @@ def prune_builds(log_dir, keep, protect=(), failed=None):
 class BuildMonitor:
     def __init__(self, workspace, log_base="log", pin_build=None):
         self.workspace = os.path.realpath(workspace)
+        self.workspace_id = self.workspace
+        self.workspace_name = os.path.basename(self.workspace.rstrip(os.sep))
         self.log_base = os.path.join(self.workspace, log_base)
         self.pin_build = pin_build  # a fixed historical build, or None
         self.index = PackageIndex(self.workspace)
@@ -318,7 +320,8 @@ class BuildMonitor:
         summary = f"{done} of {total} packages in " + (f"{mins}m {secs}s" if mins else f"{secs}s")
         if failed:
             summary += f", {failed} failed"
-        values = {"workspace": self.workspace, "name": os.path.basename(self.workspace),
+        values = {"workspace": self.workspace_id,
+                  "name": self.workspace_name,
                   "build": build_id, "outcome": outcome, "summary": summary,
                   "failed": str(failed)}
         try:
@@ -594,7 +597,7 @@ class BuildMonitor:
             with self.lock:
                 self.state_json = json.dumps(
                     {"error": "no colcon build logs found under "
-                              f"{self.log_base}", "workspace": self.workspace,
+                              f"{self.log_base}", "workspace": self.workspace_id,
                      "sys": self.sample_system(), "seq": self.seq})
             return
         build_id = os.path.basename(build_dir)
@@ -727,7 +730,7 @@ class BuildMonitor:
             self._pkg_cached = (packages, counts)
 
         state = {
-            "workspace": self.workspace,
+            "workspace": self.workspace_id,
             "build_id": build_id,
             "active": bool(active),
             "workers": (self.namespace or {}).get("parallel_workers"),
@@ -825,6 +828,9 @@ class BuildMonitor:
             # scan fast while someone watches, slow down when nobody does
             watched = time.time() - self.last_request < 15
             time.sleep(0.8 if watched else 4.0)
+
+    def stop(self):
+        self.stopped = True
 
     # -- log serving ---------------------------------------------------------
 
