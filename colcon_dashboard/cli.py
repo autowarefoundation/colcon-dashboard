@@ -35,6 +35,7 @@ from urllib.parse import quote
 from . import __version__
 from .config import CONFIG, write_template
 from .monitor import prune_builds
+from .remote import canonical_workspace, parse_remote_workspace
 from .registry import (CACHE_DIR, GLOBAL_PORT, Registry, SERVER_FILE,
                        auto_restart_on, watch_upgrade)
 from .service import (SERVICE, reload_if_unseen, sync_menu_entry, systemctl, unit_known,
@@ -139,7 +140,14 @@ def fmt_bytes(n):
 
 
 def resolve_workspace(arg):
-    workspace = os.path.realpath(arg or ".")
+    value = arg or "."
+    try:
+        remote = parse_remote_workspace(value)
+    except ValueError as exc:
+        raise SystemExit(f"invalid remote workspace: {exc}") from exc
+    if remote:
+        return remote.uri
+    workspace = canonical_workspace(value)
     if not os.path.isdir(workspace):
         raise SystemExit(f"not a directory: {workspace}")
     return workspace
@@ -285,6 +293,8 @@ def show_status(info, workspace):
 
 
 def prune_cmd(info, alive, workspace, keep, log_base):
+    if parse_remote_workspace(workspace):
+        raise SystemExit("remote workspaces are read-only; prune is unavailable")
     keep = max(1, keep)
     if alive:
         # use the API only when the server confirms it watches the same

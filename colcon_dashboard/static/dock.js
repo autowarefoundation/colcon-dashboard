@@ -82,17 +82,18 @@ export const FILE_LINE_RE =
 // a path from a log, on this machine: relative to the workspace, or
 // /ws/src/a.cpp from a container that has the workspace at /ws
 function hostPath(p) {
-  if (!p.startsWith('/')) return `${App.workspace}/${p}`;
+  const workspace = App.remote?.path || App.workspace;
+  if (!p.startsWith('/')) return `${workspace}/${p}`;
   const root = App.runRoot;
   if (root && (p === root || p.startsWith(root + '/')))
-    return App.workspace + p.slice(root.length);
+    return workspace + p.slice(root.length);
   return p;
 }
 
 // node: the text part of a log line (.lc)
 export function linkifyLine(node) {
   const tmpl = App.cfg?.editor_url;
-  if (!tmpl || !node) return;
+  if (!tmpl || !node || App.capabilities.editor === false) return;
   if (node.nodeType !== 3 && node.querySelector?.('.elink')) return;
   const m = FILE_LINE_RE.exec(node.textContent);
   if (!m) return;
@@ -407,7 +408,8 @@ export function updateSearchCount(p) {
 export function pkgAbsPath(name) {
   const rel = App.graph?.[name]?.path;
   if (!rel) return null;
-  return rel.startsWith('/') ? rel : `${App.workspace}/${rel}`;
+  const workspace = App.remote?.path || App.workspace;
+  return rel.startsWith('/') ? rel : `${workspace}/${rel}`;
 }
 
 export function activatePane(name) {

@@ -9,6 +9,8 @@ export const App = {
   active: false,
   total: 0,
   workspace: '',        // absolute path, from /api/state
+  remote: null,         // remote target metadata, or null for a local workspace
+  capabilities: {},     // optional workspace operations supported by the server
   runRoot: '',          // where colcon ran, when not here: /ws in a container
   cfg: null,            // /api/config: version, editor_url
   scope: 'build',       // 'build' | 'all'

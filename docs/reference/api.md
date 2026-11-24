@@ -7,7 +7,9 @@ description: >-
 
 # HTTP API
 
-Workspace endpoints take a `ws=<path>` query parameter. Add `build=<build id>` to read an older build.
+Workspace endpoints take a `ws=<path-or-remote-URI>` query parameter. Add
+`build=<build id>` to read an older build. Remote state includes its SSH target
+and a `capabilities` object; remote build lists carry the mutation capabilities.
 
 The server refuses requests that a web page on another site sends. It answers `403` in these cases:
 
@@ -28,8 +30,8 @@ Every answer carries the `X-Dashboard-Version` header with the version of the se
 | `/api/scan-home/set?value=` (POST) | Saves the `scan_home` answer (`yes` or `no`) in config.ini. If the server cannot save it in the file, `saved` is false and the answer applies until the server restarts |
 | `/api/register?ws=` (POST) | Registers a workspace, like opening it in the page |
 | `/api/favorite?ws=&fav=1` (POST) | Pins or unpins a workspace |
-| `/api/builds/delete?ws=&build=` (POST) | Deletes the logs of one build |
-| `/api/builds/prune?ws=&keep=3` (POST) | Deletes all but the newest runs of each kind |
+| `/api/builds/delete?ws=&build=` (POST) | Deletes the logs of one local build; remote workspaces return a read-only error |
+| `/api/builds/prune?ws=&keep=3` (POST) | Deletes all but the newest local runs of each kind; remote workspaces return a read-only error |
 | `/api/state?ws=` | Job states, counts, timings, build metadata |
 | `/api/graph?ws=` | Direct dependency edges for the graph views |
 | `/api/builds?ws=` | The `build_*` and `test_*` runs under the log base, plus the latest and pinned ids |

@@ -9,7 +9,7 @@ description: >-
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `workspace` | | Workspace to register and print the page URL for (optional) |
+| `workspace` | | Local workspace path, `ssh://host/absolute/path`, or `docker+ssh://host/container/absolute/path` to register and print the page URL for (optional) |
 | `--open` | | Open the page in the browser, after the server starts or the workspace registers |
 | `--port` | `8642` | HTTP port. The default falls back to a free port when taken, and the server prints that port. A running server keeps its port: the command says so |
 | `--host` | `127.0.0.1` | Bind address. Use `0.0.0.0` to reach the page from another machine |
@@ -17,7 +17,7 @@ description: >-
 | `--version` | | Print the version |
 | `--status` | | Print the build status of the workspace and exit |
 | `--list` | | List the known workspaces and their URLs |
-| `--prune` | | Delete all but the newest runs of each kind (build, test) |
+| `--prune` | | Delete all but the newest runs of each kind (build, test); unavailable for read-only remote workspaces |
 | `--keep` | `3` | How many runs of each kind `--prune` keeps. Works only with `--prune` |
 | `--stop` | | Stop the server |
 | `--install-service` | | Install and start the systemd user service. It prints the Python that the service runs. It stops with a hint when systemd user services do not work, as in most containers |

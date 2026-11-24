@@ -28,6 +28,7 @@ A long `colcon build` prints a wall of text. You cannot see what builds now, wha
 - **Nothing changes in how you build.** The dashboard reads the logs that colcon already writes into `log/`. Every build shows up: from any terminal, with any options.
 - **No dependencies.** The server is plain Python 3.8 or newer, with only the standard library.
 - **One address for every workspace.** One server on `localhost:8642` serves all your workspaces, from a small package set to a 500-package Autoware build.
+- **Remote workspaces.** Read a host or Docker workspace through SSH without installing the dashboard on the remote machine.
 
 ## What you get
 

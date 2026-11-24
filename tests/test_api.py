@@ -294,6 +294,15 @@ class ApiTest(unittest.TestCase):
                           + "&build=../../etc")
         self.assertEqual(st, 400)
 
+    def test_remote_workspaces_are_read_only(self):
+        remote = urllib.parse.quote(
+            "ssh://payload/home/q/ros2ws", safe="")
+        st, result = self.post(
+            "/api/builds/prune?ws=" + remote + "&keep=3")
+        self.assertEqual(st, 400)
+        self.assertFalse(result["ok"])
+        self.assertIn("read-only", result["error"])
+
     def use_tmp_config(self):
         saved = (CONFIG.path, CONFIG.exists, CONFIG.extra_roots,
                  CONFIG.scan_home)

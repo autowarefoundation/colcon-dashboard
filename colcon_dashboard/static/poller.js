@@ -57,7 +57,9 @@ export async function pollState() {
     return false;
   }
   // only "there is no build" errors: "scanning..." comes first on every load
-  $('#vizEmpty').hidden = s.nows || !/^no (colcon build logs|events\.log)/.test(s.error || '');
+  const visibleError = /^(?:no (?:colcon build logs|events\.log)|remote workspace:)/
+    .test(s.error || '');
+  $('#vizEmpty').hidden = s.nows || !visibleError;
   if (s.nows) {
     setBadge('idle', 'PICK A WORKSPACE');
     // write into the switchers' value lines: header.js fills their parts
@@ -78,6 +80,8 @@ export async function pollState() {
   }
   // set before build-changed: its handlers open panes that render paths
   App.workspace = s.workspace || App.workspace;
+  App.remote = s.remote || null;
+  App.capabilities = s.capabilities || {};
   App.runRoot = s.run_root || '';
   if (s.build_id !== App.buildId) {
     const first = App.buildId === null;

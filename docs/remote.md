@@ -1,15 +1,60 @@
 ---
 icon: lucide/server
 description: >-
-  Watch a build on another machine: an SSH tunnel, VS Code Remote-SSH, a
-  service that keeps running after you log out, and editor links over SSH.
+  Watch a build on another machine directly over SSH, or reach a dashboard
+  that runs there through an SSH tunnel.
 ---
 
 # Remote machine
 
-The dashboard runs on the machine that builds. You can open its page from another machine.
+Colcon Dashboard can read a remote workspace over SSH without an installation
+on the remote machine. It can also run on the build machine and serve its page
+through an SSH tunnel.
+
+## Read a workspace over SSH
+
+Pass an SSH workspace URI on the machine where the dashboard is installed:
+
+```bash
+colcon-dashboard ssh://build-machine/home/me/ros2_ws --open
+```
+
+The same URI works in the workspace picker. Add the SSH user or port when they
+are not in `~/.ssh/config`:
+
+```bash
+colcon-dashboard ssh://me@build-machine:2222/home/me/ros2_ws --open
+```
+
+For a workspace that exists only inside a Docker container on the remote
+machine, put the container name before its absolute workspace path:
+
+```bash
+colcon-dashboard docker+ssh://build-machine/ros2/home/q/ros2ws --open
+```
+
+The local dashboard starts a temporary Python agent through `ssh`, reads build
+events and logs by offset, and stops the agent with the SSH connection. It does
+not install or write anything on the remote machine.
+
+Requirements:
+
+- `ssh build-machine` must work non-interactively through keys or an SSH agent,
+  and the host key must already be trusted. The background service never asks
+  for a password or host-key confirmation.
+- The remote host, or the selected container, needs Python 3.8 or newer.
+- A container target requires permission to run `docker exec` on the remote
+  host.
+
+Remote workspaces are read-only. The dashboard shows live state, package logs,
+the graph, test results, history, and the remote machine's system meters. Log
+deletion, automatic pruning, AI analysis, and editor links are unavailable.
+Remote workspaces must be opened by their explicit URI; the picker does not
+scan remote hosts.
 
 ## Use an SSH tunnel
+
+Use this mode when Colcon Dashboard is installed on the build machine.
 
 An SSH tunnel is the safe way. The server keeps its default bind address, `127.0.0.1`, so nobody else on the network reaches it.
 

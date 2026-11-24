@@ -16,6 +16,7 @@ from .ai import CLAUDE_BIN
 from .config import CONFIG, save_extra_roots, save_scan_home
 from .events import BUILD_DIR_RE
 from .monitor import prune_builds, remove_build_dir
+from .remote import canonical_workspace, parse_remote_workspace
 from .registry import (check_update, discover_all, install_source, update_check_on,
                        update_info, update_status)
 
@@ -228,14 +229,17 @@ class Handler(BaseHTTPRequestHandler):
             if mon is None:
                 return self._send(400, json.dumps({"error": "not a directory"}))
             return self._send(200, json.dumps(
-                {"ok": True, "workspace": mon.workspace}))
+                {"ok": True, "workspace": mon.workspace_id}))
         if path == "/api/favorite":
             ws = q.get("ws", [None])[0]
             if not ws:
                 return self._send(400, json.dumps({"error": "no workspace"}))
             fav = q.get("fav", ["1"])[0] not in ("0", "false")
-            self.registry.set_favorite(
-                os.path.realpath(os.path.expanduser(ws)), fav)
+            try:
+                ws = canonical_workspace(ws)
+            except ValueError:
+                return self._send(400, json.dumps({"error": "bad workspace"}))
+            self.registry.set_favorite(ws, fav)
             return self._send(200, json.dumps({"ok": True}))
         if path == "/api/scan-roots/set":
             return self._set_scan_roots(q)
@@ -327,6 +331,9 @@ class Handler(BaseHTTPRequestHandler):
         ws = q.get("ws", [None])[0]
         if not ws:
             return self._send(400, json.dumps({"error": "no workspace"}))
+        if parse_remote_workspace(ws):
+            return self._send(400, json.dumps(
+                {"ok": False, "error": "remote workspaces are read-only"}))
         ws = os.path.realpath(os.path.expanduser(ws))
         log_dir = os.path.realpath(os.path.join(ws, self.registry.log_base))
         if not os.path.isdir(log_dir):
@@ -400,6 +407,7 @@ class Handler(BaseHTTPRequestHandler):
                 "version": __version__,
                 "editor_url": CONFIG.editor_url,
                 "log_base": self.registry.log_base,
+                "remote_workspaces": True,
                 "install": install_source(),
                 "config": {
                     "path": CONFIG.path,
