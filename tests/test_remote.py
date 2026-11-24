@@ -123,6 +123,24 @@ class RemoteMonitor(unittest.TestCase):
             "demo", "combined", tail["offset"])
         self.assertEqual(continued["data"], "")
 
+    def test_container_base_paths_are_mapped_individually(self):
+        for path, name in (("src/core/a", "a"),
+                           ("src/extra/b", "b"),
+                           ("tools/c", "c")):
+            package = os.path.join(self.ws, path)
+            os.makedirs(package)
+            with open(os.path.join(package, "package.xml"), "w") as f:
+                f.write(f"""<package><name>{name}</name><version>0.0.0</version>
+<description>{name}</description><maintainer email="a@b">a</maintainer>
+<license>Apache-2.0</license></package>""")
+
+        self.monitor.mirror.sync_packages(["/container/src/core", "/container/tools"])
+        package_paths = []
+        for dirpath, _dirs, files in os.walk(self.monitor.mirror.root):
+            if "package.xml" in files:
+                package_paths.append(os.path.relpath(dirpath, self.monitor.mirror.root))
+        self.assertEqual(set(package_paths), {"src/core/a", "tools/c"})
+
     def test_appended_events_are_followed(self):
         self.monitor.scan_once()
         with open(os.path.join(self.build, "events.log"), "ab") as f:
